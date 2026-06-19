@@ -55,8 +55,6 @@ services:
       DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
       REDIS_URL: redis://redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
-      WORKER_NAME: default
-      WORKER_HEARTBEAT_STALE_AFTER_MS: 30000
     ports:
       - "3000:3000"
     volumes:
@@ -70,22 +68,6 @@ services:
         condition: service_healthy
       meilisearch:
         condition: service_started
-
-  worker:
-    image: oven/bun:1.2
-    working_dir: /workspace
-    command: sh -lc "bun install --frozen-lockfile && cd packages/api && bun run worker"
-    environment:
-      DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
-      WORKER_NAME: default
-      WORKER_HEARTBEAT_INTERVAL_MS: 10000
-    volumes:
-      - .:/workspace
-      - worker-node-modules:/workspace/node_modules
-      - bun-install-cache:/root/.bun/install/cache
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   web:
     image: oven/bun:1.2
@@ -108,5 +90,4 @@ volumes:
   minio-data:
   bun-install-cache:
   api-node-modules:
-  worker-node-modules:
   web-node-modules:

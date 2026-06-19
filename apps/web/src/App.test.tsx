@@ -35,7 +35,6 @@ describe("App", () => {
           services: {
             database: "ok",
             queue: "ok",
-            worker: "ok",
             search: "ok"
           },
           checkedAt: "2026-06-19T12:00:00.000Z"

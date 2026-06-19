@@ -185,8 +185,8 @@ const HealthSummary = ({
         {health.status === "ok" ? "Healthy" : "Degraded"}
       </span>
       <small className="text-xs text-[#858b9a]">
-        DB {health.services.database} · Queue {health.services.queue} · Worker{" "}
-        {health.services.worker} · Search {health.services.search}
+        DB {health.services.database} · Queue {health.services.queue} · Search{" "}
+        {health.services.search}
       </small>
     </div>
   );

@@ -10,9 +10,7 @@ const clients = createRuntimeClients({
 });
 
 const app = createApp({
-  dependencies: clients,
-  workerName: config.workerName,
-  workerHeartbeatStaleAfterMs: config.workerHeartbeatStaleAfterMs
+  dependencies: clients
 });
 
 Bun.serve({

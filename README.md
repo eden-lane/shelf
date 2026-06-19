@@ -1,6 +1,6 @@
 # Bookmarks
 
-A self-hosted bookmarks app, currently bootstrapped as a runnable product shell with API health checks, local services, and a worker heartbeat.
+A self-hosted bookmarks app, currently bootstrapped as a runnable product shell with API health checks and local services.
 
 ## Local startup
 
@@ -25,7 +25,6 @@ The Compose stack starts:
 
 - React/Vite web app
 - Hono/Bun API
-- Bun background worker
 - Postgres
 - Redis queue backend
 - Meilisearch search service
@@ -50,11 +49,17 @@ bun test
 bun run typecheck
 ```
 
+Manage database schema changes with Drizzle:
+
+```sh
+bun run db:generate
+bun run db:migrate
+```
+
 Run services outside Docker when you already have dependencies available:
 
 ```sh
 bun run dev:api
-bun run dev:worker
 bun run dev:web
 ```
 

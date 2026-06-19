@@ -1,20 +1,13 @@
 import Redis from "ioredis";
 import pg from "pg";
+import { createDatabase, type Database } from "./db";
 import type {
   DatabaseHealthClient,
   QueueHealthClient,
-  SearchHealthClient,
-  WorkerHeartbeatStore
+  SearchHealthClient
 } from "./health";
 
 const { Pool } = pg;
-
-export const workerHeartbeatTableSql = `
-  create table if not exists worker_heartbeats (
-    worker_name text primary key,
-    checked_at timestamptz not null default now()
-  )
-`;
 
 export class PostgresDatabaseHealthClient implements DatabaseHealthClient {
   constructor(private readonly pool: pg.Pool) {}
@@ -51,44 +44,13 @@ export class MeilisearchHealthClient implements SearchHealthClient {
   }
 }
 
-export class PostgresWorkerHeartbeatStore implements WorkerHeartbeatStore {
-  constructor(private readonly pool: pg.Pool) {}
-
-  async ensureSchema(): Promise<void> {
-    await this.pool.query(workerHeartbeatTableSql);
-  }
-
-  async getLastHeartbeat(workerName: string): Promise<Date | null> {
-    await this.ensureSchema();
-    const result = await this.pool.query<{ checked_at: Date }>(
-      "select checked_at from worker_heartbeats where worker_name = $1",
-      [workerName]
-    );
-
-    return result.rows[0]?.checked_at ?? null;
-  }
-
-  async writeHeartbeat(workerName: string): Promise<void> {
-    await this.ensureSchema();
-    await this.pool.query(
-      `
-        insert into worker_heartbeats (worker_name, checked_at)
-        values ($1, now())
-        on conflict (worker_name)
-        do update set checked_at = excluded.checked_at
-      `,
-      [workerName]
-    );
-  }
-}
-
 export interface RuntimeClients {
   pool: pg.Pool;
+  db: Database;
   redis: Redis;
   database: PostgresDatabaseHealthClient;
   queue: RedisQueueHealthClient;
   search: MeilisearchHealthClient;
-  worker: PostgresWorkerHeartbeatStore;
   close(): Promise<void>;
 }
 
@@ -98,15 +60,16 @@ export const createRuntimeClients = (options: {
   meilisearchUrl: string;
 }): RuntimeClients => {
   const pool = new Pool({ connectionString: options.databaseUrl });
+  const db = createDatabase(pool);
   const redis = new Redis(options.redisUrl, { lazyConnect: true });
 
   return {
     pool,
+    db,
     redis,
     database: new PostgresDatabaseHealthClient(pool),
     queue: new RedisQueueHealthClient(redis),
     search: new MeilisearchHealthClient(options.meilisearchUrl),
-    worker: new PostgresWorkerHeartbeatStore(pool),
     async close() {
       await Promise.allSettled([pool.end(), redis.quit()]);
     }

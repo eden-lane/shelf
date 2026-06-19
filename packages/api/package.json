@@ -8,13 +8,13 @@
   },
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "worker": "bun src/worker.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@bookmarks/shared": "workspace:*",
     "@orpc/server": "latest",
+    "drizzle-orm": "latest",
     "hono": "latest",
     "ioredis": "latest",
     "pg": "latest"
