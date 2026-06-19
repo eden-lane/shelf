@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "rootDir": "../..",
+    "outDir": "dist",
+    "types": ["bun", "happy-dom"]
+  },
+  "include": ["src", "vite.config.ts", "../../packages/shared/src"]
+}

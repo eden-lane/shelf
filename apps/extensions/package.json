@@ -1,0 +1,12 @@
+{
+  "name": "@bookmarks/extensions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "wxt": "latest"
+  }
+}

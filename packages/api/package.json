@@ -1,0 +1,26 @@
+{
+  "name": "@bookmarks/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./rpc": "./src/rpc.ts"
+  },
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "worker": "bun src/worker.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bookmarks/shared": "workspace:*",
+    "@orpc/server": "latest",
+    "hono": "latest",
+    "ioredis": "latest",
+    "pg": "latest"
+  },
+  "devDependencies": {
+    "@types/pg": "latest",
+    "typescript": "latest"
+  }
+}

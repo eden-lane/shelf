@@ -1,0 +1,112 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: bookmarks
+      POSTGRES_PASSWORD: bookmarks
+      POSTGRES_DB: bookmarks
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookmarks -d bookmarks"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.14
+    environment:
+      MEILI_ENV: development
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili-data:/meili_data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: bookmarks
+      MINIO_ROOT_PASSWORD: bookmarks-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  api:
+    image: oven/bun:1.2
+    working_dir: /workspace
+    command: sh -lc "bun install --frozen-lockfile && cd packages/api && bun run dev"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
+      REDIS_URL: redis://redis:6379
+      MEILISEARCH_URL: http://meilisearch:7700
+      WORKER_NAME: default
+      WORKER_HEARTBEAT_STALE_AFTER_MS: 30000
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace
+      - api-node-modules:/workspace/node_modules
+      - bun-install-cache:/root/.bun/install/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+
+  worker:
+    image: oven/bun:1.2
+    working_dir: /workspace
+    command: sh -lc "bun install --frozen-lockfile && cd packages/api && bun run worker"
+    environment:
+      DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
+      WORKER_NAME: default
+      WORKER_HEARTBEAT_INTERVAL_MS: 10000
+    volumes:
+      - .:/workspace
+      - worker-node-modules:/workspace/node_modules
+      - bun-install-cache:/root/.bun/install/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: oven/bun:1.2
+    working_dir: /workspace
+    command: sh -lc "bun install --frozen-lockfile && cd apps/web && bun run dev --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+      - web-node-modules:/workspace/node_modules
+      - bun-install-cache:/root/.bun/install/cache
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  meili-data:
+  minio-data:
+  bun-install-cache:
+  api-node-modules:
+  worker-node-modules:
+  web-node-modules:

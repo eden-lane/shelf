@@ -1,0 +1,20 @@
+{
+  "name": "bookmarks",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "cd packages/api && bun run dev",
+    "dev:worker": "cd packages/api && bun run worker",
+    "dev:web": "cd apps/web && bun run dev",
+    "test": "bun test packages/api/src apps/web/src",
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/api/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "latest"
+  }
+}

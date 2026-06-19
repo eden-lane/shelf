@@ -1,0 +1,27 @@
+{
+  "name": "@bookmarks/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bookmarks/shared": "workspace:*",
+    "@tanstack/react-query": "latest",
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "@testing-library/react": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "happy-dom": "latest",
+    "typescript": "latest"
+  }
+}
