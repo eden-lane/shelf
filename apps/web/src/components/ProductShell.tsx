@@ -48,13 +48,13 @@ export const ProductShell = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 font-sans text-slate-950 md:h-screen md:overflow-hidden">
+    <main className="min-h-screen bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-30 w-[min(300px,calc(100vw-48px))] overflow-hidden bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:z-20 md:w-[300px]",
+          "fixed inset-y-0 left-0 z-30 w-[min(300px,calc(100vw-48px))] overflow-hidden bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:static md:h-screen md:w-[300px] md:shrink-0",
           isSidebarVisible
             ? "translate-x-0 border-r border-gray-200 opacity-100 shadow-[16px_0_44px_rgb(15_23_42_/_0.14)] md:shadow-none"
-            : "pointer-events-none -translate-x-full border-r-0 opacity-0"
+            : "pointer-events-none -translate-x-full border-r-0 opacity-0 md:hidden"
         ].join(" ")}
         aria-label="Primary"
         aria-hidden={!isSidebarVisible}
@@ -74,7 +74,7 @@ export const ProductShell = () => {
       </aside>
 
       <section
-        className="flex min-w-0 flex-col gap-5 p-5 md:h-screen md:overflow-y-auto md:p-7"
+        className="flex min-w-0 flex-col gap-5 p-5 md:h-screen md:flex-1 md:overflow-y-auto md:p-7"
         aria-label="Items workspace"
       >
         <header className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
