@@ -14,14 +14,13 @@ import {
   type BookmarkCursor,
   type BookmarksStore
 } from "./bookmarks";
-import { getCurrentUserResponse } from "./currentUser";
-import type { DevIdentity } from "./identity";
+import { getCurrentUserResponse, type CurrentIdentity } from "./currentUser";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
 
 export interface RpcRouterOptions {
   dependencies: HealthDependencies;
-  currentUser?: DevIdentity;
+  currentUser?: CurrentIdentity;
   bookmarksStore?: BookmarksStore;
   bookmarkEnrichmentQueue?: BookmarkEnrichmentQueue;
 }
@@ -66,6 +65,9 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       const targetFolder = bookmark.folderId
         ? folders.find((folder) => folder.id === bookmark.folderId)
         : null;
+      const personalLibrary = options.currentUser.libraries.find(
+        (library) => library.kind === "personal"
+      );
 
       if (bookmark.folderId && !targetFolder) {
         throw new ORPCError("BAD_REQUEST", {
@@ -73,9 +75,21 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      const targetFolderId = targetFolder?.id ?? options.currentUser.personalInboxFolderId;
-      const targetLibraryId = targetFolder?.libraryId ?? options.currentUser.personalLibraryId;
+      if (!targetFolder && !personalLibrary) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Personal library is not configured"
+        });
+      }
+
+      const targetFolderId = targetFolder?.id ?? null;
+      const targetLibraryId = targetFolder?.libraryId ?? personalLibrary?.id;
       const selectedTagIds = bookmark.tagIds;
+
+      if (!targetLibraryId) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Target library is not configured"
+        });
+      }
 
       if (selectedTagIds && selectedTagIds.length > 0) {
         const tags = await options.bookmarksStore.listTags({ libraryIds: [targetLibraryId] });
@@ -89,7 +103,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       }
 
       const createdBookmark = await options.bookmarksStore.createBookmark({
-        createdByUserId: options.currentUser.userId,
+        createdByUserId: options.currentUser.user.id,
         folderId: targetFolderId,
         libraryId: targetLibraryId,
         tagIds: selectedTagIds,
@@ -244,7 +258,7 @@ export type RpcRouter = ReturnType<typeof createRpcRouter>;
 
 const parseBookmarksInput = (
   input: unknown
-): { limit: number; cursor?: BookmarkCursor; folderId?: string } | null => {
+): { limit: number; cursor?: BookmarkCursor; folderId?: string; inbox?: boolean } | null => {
   if (!isRecord(input)) {
     return {
       limit: parseBookmarksLimit(null)
@@ -261,6 +275,7 @@ const parseBookmarksInput = (
   return {
     cursor: cursor ?? undefined,
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
+    inbox: input.inbox === true,
     limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null)
   };
 };
@@ -426,12 +441,12 @@ const parseSelectedTagIds = (value: unknown): string[] | undefined => {
   return [...tagIds].slice(0, 50);
 };
 
-const currentUserLibraryIds = (currentUser: DevIdentity) => [
-  currentUser.personalLibraryId,
-  currentUser.organizationLibraryId
-];
+const currentUserLibraryIds = (currentUser: CurrentIdentity) =>
+  currentUser.libraries.map((library) => library.id);
 
-function assertCurrentUser(currentUser: DevIdentity | undefined): asserts currentUser is DevIdentity {
+function assertCurrentUser(
+  currentUser: CurrentIdentity | undefined
+): asserts currentUser is CurrentIdentity {
   if (!currentUser) {
     throw new ORPCError("UNAUTHORIZED", {
       message: "No current user is configured"

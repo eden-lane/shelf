@@ -9,7 +9,6 @@ interface CurrentUserResponse {
     id: string;
     kind: "personal" | "organization";
     name: string;
-    inboxFolderId: string;
   }>;
 }
 

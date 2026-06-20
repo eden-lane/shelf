@@ -76,7 +76,7 @@ export const insertBookmarkIntoPages = (
   };
 };
 
-export const bookmarkQueryKeysForFolder = (folderId: string): Array<["bookmarks", string | null]> => [
-  ["bookmarks", null],
-  ["bookmarks", folderId]
-];
+export const bookmarkQueryKeysForFolder = (
+  folderId: string | null
+): Array<["bookmarks", string | null]> =>
+  folderId ? [["bookmarks", folderId]] : [["bookmarks", null]];

@@ -1,5 +1,5 @@
 import type { BookmarksPageResponse } from "@bookmarks/shared";
-import { and, desc, eq, inArray, lt, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, type SQL } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
 import { bookmarkSelectFields, serializeBookmark } from "./bookmarkRows";
@@ -18,6 +18,8 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
 
   if (input.folderId) {
     filters.push(eq(schema.savedItems.folderId, input.folderId));
+  } else if (input.inbox) {
+    filters.push(isNull(schema.savedItems.folderId));
   }
 
   if (input.cursor) {
@@ -35,7 +37,7 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
   const rows = await db
     .select(bookmarkSelectFields)
     .from(schema.savedItems)
-    .innerJoin(
+    .leftJoin(
       schema.folders,
       and(
         eq(schema.savedItems.folderId, schema.folders.id),

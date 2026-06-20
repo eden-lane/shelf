@@ -38,8 +38,8 @@ describe("App", () => {
       {
         id: "00000000-0000-4000-8000-000000000010",
         libraryId: "00000000-0000-4000-8000-000000000003",
-        folderId: "00000000-0000-4000-8000-000000000005",
-        folderName: "Inbox",
+        folderId: null,
+        folderName: null,
         url: "https://example.com/article",
         title: "Example Article",
         description: "A saved bookmark from the API.",
@@ -55,8 +55,8 @@ describe("App", () => {
       {
         id: "00000000-0000-4000-8000-000000000012",
         libraryId: "00000000-0000-4000-8000-000000000003",
-        folderId: "00000000-0000-4000-8000-000000000005",
-        folderName: "Inbox",
+        folderId: null,
+        folderName: null,
         url: "https://plain.example/post",
         title: "Plain Bookmark",
         description: null,
@@ -75,10 +75,10 @@ describe("App", () => {
         id: "00000000-0000-4000-8000-000000000005",
         libraryId: "00000000-0000-4000-8000-000000000003",
         parentId: null,
-        name: "Inbox",
-        iconName: "IconInbox",
+        name: "Research",
+        iconName: "IconBook",
         iconColor: "#3b82f6",
-        bookmarkCount: 2,
+        bookmarkCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       },
@@ -131,6 +131,42 @@ describe("App", () => {
       const request = input instanceof Request ? input : new Request(input, init);
       const url = new URL(request.url);
 
+      if (url.pathname === "/auth/session") {
+        return new Response(
+          JSON.stringify({
+            user: {
+              user: {
+                id: "00000000-0000-4000-8000-000000000001",
+                email: "dev@localhost",
+                emailVerifiedAt: null,
+                name: "Dev User",
+                username: null,
+                avatarUrl: null,
+                billingCustomerId: null,
+                locale: null
+              },
+              organizations: [],
+              libraries: [
+                {
+                  id: "00000000-0000-4000-8000-000000000003",
+                  kind: "personal",
+                  name: "Personal"
+                }
+              ]
+            },
+            registration: {
+              mode: "first-user-only",
+              available: false
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
       if (url.pathname === "/rpc/currentUser") {
         return new Response(
           JSON.stringify({
@@ -138,20 +174,19 @@ describe("App", () => {
               user: {
                 id: "00000000-0000-4000-8000-000000000001",
                 email: "dev@localhost",
-                name: "Dev User"
+                emailVerifiedAt: null,
+                name: "Dev User",
+                username: null,
+                avatarUrl: null,
+                billingCustomerId: null,
+                locale: null
               },
-              organization: {
-                id: "00000000-0000-4000-8000-000000000002",
-                name: "Dev Workspace",
-                slug: "dev",
-                role: "owner"
-              },
+              organizations: [],
               libraries: [
                 {
                   id: "00000000-0000-4000-8000-000000000003",
                   kind: "personal",
-                  name: "Personal",
-                  inboxFolderId: "00000000-0000-4000-8000-000000000005"
+                  name: "Personal"
                 }
               ]
             }
@@ -166,11 +201,13 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/bookmarks/list") {
         const body = (await request.json()) as {
-          json?: { folderId?: string | null };
+          json?: { folderId?: string | null; inbox?: boolean };
         };
-        const items = body.json?.folderId
-          ? savedItems.filter((item) => item.folderId === body.json?.folderId)
-          : savedItems;
+        const items = body.json?.inbox
+          ? savedItems.filter((item) => item.folderId === null)
+          : body.json?.folderId
+            ? savedItems.filter((item) => item.folderId === body.json?.folderId)
+            : savedItems;
 
         return new Response(
           JSON.stringify({
@@ -232,15 +269,16 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/bookmarks/create") {
         const body = (await request.json()) as { json?: { folderId?: string; url?: string } };
-        const targetFolderId = body.json?.folderId || "00000000-0000-4000-8000-000000000005";
-        const targetFolder = folders.find((folder) => folder.id === targetFolderId) ?? folders[0]!;
+        const targetFolder = body.json?.folderId
+          ? (folders.find((folder) => folder.id === body.json?.folderId) ?? null)
+          : null;
         await createGate;
 
         const savedItem = {
           id: "00000000-0000-4000-8000-000000000011",
-          libraryId: targetFolder.libraryId,
-          folderId: targetFolder.id,
-          folderName: targetFolder.name,
+          libraryId: targetFolder?.libraryId ?? "00000000-0000-4000-8000-000000000003",
+          folderId: targetFolder?.id ?? null,
+          folderName: targetFolder?.name ?? null,
           url: body.json?.url || "https://added.example/post",
           title: null,
           description: null,
@@ -254,7 +292,9 @@ describe("App", () => {
           updatedAt: "2026-06-20T12:00:00.000Z"
         } satisfies BookmarkItem;
         savedItems.unshift(savedItem);
-        const folderIndex = folders.findIndex((folder) => folder.id === targetFolder.id);
+        const folderIndex = targetFolder
+          ? folders.findIndex((folder) => folder.id === targetFolder.id)
+          : -1;
 
         if (folderIndex >= 0) {
           folders[folderIndex] = {
@@ -338,8 +378,8 @@ describe("App", () => {
     });
 
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Items" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Items" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Inbox" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
@@ -361,41 +401,42 @@ describe("App", () => {
         )
       ).toBeTruthy();
       expect(screen.getByRole("img", { name: "No thumbnail available" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Folder actions for Inbox" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Folder actions for Research" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
-      expect(screen.getAllByLabelText("Bookmark folder Inbox")).toHaveLength(2);
+      expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "Research" }));
+    expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("heading", { name: "Research / Archive" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
-    expect(screen.getByRole("heading", { name: "Inbox / Archive" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Items" }));
-    expect(screen.getByRole("heading", { name: "Items" })).toBeTruthy();
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 420 });
-    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
-    expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Research" }));
+    expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse folder Inbox" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse folder Research" }));
     expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
     expect(window.localStorage.getItem("bookmarks.collapsedFolders")).toBe(
       '["00000000-0000-4000-8000-000000000005"]'
     );
-    fireEvent.click(screen.getByRole("button", { name: "Expand folder Inbox" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand folder Research" }));
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse workspace Personal" }));
-    expect(screen.queryByRole("button", { name: "Inbox" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
     expect(window.localStorage.getItem("bookmarks.collapsedLibraries")).toBe(
       '["00000000-0000-4000-8000-000000000003"]'
     );
     fireEvent.click(screen.getByRole("button", { name: "Expand workspace Personal" }));
-    expect(screen.getByRole("button", { name: "Inbox" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Research" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
 
     await waitFor(() => {
       expect(
@@ -462,7 +503,7 @@ describe("App", () => {
       expect(screen.queryByText("Plain Bookmark")).toBeNull();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Folder actions for Inbox" }));
+    fireEvent.click(screen.getByRole("button", { name: "Folder actions for Research" }));
 
     await waitFor(() => {
       expect(screen.getByRole("menuitem", { name: "Create new folder" })).toBeTruthy();

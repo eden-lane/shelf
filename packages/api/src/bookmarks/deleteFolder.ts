@@ -25,9 +25,8 @@ export const deleteFolder = async (
         : null;
 
       if (
-        !destination ||
-        destination.libraryId !== target.libraryId ||
-        deletedFolderIds.includes(destination.id)
+        destination &&
+        (destination.libraryId !== target.libraryId || deletedFolderIds.includes(destination.id))
       ) {
         throw new Error("Choose a destination folder outside the deleted folder");
       }
@@ -35,7 +34,7 @@ export const deleteFolder = async (
       await tx
         .update(schema.savedItems)
         .set({
-          folderId: destination.id,
+          folderId: destination?.id ?? null,
           updatedAt: sql`now()`
         })
         .where(

@@ -21,8 +21,8 @@ export const bookmarkSelectFields = {
 export interface BookmarkRow {
   id: string;
   libraryId: string;
-  folderId: string;
-  folderName: string;
+  folderId: string | null;
+  folderName: string | null;
   url: string;
   title: string | null;
   description: string | null;

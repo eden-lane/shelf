@@ -49,7 +49,7 @@ export const createBookmark = async (db: Database, input: CreateBookmarkInput) =
     const [row] = await tx
       .select(bookmarkSelectFields)
       .from(schema.savedItems)
-      .innerJoin(
+      .leftJoin(
         schema.folders,
         and(
           eq(schema.savedItems.folderId, schema.folders.id),

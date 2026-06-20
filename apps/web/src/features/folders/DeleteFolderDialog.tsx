@@ -48,18 +48,15 @@ export const DeleteFolderDialog = ({
   });
 
   useEffect(() => {
-    const firstDestination = destinationFolders[0]?.id ?? "";
-
-    setDestinationFolderId(firstDestination);
-    setMode(firstDestination ? "move" : "delete");
+    setDestinationFolderId("");
+    setMode("move");
   }, [destinationFolders, folder]);
 
   if (!folder) {
     return null;
   }
 
-  const submitDisabled =
-    deleteFolderMutation.isPending || (mode === "move" && !destinationFolderId);
+  const submitDisabled = deleteFolderMutation.isPending;
 
   return (
     <Dialog.Root open={Boolean(folder)} onOpenChange={(open) => !open && onClose()}>
@@ -86,7 +83,7 @@ export const DeleteFolderDialog = ({
             onSubmit={(event) => {
               event.preventDefault();
               deleteFolderMutation.mutate({
-                destinationFolderId: mode === "move" ? destinationFolderId : null,
+                destinationFolderId: mode === "move" ? destinationFolderId || null : null,
                 folderId: folder.id,
                 mode
               });
@@ -96,19 +93,19 @@ export const DeleteFolderDialog = ({
               <input
                 className="mt-1"
                 checked={mode === "move"}
-                disabled={destinationFolders.length === 0}
                 name="delete-mode"
                 type="radio"
                 onChange={() => setMode("move")}
               />
               <span className="grid gap-2">
-                <span>Move bookmarks to another folder</span>
+                <span>Move bookmarks to Inbox or another folder</span>
                 <select
                   className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-semibold text-[#242833] outline-none disabled:bg-[#f3f5f9] disabled:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
-                  disabled={mode !== "move" || destinationFolders.length === 0}
+                  disabled={mode !== "move"}
                   value={destinationFolderId}
                   onChange={(event) => setDestinationFolderId(event.target.value)}
                 >
+                  <option value="">Inbox</option>
                   {destinationFolders.map((candidate) => (
                     <option key={candidate.id} value={candidate.id}>
                       {folderPath(candidate, folders)}

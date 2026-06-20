@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FolderItem } from "@bookmarks/shared";
-import { IconBookmark, IconDatabase, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
-import { getCurrentUser, getFolders } from "../api";
+import {
+  IconBookmark,
+  IconDatabase,
+  IconLayoutSidebarLeftExpand,
+  IconLogout2
+} from "@tabler/icons-react";
+import { getCurrentUser, getFolders, logout } from "../api";
 import { AddBookmarkDialog } from "../features/bookmarks/AddBookmarkDialog";
 import { BookmarksWorkspace } from "../features/bookmarks/BookmarksWorkspace";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
@@ -18,6 +23,7 @@ const isStackedSidebarViewport = () =>
   typeof window !== "undefined" && window.innerWidth < STACKED_SIDEBAR_BREAKPOINT;
 
 export const ProductShell = () => {
+  const queryClient = useQueryClient();
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
@@ -30,6 +36,12 @@ export const ProductShell = () => {
     enabled: currentUser.isSuccess,
     queryKey: ["folders"],
     queryFn: getFolders
+  });
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSuccess: async () => {
+      queryClient.clear();
+    }
   });
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
@@ -77,7 +89,7 @@ export const ProductShell = () => {
         className="flex min-w-0 flex-col gap-5 p-5 md:h-screen md:flex-1 md:overflow-y-auto md:p-7"
         aria-label="Items workspace"
       >
-        <header className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+        <header className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
           {!isSidebarVisible ? (
             <button
               className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -99,6 +111,16 @@ export const ProductShell = () => {
           <div className="min-w-0">
             <FolderBreadcrumbs folders={activeFolderPath} />
           </div>
+          <button
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-label="Log out"
+            title="Log out"
+            type="button"
+            disabled={logoutMutation.isPending}
+            onClick={() => logoutMutation.mutate()}
+          >
+            <IconLogout2 size={22} stroke={1.5} aria-hidden="true" focusable="false" />
+          </button>
         </header>
 
         <BookmarksWorkspace folderId={activeFolderId} folderName={activeFolder?.name ?? null} />
@@ -114,7 +136,7 @@ export const ProductShell = () => {
 };
 
 const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
-  const label = folders.length > 0 ? folders.map((folder) => folder.name).join(" / ") : "Items";
+  const label = folders.length > 0 ? folders.map((folder) => folder.name).join(" / ") : "Inbox";
 
   return (
     <h1
@@ -142,7 +164,7 @@ const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
             aria-hidden="true"
             focusable="false"
           />
-          <span className="min-w-0 truncate">Items</span>
+          <span className="min-w-0 truncate">Inbox</span>
         </span>
       )}
     </h1>

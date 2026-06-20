@@ -11,7 +11,6 @@ interface CurrentUserResponse {
     id: string;
     kind: "personal" | "organization";
     name: string;
-    inboxFolderId: string;
   }>;
 }
 
@@ -35,7 +34,7 @@ interface TagItem {
 interface BookmarkLocationItem {
   id: string;
   libraryId: string;
-  folderId: string;
+  folderId: string | null;
   url: string;
   createdAt: string;
   updatedAt: string;
@@ -69,7 +68,7 @@ const App = () => {
 
   const isFolderSelectionDisabled = createMemo(() => !currentUser() || folders().length === 0);
   const saveDisabled = createMemo(
-    () => isBusy() || !activePage() || !selectedFolderId() || isFolderSelectionDisabled()
+    () => isBusy() || !activePage() || !currentUser()
   );
 
   const folderById = createMemo(() => new Map(folders().map((folder) => [folder.id, folder])));
@@ -84,7 +83,7 @@ const App = () => {
       return folderPath(folder, folders());
     }
 
-    return isFolderSelectionDisabled() ? "No folders found" : "Choose folder";
+    return "Inbox";
   });
 
   const folderTree = createMemo(() => buildFolderTree(folders()));
@@ -92,13 +91,13 @@ const App = () => {
     savedLocations()
       .map((location) => {
         const library = libraryById().get(location.libraryId);
-        const folder = folderById().get(location.folderId);
+        const folder = location.folderId ? folderById().get(location.folderId) : null;
 
-        if (!library || !folder) {
+        if (!library) {
           return null;
         }
 
-        return `${library.name} / ${folderPath(folder, folders())}`;
+        return `${library.name} / ${folder ? folderPath(folder, folders()) : "Inbox"}`;
       })
       .filter((label): label is string => Boolean(label))
       .sort((left, right) => left.localeCompare(right))
@@ -146,10 +145,10 @@ const App = () => {
       setFolders(folderResponse);
       setTags(tagResponse);
       setSavedLocations(locationResponse);
-      setSelectedFolderId(userResponse.libraries[0]?.inboxFolderId ?? "");
+      setSelectedFolderId("");
       setSelectedTagIds([]);
       setPickerLibraryId(userResponse.libraries[0]?.id ?? null);
-      setExpandedFolderIds(expandedAncestorIds(folderResponse, userResponse.libraries[0]?.inboxFolderId ?? ""));
+      setExpandedFolderIds(new Set<string>());
       writeMessage("", "neutral");
       setStatus("Ready");
     } catch (error) {

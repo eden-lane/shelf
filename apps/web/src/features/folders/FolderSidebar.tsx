@@ -154,7 +154,7 @@ export const FolderSidebar = ({
       </div>
       <div className="grid gap-3">
         <div className="flex items-center justify-between px-2.5">
-          <span className="text-sm font-medium text-gray-500">My organization</span>
+          <span className="text-sm font-medium text-gray-500">Libraries</span>
           {currentUser?.libraries[0] ? (
             <button
               className="grid h-8 w-8 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -180,7 +180,7 @@ export const FolderSidebar = ({
           onClick={() => onSelectFolder(null)}
         >
           <IconBookmark size={21} stroke={1.5} aria-hidden="true" focusable="false" />
-          <span>Items</span>
+          <span>Inbox</span>
         </button>
         {isLoading ? (
           <p className="m-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-bold text-gray-500">

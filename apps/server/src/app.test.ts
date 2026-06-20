@@ -2,21 +2,15 @@ import { describe, expect, test } from "bun:test";
 import type { BookmarksStore } from "@bookmarks/api/bookmarks";
 import type { HealthDependencies } from "@bookmarks/api/health";
 import { Buffer } from "node:buffer";
-import {
-  DEV_ORGANIZATION_ID,
-  DEV_ORGANIZATION_INBOX_FOLDER_ID,
-  DEV_ORGANIZATION_LIBRARY_ID,
-  DEV_ORGANIZATION_LIBRARY_NAME,
-  DEV_ORGANIZATION_NAME,
-  DEV_ORGANIZATION_SLUG,
-  DEV_PERSONAL_INBOX_FOLDER_ID,
-  DEV_PERSONAL_LIBRARY_ID,
-  DEV_PERSONAL_LIBRARY_NAME,
-  DEV_USER_EMAIL,
-  DEV_USER_ID,
-  DEV_USER_NAME
-} from "@bookmarks/api/identity";
 import { createApp } from "./app";
+
+const DEV_USER_ID = "00000000-0000-4000-8000-000000000001";
+const DEV_PERSONAL_LIBRARY_ID = "00000000-0000-4000-8000-000000000003";
+const DEV_USER_EMAIL = "dev@localhost";
+const DEV_USER_NAME = "Dev User";
+const DEV_PERSONAL_LIBRARY_NAME = "Personal";
+const TEST_FOLDER_ID = "00000000-0000-4000-8000-000000000005";
+const TEST_CHILD_FOLDER_ID = "00000000-0000-4000-8000-000000000020";
 
 const dependencies = (overrides: Partial<HealthDependencies> = {}): HealthDependencies => ({
   database: {
@@ -32,18 +26,24 @@ const dependencies = (overrides: Partial<HealthDependencies> = {}): HealthDepend
 });
 
 const currentUser = {
-  userId: DEV_USER_ID,
-  organizationId: DEV_ORGANIZATION_ID,
-  personalLibraryId: DEV_PERSONAL_LIBRARY_ID,
-  organizationLibraryId: DEV_ORGANIZATION_LIBRARY_ID,
-  personalInboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID,
-  organizationInboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
-  personalLibraryName: DEV_PERSONAL_LIBRARY_NAME,
-  organizationLibraryName: DEV_ORGANIZATION_LIBRARY_NAME,
-  email: DEV_USER_EMAIL,
-  name: DEV_USER_NAME,
-  organizationName: DEV_ORGANIZATION_NAME,
-  organizationSlug: DEV_ORGANIZATION_SLUG
+  user: {
+    id: DEV_USER_ID,
+    email: DEV_USER_EMAIL,
+    emailVerifiedAt: null,
+    name: DEV_USER_NAME,
+    username: null,
+    avatarUrl: null,
+    billingCustomerId: null,
+    locale: null
+  },
+  organizations: [],
+  libraries: [
+    {
+      id: DEV_PERSONAL_LIBRARY_ID,
+      kind: "personal" as const,
+      name: DEV_PERSONAL_LIBRARY_NAME
+    }
+  ]
 };
 
 const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStore => ({
@@ -110,28 +110,19 @@ describe("current user endpoint", () => {
       user: {
         id: DEV_USER_ID,
         email: DEV_USER_EMAIL,
+        emailVerifiedAt: null,
+        avatarUrl: null,
+        billingCustomerId: null,
+        locale: null,
+        username: null,
         name: DEV_USER_NAME
       },
-      organization: {
-        id: DEV_ORGANIZATION_ID,
-        name: DEV_ORGANIZATION_NAME,
-        slug: DEV_ORGANIZATION_SLUG,
-        role: "owner"
-      },
+      organizations: [],
       libraries: [
         {
           id: DEV_PERSONAL_LIBRARY_ID,
           kind: "personal",
-          name: DEV_PERSONAL_LIBRARY_NAME,
-          inboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID
-        },
-        {
-          id: DEV_ORGANIZATION_LIBRARY_ID,
-          kind: "organization",
-          name: DEV_ORGANIZATION_LIBRARY_NAME,
-          inboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
-          organizationId: DEV_ORGANIZATION_ID,
-          organizationSlug: DEV_ORGANIZATION_SLUG
+          name: DEV_PERSONAL_LIBRARY_NAME
         }
       ]
     });
@@ -159,7 +150,7 @@ describe("bookmarks RPC", () => {
           {
             id: "00000000-0000-4000-8000-000000000010",
             libraryId: DEV_PERSONAL_LIBRARY_ID,
-            folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+            folderId: TEST_FOLDER_ID,
             folderName: "Inbox",
             url: "https://example.com/first",
             title: "First",
@@ -176,7 +167,7 @@ describe("bookmarks RPC", () => {
           {
             id: "00000000-0000-4000-8000-000000000009",
             libraryId: DEV_PERSONAL_LIBRARY_ID,
-            folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+            folderId: TEST_FOLDER_ID,
             folderName: "Inbox",
             url: "https://example.com/second",
             title: "Second",
@@ -214,7 +205,9 @@ describe("bookmarks RPC", () => {
     expect(typeof body.json.nextCursor).toBe("string");
     expect(calls[0]).toEqual({
       cursor: undefined,
-      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      folderId: undefined,
+      inbox: false,
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID],
       limit: 1
     });
   });
@@ -247,15 +240,15 @@ describe("bookmarks RPC", () => {
             {
               id: "00000000-0000-4000-8000-000000000010",
               libraryId: DEV_PERSONAL_LIBRARY_ID,
-              folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+              folderId: TEST_FOLDER_ID,
               url: input.url,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             },
             {
               id: "00000000-0000-4000-8000-000000000011",
-              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
-              folderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              folderId: TEST_CHILD_FOLDER_ID,
               url: input.url,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -279,7 +272,7 @@ describe("bookmarks RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json).toHaveLength(2);
     expect(calls[0]).toEqual({
-      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID],
       url: "https://example.com/article"
     });
   });
@@ -295,7 +288,7 @@ describe("bookmarks RPC", () => {
           id: "00000000-0000-4000-8000-000000000010",
           libraryId: input.libraryId,
           folderId: input.folderId,
-          folderName: "Inbox",
+          folderName: null,
           url: input.url,
           title: null,
           description: null,
@@ -334,7 +327,7 @@ describe("bookmarks RPC", () => {
     expect(body.json.url).toBe("https://example.com/article");
     expect(calls[0]).toEqual({
       createdByUserId: DEV_USER_ID,
-      folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+      folderId: null,
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       tagIds: undefined,
       url: "https://example.com/article"
@@ -371,8 +364,8 @@ describe("bookmarks RPC", () => {
           return [
             {
               id: "00000000-0000-4000-8000-000000000020",
-              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
-              parentId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              parentId: TEST_CHILD_FOLDER_ID,
               name: "Reading",
               iconName: null,
               iconColor: null,
@@ -386,7 +379,7 @@ describe("bookmarks RPC", () => {
           return [
             {
               id: "00000000-0000-4000-8000-000000000030",
-              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
               name: "Research",
               bookmarkCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
@@ -417,7 +410,7 @@ describe("bookmarks RPC", () => {
     expect(calls[0]).toEqual({
       createdByUserId: DEV_USER_ID,
       folderId: "00000000-0000-4000-8000-000000000020",
-      libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+      libraryId: DEV_PERSONAL_LIBRARY_ID,
       tagIds: ["00000000-0000-4000-8000-000000000030"],
       url: "https://example.com/article"
     });
@@ -470,7 +463,7 @@ describe("bookmarks RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json.deletedBookmarkId).toBe("00000000-0000-4000-8000-000000000010");
     expect(calls[0]).toEqual({
-      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
       bookmarkId: "00000000-0000-4000-8000-000000000010"
     });
   });
@@ -513,7 +506,7 @@ describe("folders RPC", () => {
 
           return [
             {
-              id: DEV_PERSONAL_INBOX_FOLDER_ID,
+              id: TEST_FOLDER_ID,
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               parentId: null,
               name: "Inbox",
@@ -542,7 +535,7 @@ describe("folders RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json[0].name).toBe("Inbox");
     expect(calls[0]).toEqual({
-      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID]
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID]
     });
   });
 
@@ -577,7 +570,7 @@ describe("folders RPC", () => {
           iconColor: "#3B82F6",
           iconName: "IconInbox",
           name: " Reading ",
-          parentId: DEV_PERSONAL_INBOX_FOLDER_ID
+          parentId: TEST_FOLDER_ID
         }
       }),
       headers: {
@@ -590,12 +583,12 @@ describe("folders RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json.name).toBe("Reading");
     expect(calls[0]).toEqual({
-      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       iconColor: "#3b82f6",
       iconName: "IconInbox",
       name: "Reading",
-      parentId: DEV_PERSONAL_INBOX_FOLDER_ID
+      parentId: TEST_FOLDER_ID
     });
   });
 
@@ -618,8 +611,8 @@ describe("folders RPC", () => {
     const response = await app.request("/rpc/folders/delete", {
       body: JSON.stringify({
         json: {
-          destinationFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
-          folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+          destinationFolderId: TEST_CHILD_FOLDER_ID,
+          folderId: TEST_FOLDER_ID,
           mode: "move"
         }
       }),
@@ -631,11 +624,11 @@ describe("folders RPC", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.json.deletedFolderIds).toEqual([DEV_PERSONAL_INBOX_FOLDER_ID]);
+    expect(body.json.deletedFolderIds).toEqual([TEST_FOLDER_ID]);
     expect(calls[0]).toEqual({
-      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
-      destinationFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
-      folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      destinationFolderId: TEST_CHILD_FOLDER_ID,
+      folderId: TEST_FOLDER_ID,
       mode: "move"
     });
   });
@@ -677,7 +670,7 @@ describe("tags RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json[0].name).toBe("Research");
     expect(calls[0]).toEqual({
-      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID]
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID]
     });
   });
 });

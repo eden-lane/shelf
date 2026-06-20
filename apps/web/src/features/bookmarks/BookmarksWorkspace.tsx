@@ -18,7 +18,8 @@ export const BookmarksWorkspace = ({
   const [notification, setNotification] = useState<string | null>(null);
   const bookmarks = useInfiniteQuery({
     queryKey: ["bookmarks", folderId],
-    queryFn: ({ pageParam }) => getBookmarks({ cursor: pageParam, folderId, limit: 20 }),
+    queryFn: ({ pageParam }) =>
+      getBookmarks({ cursor: pageParam, folderId, inbox: folderId === null, limit: 20 }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor
   });
@@ -181,7 +182,7 @@ export const BookmarksWorkspace = ({
           <p className="mb-0 max-w-[56ch] text-[#697080]">
             {folderName
               ? "Bookmarks added to this folder will appear here."
-              : "Added bookmarks will appear here as soon as they are saved."}
+              : "Bookmarks without a folder will appear here as soon as they are saved."}
           </p>
         </div>
       </section>
@@ -192,14 +193,14 @@ export const BookmarksWorkspace = ({
     <>
       <section
         className="grid gap-3"
-        aria-label={folderName ? `${folderName} items` : "Saved items"}
+        aria-label={folderName ? `${folderName} items` : "Inbox items"}
         aria-busy={bookmarks.isFetchingNextPage}
       >
         {items.map((item) => (
           <BookmarkRow
             item={item}
             key={item.id}
-            showFolderName={folderId === null}
+            showFolderName={false}
             onDeleteBookmark={(bookmarkId) => deleteBookmarkMutation.mutate({ bookmarkId })}
             onLinkCopied={() => setNotification("Link copied")}
           />

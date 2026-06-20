@@ -10,6 +10,7 @@ export interface ListBookmarksInput {
   libraryIds: string[];
   limit: number;
   folderId?: string;
+  inbox?: boolean;
   cursor?: BookmarkCursor;
 }
 
@@ -20,7 +21,7 @@ export interface ListBookmarkLocationsInput {
 
 export interface CreateBookmarkInput {
   libraryId: string;
-  folderId: string;
+  folderId: string | null;
   createdByUserId: string;
   url: string;
   tagIds?: string[];
