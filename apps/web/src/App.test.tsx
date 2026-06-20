@@ -54,8 +54,21 @@ describe("App", () => {
         bookmarkCount: 1,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000020",
+        libraryId: "00000000-0000-4000-8000-000000000003",
+        parentId: null,
+        name: "Read later",
+        bookmarkCount: 0,
+        createdAt: "2026-06-19T12:00:00.000Z",
+        updatedAt: "2026-06-19T12:00:00.000Z"
       }
     ];
+    let finishCreate = () => {};
+    const createGate = new Promise<void>((resolve) => {
+      finishCreate = resolve;
+    });
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -95,10 +108,17 @@ describe("App", () => {
       }
 
       if (url.pathname === "/rpc/bookmarks/list") {
+        const body = (await request.json()) as {
+          json?: { folderId?: string | null };
+        };
+        const items = body.json?.folderId
+          ? savedItems.filter((item) => item.folderId === body.json?.folderId)
+          : savedItems;
+
         return new Response(
           JSON.stringify({
             json: {
-              items: savedItems,
+              items,
               nextCursor: null
             }
           }),
@@ -146,12 +166,16 @@ describe("App", () => {
       }
 
       if (url.pathname === "/rpc/bookmarks/create") {
-        const body = (await request.json()) as { json?: { url?: string } };
+        const body = (await request.json()) as { json?: { folderId?: string; url?: string } };
+        const targetFolderId = body.json?.folderId || "00000000-0000-4000-8000-000000000005";
+        const targetFolder = folders.find((folder) => folder.id === targetFolderId) ?? folders[0]!;
+        await createGate;
+
         const savedItem = {
           id: "00000000-0000-4000-8000-000000000011",
-          libraryId: "00000000-0000-4000-8000-000000000003",
-          folderId: "00000000-0000-4000-8000-000000000005",
-          folderName: "Inbox",
+          libraryId: targetFolder.libraryId,
+          folderId: targetFolder.id,
+          folderName: targetFolder.name,
           url: body.json?.url || "https://added.example/post",
           title: null,
           description: null,
@@ -159,6 +183,15 @@ describe("App", () => {
           updatedAt: "2026-06-20T12:00:00.000Z"
         };
         savedItems.unshift(savedItem);
+        const folderIndex = folders.findIndex((folder) => folder.id === targetFolder.id);
+
+        if (folderIndex >= 0) {
+          folders[folderIndex] = {
+            ...folders[folderIndex],
+            bookmarkCount: folders[folderIndex].bookmarkCount + 1,
+            updatedAt: "2026-06-20T12:00:00.000Z"
+          };
+        }
 
         return new Response(JSON.stringify({ json: savedItem }), {
           headers: {
@@ -245,5 +278,40 @@ describe("App", () => {
     });
 
     expect(screen.queryByText("Healthy")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Read later" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "No items yet" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Folder actions for Read later" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("menuitem", { name: "Add a bookmark" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a bookmark" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add to Read later" })).toBeTruthy();
+    });
+
+    const pageUrlInput = screen.getByLabelText("Page URL") as HTMLInputElement;
+    pageUrlInput.value = "https://added.example/post";
+    pageUrlInput.setAttribute("value", "https://added.example/post");
+    fireEvent.input(pageUrlInput);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Saving" })).toBeTruthy();
+      expect(document.body.textContent).not.toContain("No items yet");
+    });
+
+    finishCreate();
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("https://added.example/post");
+    });
   });
 });

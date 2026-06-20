@@ -50,13 +50,15 @@ import {
   updateFolder
 } from "./api";
 
-const queryClient = new QueryClient();
+export const App = () => {
+  const [queryClient] = useState(() => new QueryClient());
 
-export const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ProductShell />
-  </QueryClientProvider>
-);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ProductShell />
+    </QueryClientProvider>
+  );
+};
 
 type FolderNode = FolderItem & {
   children: FolderNode[];
@@ -1019,19 +1021,105 @@ const AddBookmarkDialog = ({
   const formRef = useRef<HTMLFormElement | null>(null);
   const queryClient = useQueryClient();
   const addBookmark = useMutation({
-    mutationFn: createBookmark,
-    onSuccess: (bookmark) => {
-      if (!visibleFolderId || bookmark.folderId === visibleFolderId) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
-          ["bookmarks", visibleFolderId],
-          (data) => insertBookmarkIntoPages(data, bookmark)
+    mutationFn: ({ optimisticFolder: _optimisticFolder, ...input }: AddBookmarkMutationInput) =>
+      createBookmark(input),
+    onMutate: async (input) => {
+      const optimisticFolder = input.optimisticFolder;
+
+      if (!optimisticFolder) {
+        return { targetFolderId: null };
+      }
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["bookmarks"] }),
+        queryClient.cancelQueries({ queryKey: ["folders"] })
+      ]);
+
+      const bookmarkQueryKeys = bookmarkQueryKeysForFolder(optimisticFolder.id);
+      const previousBookmarks = bookmarkQueryKeys.map((queryKey) => ({
+        data: queryClient.getQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey),
+        hadData: Boolean(queryClient.getQueryState(queryKey)),
+        queryKey
+      }));
+      const previousFolders = queryClient.getQueryData<FolderItem[]>(["folders"]);
+      const now = new Date().toISOString();
+      const optimisticBookmark: BookmarkItem = {
+        id: `optimistic-${crypto.randomUUID()}`,
+        libraryId: optimisticFolder.libraryId,
+        folderId: optimisticFolder.id,
+        folderName: optimisticFolder.name,
+        url: input.url,
+        title: null,
+        description: null,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      for (const queryKey of bookmarkQueryKeys) {
+        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey, (data) =>
+          insertBookmarkIntoPages(data, optimisticBookmark)
         );
       }
 
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-      void queryClient.invalidateQueries({ queryKey: ["folders"] });
+      queryClient.setQueryData<FolderItem[]>(["folders"], (currentFolders = []) =>
+        currentFolders.map((folder) =>
+          folder.id === optimisticFolder.id
+            ? { ...folder, bookmarkCount: folder.bookmarkCount + 1, updatedAt: now }
+            : folder
+        )
+      );
+
+      return {
+        optimisticBookmarkId: optimisticBookmark.id,
+        previousBookmarks,
+        previousFolders,
+        targetFolderId: optimisticFolder.id
+      };
+    },
+    onError: (_error, _input, context) => {
+      for (const previousBookmark of context?.previousBookmarks ?? []) {
+        if (previousBookmark.hadData) {
+          queryClient.setQueryData(previousBookmark.queryKey, previousBookmark.data);
+        } else {
+          queryClient.removeQueries({ exact: true, queryKey: previousBookmark.queryKey });
+        }
+      }
+
+      if (context?.previousFolders) {
+        queryClient.setQueryData(["folders"], context.previousFolders);
+      }
+    },
+    onSuccess: (bookmark, _input, context) => {
+      if (!visibleFolderId || bookmark.folderId === visibleFolderId) {
+        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+          ["bookmarks", visibleFolderId],
+          (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
+        );
+      }
+
       formRef.current?.reset();
       onOpenChange(false);
+    },
+    onSettled: (bookmark, _error, input, context) => {
+      const targetFolderId =
+        bookmark?.folderId ?? context?.targetFolderId ?? input.optimisticFolder?.id ?? null;
+
+      if (bookmark && context?.optimisticBookmarkId) {
+        for (const queryKey of bookmarkQueryKeysForFolder(bookmark.folderId)) {
+          queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+            queryKey,
+            (data) => insertBookmarkIntoPages(data, bookmark, context.optimisticBookmarkId)
+          );
+        }
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks", null], exact: true });
+
+      if (targetFolderId) {
+        void queryClient.invalidateQueries({ queryKey: ["bookmarks", targetFolderId], exact: true });
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["folders"] });
     }
   });
 
@@ -1040,7 +1128,7 @@ const AddBookmarkDialog = ({
     const formData = new FormData(event.currentTarget);
     const url = String(formData.get("url") ?? "");
 
-    addBookmark.mutate({ folderId: targetFolder?.id, url });
+    addBookmark.mutate({ folderId: targetFolder?.id, optimisticFolder: targetFolder, url });
   };
 
   return (
@@ -1111,9 +1199,16 @@ const AddBookmarkDialog = ({
   );
 };
 
+type AddBookmarkMutationInput = {
+  folderId?: string;
+  optimisticFolder: FolderItem | null;
+  url: string;
+};
+
 const insertBookmarkIntoPages = (
   data: InfiniteData<BookmarksPageResponse, string | null> | undefined,
-  bookmark: BookmarkItem
+  bookmark: BookmarkItem,
+  replacementId?: string
 ): InfiniteData<BookmarksPageResponse, string | null> => {
   if (!data) {
     return {
@@ -1129,7 +1224,7 @@ const insertBookmarkIntoPages = (
 
   const pagesWithoutDuplicate = data.pages.map((page) => ({
     ...page,
-    items: page.items.filter((item) => item.id !== bookmark.id)
+    items: page.items.filter((item) => item.id !== bookmark.id && item.id !== replacementId)
   }));
   const [firstPage, ...restPages] = pagesWithoutDuplicate;
 
@@ -1144,6 +1239,11 @@ const insertBookmarkIntoPages = (
     ]
   };
 };
+
+const bookmarkQueryKeysForFolder = (folderId: string): Array<["bookmarks", string | null]> => [
+  ["bookmarks", null],
+  ["bookmarks", folderId]
+];
 
 const buildFolderTree = (folders: FolderItem[]): FolderNode[] => {
   const nodes = new Map<string, FolderNode>();
