@@ -34,23 +34,18 @@ The oRPC endpoint is mounted at `http://localhost:3000/rpc`.
 
 MinIO is available at [http://localhost:9001](http://localhost:9001) using the credentials from `.env.example`.
 
-## Dev identity
+## Authentication
 
-The API defaults to `AUTH_MODE=dev` outside production. In this mode, startup creates
-one idempotent local user, organization, personal library, organization library, and
-default Inbox folders so feature work can rely on real foreign keys before registration
-and authorization exist:
+The API defaults to `AUTH_MODE=session`. Development uses the same email/password
+signup, login, logout, and database-backed httpOnly sessions as production.
+Registration is controlled with
+`REGISTRATION_MODE=first-user-only | open | closed`; first-user-only allows signup
+only while the users table is empty. Mutating cookie-authenticated requests must
+come from an allowed origin configured with `APP_ORIGINS`.
 
-- user: `dev@localhost`
-- user id: `00000000-0000-4000-8000-000000000001`
-- organization: `dev`
-- organization id: `00000000-0000-4000-8000-000000000002`
-- personal library id: `00000000-0000-4000-8000-000000000003`
-- organization library id: `00000000-0000-4000-8000-000000000004`
-- personal Inbox folder id: `00000000-0000-4000-8000-000000000005`
-- organization Inbox folder id: `00000000-0000-4000-8000-000000000006`
+Set `AUTH_MODE=none` to disable session auth.
 
-Set `AUTH_MODE=none` to disable the bootstrap.
+Inbox is implicit: a saved item is in Inbox when its `folder_id` is `null`.
 
 ## Development
 

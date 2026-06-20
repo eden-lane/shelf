@@ -52,6 +52,10 @@ services:
     command: sh -lc "bun install --frozen-lockfile && cd apps/server && bun run dev"
     environment:
       PORT: 3000
+      AUTH_MODE: session
+      REGISTRATION_MODE: first-user-only
+      APP_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.14:5173
+      SESSION_COOKIE_SECURE: "false"
       DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
       REDIS_URL: redis://redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
@@ -73,8 +77,6 @@ services:
     image: oven/bun:1.2
     working_dir: /workspace
     command: sh -lc "bun install --frozen-lockfile && cd apps/web && bun run dev --host 0.0.0.0"
-    environment:
-      VITE_API_BASE_URL: http://localhost:3000
     ports:
       - "5173:5173"
     volumes:

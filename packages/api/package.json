@@ -4,11 +4,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./auth": "./src/auth/index.ts",
     "./bookmarks": "./src/bookmarks/index.ts",
     "./currentUser": "./src/currentUser/index.ts",
     "./db": "./src/db/index.ts",
     "./health": "./src/health/index.ts",
-    "./identity": "./src/identity/index.ts",
     "./rpc": "./src/rpc.ts"
   },
   "scripts": {

@@ -1,4 +1,3 @@
-import { ensureDevIdentity, type DevIdentity } from "@bookmarks/api/identity";
 import { createApp } from "./app";
 import { BookmarkEnrichmentWorker, RedisBookmarkEnrichmentQueue } from "./bookmarkEnrichmentQueue";
 import { createRuntimeClients } from "./clients";
@@ -11,19 +10,13 @@ const clients = createRuntimeClients({
   meilisearchUrl: config.meilisearchUrl
 });
 
-let currentUser: DevIdentity | undefined;
-
-if (config.authMode === "dev") {
-  currentUser = await ensureDevIdentity(clients.pool);
-  console.log(
-    `Dev identity ready: ${currentUser.email} (${currentUser.userId}) in ${currentUser.organizationSlug}`
-  );
-}
-
 const app = createApp({
   bookmarkEnrichmentQueue: new RedisBookmarkEnrichmentQueue(clients.redis),
   dependencies: clients,
-  currentUser
+  authMode: config.authMode,
+  registrationMode: config.registrationMode,
+  allowedOrigins: config.allowedOrigins,
+  sessionCookieSecure: config.sessionCookieSecure
 });
 const bookmarkEnrichmentWorker = new BookmarkEnrichmentWorker({
   db: clients.db,

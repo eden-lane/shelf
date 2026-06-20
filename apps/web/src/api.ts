@@ -1,4 +1,6 @@
 import type {
+  AuthCredentials,
+  AuthSessionResponse,
   BookmarkItem,
   BookmarksPageResponse,
   CreateBookmarkInput,
@@ -14,8 +16,12 @@ import type {
 import { createORPCClient, type Client, type NestedClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const runtimeApiBaseUrl =
+  typeof window === "undefined" ? "http://localhost:3000" : `${window.location.protocol}//${window.location.hostname}:3000`;
+const apiBaseUrl = configuredApiBaseUrl || runtimeApiBaseUrl;
 const rpcLink = new RPCLink({
+  fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
   url: new URL("/rpc", apiBaseUrl).toString()
 });
 const rpc = createORPCClient<WebRpcClient>(rpcLink);
@@ -46,18 +52,66 @@ export const getHealth = async (): Promise<HealthResponse> => rpc.health();
 
 export const getCurrentUser = async (): Promise<CurrentUserResponse> => rpc.currentUser();
 
+export const getAuthSession = async (): Promise<AuthSessionResponse> => {
+  const response = await fetch(new URL("/auth/session", apiBaseUrl), {
+    credentials: "include"
+  });
+
+  return readJsonResponse<AuthSessionResponse>(response);
+};
+
+export const signup = async (input: AuthCredentials): Promise<{ user: CurrentUserResponse }> => {
+  const response = await fetch(new URL("/auth/signup", apiBaseUrl), {
+    body: JSON.stringify(input),
+    credentials: "include",
+    headers: {
+      "content-type": "application/json"
+    },
+    method: "POST"
+  });
+
+  return readJsonResponse<{ user: CurrentUserResponse }>(response);
+};
+
+export const login = async (
+  input: Pick<AuthCredentials, "email" | "password">
+): Promise<{ user: CurrentUserResponse }> => {
+  const response = await fetch(new URL("/auth/login", apiBaseUrl), {
+    body: JSON.stringify(input),
+    credentials: "include",
+    headers: {
+      "content-type": "application/json"
+    },
+    method: "POST"
+  });
+
+  return readJsonResponse<{ user: CurrentUserResponse }>(response);
+};
+
+export const logout = async (): Promise<void> => {
+  const response = await fetch(new URL("/auth/logout", apiBaseUrl), {
+    credentials: "include",
+    method: "POST"
+  });
+
+  await readJsonResponse(response);
+};
+
 export const getBookmarks = async ({
   cursor,
   folderId,
+  inbox,
   limit = 20
 }: {
   cursor?: string | null;
   folderId?: string | null;
+  inbox?: boolean;
   limit?: number;
 } = {}): Promise<BookmarksPageResponse> => {
   return rpc.bookmarks.list({
     cursor,
     folderId,
+    inbox,
     limit
   });
 };
@@ -82,3 +136,18 @@ export const deleteFolder = async (
 ): Promise<{ deletedFolderIds: string[] }> => rpc.folders.delete(input);
 
 export const apiAssetUrl = (path: string): string => new URL(path, apiBaseUrl).toString();
+
+const readJsonResponse = async <T = unknown>(response: Response): Promise<T> => {
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message =
+      body && typeof body === "object" && "error" in body && typeof body.error === "string"
+        ? body.error
+        : `Request failed with ${response.status}`;
+
+    throw new Error(message);
+  }
+
+  return body as T;
+};

@@ -1,32 +1,42 @@
 import type { CurrentUserResponse } from "@bookmarks/shared";
-import type { DevIdentity } from "../identity";
 
-export const getCurrentUserResponse = (currentUser: DevIdentity): CurrentUserResponse => ({
+export interface CurrentIdentity {
   user: {
-    id: currentUser.userId,
-    email: currentUser.email,
-    name: currentUser.name
+    id: string;
+    email: string;
+    emailVerifiedAt: Date | null;
+    name: string | null;
+    username: string | null;
+    avatarUrl: string | null;
+    billingCustomerId: string | null;
+    locale: string | null;
+  };
+  organizations: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    role: "owner" | "member";
+  }>;
+  libraries: Array<{
+    id: string;
+    kind: "personal" | "organization";
+    name: string;
+    organizationId?: string;
+    organizationSlug?: string;
+  }>;
+}
+
+export const getCurrentUserResponse = (currentUser: CurrentIdentity): CurrentUserResponse => ({
+  user: {
+    id: currentUser.user.id,
+    email: currentUser.user.email,
+    emailVerifiedAt: currentUser.user.emailVerifiedAt?.toISOString() ?? null,
+    name: currentUser.user.name,
+    username: currentUser.user.username,
+    avatarUrl: currentUser.user.avatarUrl,
+    billingCustomerId: currentUser.user.billingCustomerId,
+    locale: currentUser.user.locale
   },
-  organization: {
-    id: currentUser.organizationId,
-    name: currentUser.organizationName,
-    slug: currentUser.organizationSlug,
-    role: "owner"
-  },
-  libraries: [
-    {
-      id: currentUser.personalLibraryId,
-      kind: "personal",
-      name: currentUser.personalLibraryName,
-      inboxFolderId: currentUser.personalInboxFolderId
-    },
-    {
-      id: currentUser.organizationLibraryId,
-      kind: "organization",
-      name: currentUser.organizationLibraryName,
-      inboxFolderId: currentUser.organizationInboxFolderId,
-      organizationId: currentUser.organizationId,
-      organizationSlug: currentUser.organizationSlug
-    }
-  ]
+  organizations: currentUser.organizations,
+  libraries: currentUser.libraries
 });

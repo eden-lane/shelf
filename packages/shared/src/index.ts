@@ -14,29 +14,51 @@ export interface CurrentUserResponse {
   user: {
     id: string;
     email: string;
-    name: string;
+    emailVerifiedAt: string | null;
+    name: string | null;
+    username: string | null;
+    avatarUrl: string | null;
+    billingCustomerId: string | null;
+    locale: string | null;
   };
-  organization: {
+  organizations: Array<{
     id: string;
     name: string;
     slug: string;
-    role: "owner";
-  };
+    role: "owner" | "member";
+  }>;
   libraries: Array<{
     id: string;
     kind: "personal" | "organization";
     name: string;
-    inboxFolderId: string;
     organizationId?: string;
     organizationSlug?: string;
   }>;
 }
 
+export interface RegistrationStatus {
+  mode: "first-user-only" | "open" | "closed";
+  available: boolean;
+}
+
+export interface AuthSessionResponse {
+  user: CurrentUserResponse | null;
+  registration: RegistrationStatus;
+}
+
+export interface AuthCredentials {
+  email: string;
+  password: string;
+  name?: string | null;
+  username?: string | null;
+  locale?: string | null;
+}
+
 export interface BookmarkItem {
   id: string;
   libraryId: string;
-  folderId: string;
-  folderName: string;
+  folderId: string | null;
+  folderName: string | null;
   url: string;
   title: string | null;
   description: string | null;
@@ -53,7 +75,7 @@ export interface BookmarkItem {
 export interface BookmarkLocationItem {
   id: string;
   libraryId: string;
-  folderId: string;
+  folderId: string | null;
   url: string;
   createdAt: string;
   updatedAt: string;
@@ -98,6 +120,7 @@ export interface DeleteBookmarkInput {
 export interface ListBookmarksInput {
   cursor?: string | null;
   folderId?: string | null;
+  inbox?: boolean;
   limit?: number;
 }
 

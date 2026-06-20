@@ -36,10 +36,43 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").notNull(),
+    passwordHash: text("password_hash"),
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     name: text("name"),
+    username: text("username"),
+    avatarUrl: text("avatar_url"),
+    billingCustomerId: text("billing_customer_id"),
+    locale: text("locale"),
     ...timestamps
   },
-  (table) => [uniqueIndex("users_email_unique_idx").on(sql`lower(${table.email})`)]
+  (table) => [
+    uniqueIndex("users_email_unique_idx").on(sql`lower(${table.email})`),
+    uniqueIndex("users_username_unique_idx")
+      .on(sql`lower(${table.username})`)
+      .where(sql`${table.username} is not null`),
+    uniqueIndex("users_billing_customer_unique_idx")
+      .on(table.billingCustomerId)
+      .where(sql`${table.billingCustomerId} is not null`)
+  ]
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => [
+    index("sessions_user_idx").on(table.userId),
+    uniqueIndex("sessions_token_hash_unique_idx").on(table.tokenHash)
+  ]
 );
 
 export const organizations = pgTable(
@@ -155,7 +188,7 @@ export const savedItems = pgTable(
     libraryId: uuid("library_id")
       .notNull()
       .references(() => libraries.id, { onDelete: "cascade" }),
-    folderId: uuid("folder_id").notNull(),
+    folderId: uuid("folder_id"),
     createdByUserId: uuid("created_by_user_id").references(() => users.id, {
       onDelete: "set null"
     }),
@@ -285,7 +318,15 @@ export const savedItemSystemLabels = pgTable(
 export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(organizationMemberships),
   libraries: many(libraries),
-  createdSavedItems: many(savedItems)
+  createdSavedItems: many(savedItems),
+  sessions: many(sessions)
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id]
+  })
 }));
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
@@ -406,6 +447,8 @@ export const savedItemSystemLabelsRelations = relations(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type OrganizationMembership = typeof organizationMemberships.$inferSelect;

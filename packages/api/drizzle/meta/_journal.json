@@ -43,6 +43,13 @@
       "when": 1781950740548,
       "tag": "0005_lumpy_makkari",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781968341086,
+      "tag": "0006_funny_warbound",
+      "breakpoints": true
     }
   ]
 }

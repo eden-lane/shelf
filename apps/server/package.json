@@ -11,6 +11,7 @@
     "@bookmarks/api": "workspace:*",
     "@orpc/server": "latest",
     "hono": "latest",
+    "hono-rate-limiter": "latest",
     "ioredis": "latest",
     "pg": "latest"
   },
