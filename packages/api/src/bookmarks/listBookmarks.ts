@@ -15,6 +15,10 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
 
   const filters: SQL[] = [inArray(schema.savedItems.libraryId, input.libraryIds)];
 
+  if (input.folderId) {
+    filters.push(eq(schema.savedItems.folderId, input.folderId));
+  }
+
   if (input.cursor) {
     const cursorCreatedAt = new Date(input.cursor.createdAt);
     const cursorFilter = or(

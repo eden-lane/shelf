@@ -1,4 +1,9 @@
-import type { CreateBookmarkInput } from "@bookmarks/shared";
+import type {
+  CreateBookmarkInput,
+  CreateFolderInput,
+  DeleteFolderInput,
+  UpdateFolderInput
+} from "@bookmarks/shared";
 import { ORPCError, os } from "@orpc/server";
 import {
   decodeBookmarkCursor,
@@ -51,10 +56,24 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
+      const allowedLibraryIds = currentUserLibraryIds(options.currentUser);
+      const folders = bookmark.folderId
+        ? await options.bookmarksStore.listFolders({ libraryIds: allowedLibraryIds })
+        : [];
+      const targetFolder = bookmark.folderId
+        ? folders.find((folder) => folder.id === bookmark.folderId)
+        : null;
+
+      if (bookmark.folderId && !targetFolder) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an available folder"
+        });
+      }
+
       return options.bookmarksStore.createBookmark({
         createdByUserId: options.currentUser.userId,
-        folderId: options.currentUser.personalInboxFolderId,
-        libraryId: options.currentUser.personalLibraryId,
+        folderId: targetFolder?.id ?? options.currentUser.personalInboxFolderId,
+        libraryId: targetFolder?.libraryId ?? options.currentUser.personalLibraryId,
         url: bookmark.url
       });
     }),
@@ -81,10 +100,68 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       return listBookmarksPage(options.bookmarksStore, {
         ...pagination,
-        libraryIds: [
-          options.currentUser.personalLibraryId,
-          options.currentUser.organizationLibraryId
-        ]
+        libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    })
+  },
+  folders: {
+    create: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const folder = parseCreateFolderInput(input);
+
+      if (!folder) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a folder title"
+        });
+      }
+
+      return options.bookmarksStore.createFolder({
+        ...folder,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    delete: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const folder = parseDeleteFolderInput(input);
+
+      if (!folder) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose how to delete this folder"
+        });
+      }
+
+      return options.bookmarksStore.deleteFolder({
+        ...folder,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    list: os.handler(() => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      return options.bookmarksStore.listFolders({
+        libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    update: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const folder = parseUpdateFolderInput(input);
+
+      if (!folder) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a folder title"
+        });
+      }
+
+      return options.bookmarksStore.updateFolder({
+        ...folder,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     })
   }
@@ -94,7 +171,7 @@ export type RpcRouter = ReturnType<typeof createRpcRouter>;
 
 const parseBookmarksInput = (
   input: unknown
-): { limit: number; cursor?: BookmarkCursor } | null => {
+): { limit: number; cursor?: BookmarkCursor; folderId?: string } | null => {
   if (!isRecord(input)) {
     return {
       limit: parseBookmarksLimit(null)
@@ -110,6 +187,7 @@ const parseBookmarksInput = (
 
   return {
     cursor: cursor ?? undefined,
+    folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
     limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null)
   };
 };
@@ -130,9 +208,97 @@ const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null =>
     }
 
     return {
+      folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
       url: url.toString()
     };
   } catch {
     return null;
   }
 };
+
+const parseCreateFolderInput = (input: unknown): CreateFolderInput | null => {
+  if (!isRecord(input) || typeof input.libraryId !== "string") {
+    return null;
+  }
+
+  const name = parseFolderName(input.name);
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    libraryId: input.libraryId,
+    name,
+    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null
+  };
+};
+
+const parseUpdateFolderInput = (input: unknown): UpdateFolderInput | null => {
+  if (!isRecord(input) || typeof input.folderId !== "string") {
+    return null;
+  }
+
+  const name = parseFolderName(input.name);
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    folderId: input.folderId,
+    name
+  };
+};
+
+const parseDeleteFolderInput = (input: unknown): DeleteFolderInput | null => {
+  if (!isRecord(input) || typeof input.folderId !== "string") {
+    return null;
+  }
+
+  if (input.mode !== "move" && input.mode !== "delete") {
+    return null;
+  }
+
+  return {
+    destinationFolderId:
+      typeof input.destinationFolderId === "string" && input.destinationFolderId
+        ? input.destinationFolderId
+        : null,
+    folderId: input.folderId,
+    mode: input.mode
+  };
+};
+
+const parseFolderName = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const name = value.trim();
+
+  return name ? name : null;
+};
+
+const currentUserLibraryIds = (currentUser: DevIdentity) => [
+  currentUser.personalLibraryId,
+  currentUser.organizationLibraryId
+];
+
+function assertCurrentUser(currentUser: DevIdentity | undefined): asserts currentUser is DevIdentity {
+  if (!currentUser) {
+    throw new ORPCError("UNAUTHORIZED", {
+      message: "No current user is configured"
+    });
+  }
+}
+
+function assertBookmarksStore(
+  bookmarksStore: BookmarksStore | undefined
+): asserts bookmarksStore is BookmarksStore {
+  if (!bookmarksStore) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "Bookmarks storage is not configured"
+    });
+  }
+}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { BookmarkItem } from "@bookmarks/shared";
+import type { BookmarkItem, FolderItem } from "@bookmarks/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
 
@@ -45,6 +45,17 @@ describe("App", () => {
         updatedAt: "2026-06-19T12:00:00.000Z"
       }
     ];
+    const folders: FolderItem[] = [
+      {
+        id: "00000000-0000-4000-8000-000000000005",
+        libraryId: "00000000-0000-4000-8000-000000000003",
+        parentId: null,
+        name: "Inbox",
+        bookmarkCount: 1,
+        createdAt: "2026-06-19T12:00:00.000Z",
+        updatedAt: "2026-06-19T12:00:00.000Z"
+      }
+    ];
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
@@ -65,7 +76,14 @@ describe("App", () => {
                 slug: "dev",
                 role: "owner"
               },
-              libraries: []
+              libraries: [
+                {
+                  id: "00000000-0000-4000-8000-000000000003",
+                  kind: "personal",
+                  name: "Personal",
+                  inboxFolderId: "00000000-0000-4000-8000-000000000005"
+                }
+              ]
             }
           }),
           {
@@ -92,6 +110,41 @@ describe("App", () => {
         );
       }
 
+      if (url.pathname === "/rpc/folders/list") {
+        return new Response(
+          JSON.stringify({
+            json: folders
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/folders/create") {
+        const body = (await request.json()) as {
+          json?: { libraryId?: string; name?: string; parentId?: string | null };
+        };
+        const folder = {
+          id: "00000000-0000-4000-8000-000000000020",
+          libraryId: body.json?.libraryId || "00000000-0000-4000-8000-000000000003",
+          parentId: body.json?.parentId ?? null,
+          name: body.json?.name || "Reading",
+          bookmarkCount: 0,
+          createdAt: "2026-06-20T12:00:00.000Z",
+          updatedAt: "2026-06-20T12:00:00.000Z"
+        };
+        folders.push(folder);
+
+        return new Response(JSON.stringify({ json: folder }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
       if (url.pathname === "/rpc/bookmarks/create") {
         const body = (await request.json()) as { json?: { url?: string } };
         const savedItem = {
@@ -114,19 +167,33 @@ describe("App", () => {
         });
       }
 
+      if (url.pathname === "/rpc/health") {
+        return new Response(
+          JSON.stringify({
+            json: {
+              status: "ok",
+              services: {
+                database: "ok",
+                queue: "ok",
+                search: "ok"
+              },
+              checkedAt: "2026-06-19T12:00:00.000Z"
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
       return new Response(
         JSON.stringify({
-          json: {
-            status: "ok",
-            services: {
-              database: "ok",
-              queue: "ok",
-              search: "ok"
-            },
-            checkedAt: "2026-06-19T12:00:00.000Z"
-          }
+          error: `Unhandled test request: ${url.pathname}`
         }),
         {
+          status: 404,
           headers: {
             "content-type": "application/json"
           }
@@ -141,8 +208,7 @@ describe("App", () => {
       expect(screen.getAllByText("Dev User")).toHaveLength(2);
     });
 
-    expect(screen.getByRole("link", { name: "Items" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Inbox" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Items" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Tags" })).toBeNull();
@@ -153,6 +219,13 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Example Article")).toBeTruthy();
       expect(screen.getByText("https://example.com/article")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Folder actions for Inbox" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Folder actions for Inbox" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("menuitem", { name: "Create new folder" })).toBeTruthy();
     });
 
     expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();

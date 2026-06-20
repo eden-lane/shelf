@@ -45,6 +45,28 @@ const currentUser = {
   organizationSlug: DEV_ORGANIZATION_SLUG
 };
 
+const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStore => ({
+  async createBookmark() {
+    throw new Error("not used");
+  },
+  async createFolder() {
+    throw new Error("not used");
+  },
+  async deleteFolder() {
+    throw new Error("not used");
+  },
+  async listBookmarks() {
+    return [];
+  },
+  async listFolders() {
+    return [];
+  },
+  async updateFolder() {
+    throw new Error("not used");
+  },
+  ...overrides
+});
+
 describe("health endpoint", () => {
   test("returns the health response from the Hono app", async () => {
     const app = createApp({
@@ -116,10 +138,7 @@ describe("current user endpoint", () => {
 describe("bookmarks RPC", () => {
   test("returns cursor-paginated bookmark items through oRPC", async () => {
     const calls: Parameters<BookmarksStore["listBookmarks"]>[0][] = [];
-    const bookmarksStore: BookmarksStore = {
-      async createBookmark() {
-        throw new Error("not used");
-      },
+    const bookmarksStore = createBookmarksStore({
       async listBookmarks(input) {
         calls.push(input);
 
@@ -148,7 +167,7 @@ describe("bookmarks RPC", () => {
           }
         ];
       }
-    };
+    });
     const app = createApp({
       bookmarksStore,
       currentUser,
@@ -177,14 +196,7 @@ describe("bookmarks RPC", () => {
 
   test("rejects bookmark RPC calls without a current user", async () => {
     const app = createApp({
-      bookmarksStore: {
-        async createBookmark() {
-          throw new Error("not used");
-        },
-        async listBookmarks() {
-          return [];
-        }
-      },
+      bookmarksStore: createBookmarksStore({}),
       dependencies: dependencies()
     });
 
@@ -201,7 +213,7 @@ describe("bookmarks RPC", () => {
 
   test("creates a bookmark through oRPC in the personal inbox", async () => {
     const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
-    const bookmarksStore: BookmarksStore = {
+    const bookmarksStore = createBookmarksStore({
       async createBookmark(input) {
         calls.push(input);
 
@@ -216,11 +228,8 @@ describe("bookmarks RPC", () => {
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
         };
-      },
-      async listBookmarks() {
-        return [];
       }
-    };
+    });
     const app = createApp({
       bookmarksStore,
       currentUser,
@@ -248,14 +257,7 @@ describe("bookmarks RPC", () => {
 
   test("rejects invalid bookmark URLs", async () => {
     const app = createApp({
-      bookmarksStore: {
-        async createBookmark() {
-          throw new Error("not used");
-        },
-        async listBookmarks() {
-          return [];
-        }
-      },
+      bookmarksStore: createBookmarksStore({}),
       currentUser,
       dependencies: dependencies()
     });
@@ -269,5 +271,135 @@ describe("bookmarks RPC", () => {
     });
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("folders RPC", () => {
+  test("lists folders for the current user's libraries", async () => {
+    const calls: Parameters<BookmarksStore["listFolders"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async listFolders(input) {
+          calls.push(input);
+
+          return [
+            {
+              id: DEV_PERSONAL_INBOX_FOLDER_ID,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              parentId: null,
+              name: "Inbox",
+              bookmarkCount: 0,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/folders/list", {
+      body: JSON.stringify({ json: null }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json[0].name).toBe("Inbox");
+    expect(calls[0]).toEqual({
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID]
+    });
+  });
+
+  test("creates a folder with the current user's allowed libraries", async () => {
+    const calls: Parameters<BookmarksStore["createFolder"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async createFolder(input) {
+          calls.push(input);
+
+          return {
+            id: "00000000-0000-4000-8000-000000000020",
+            libraryId: input.libraryId,
+            parentId: input.parentId ?? null,
+            name: input.name,
+            bookmarkCount: 0,
+            createdAt: "2026-06-20T12:00:00.000Z",
+            updatedAt: "2026-06-20T12:00:00.000Z"
+          };
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/folders/create", {
+      body: JSON.stringify({
+        json: {
+          libraryId: DEV_PERSONAL_LIBRARY_ID,
+          name: " Reading ",
+          parentId: DEV_PERSONAL_INBOX_FOLDER_ID
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.name).toBe("Reading");
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      libraryId: DEV_PERSONAL_LIBRARY_ID,
+      name: "Reading",
+      parentId: DEV_PERSONAL_INBOX_FOLDER_ID
+    });
+  });
+
+  test("deletes a folder with explicit bookmark handling", async () => {
+    const calls: Parameters<BookmarksStore["deleteFolder"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async deleteFolder(input) {
+          calls.push(input);
+
+          return {
+            deletedFolderIds: [input.folderId]
+          };
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/folders/delete", {
+      body: JSON.stringify({
+        json: {
+          destinationFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+          folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+          mode: "move"
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.deletedFolderIds).toEqual([DEV_PERSONAL_INBOX_FOLDER_ID]);
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      destinationFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+      folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+      mode: "move"
+    });
   });
 });

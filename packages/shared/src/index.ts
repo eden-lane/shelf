@@ -44,6 +44,16 @@ export interface BookmarkItem {
   updatedAt: string;
 }
 
+export interface FolderItem {
+  id: string;
+  libraryId: string;
+  parentId: string | null;
+  name: string;
+  bookmarkCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BookmarksPageResponse {
   items: BookmarkItem[];
   nextCursor: string | null;
@@ -51,4 +61,28 @@ export interface BookmarksPageResponse {
 
 export interface CreateBookmarkInput {
   url: string;
+  folderId?: string;
+}
+
+export interface ListBookmarksInput {
+  cursor?: string | null;
+  folderId?: string | null;
+  limit?: number;
+}
+
+export interface CreateFolderInput {
+  libraryId: string;
+  parentId?: string | null;
+  name: string;
+}
+
+export interface UpdateFolderInput {
+  folderId: string;
+  name: string;
+}
+
+export interface DeleteFolderInput {
+  folderId: string;
+  mode: "move" | "delete";
+  destinationFolderId?: string | null;
 }
