@@ -3,6 +3,7 @@ import {
   Fragment,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -25,6 +26,8 @@ import type {
   FolderItem
 } from "@bookmarks/shared";
 import { Dialog } from "@base-ui/react/dialog";
+import { Popover } from "@base-ui/react/popover";
+import * as TablerIcons from "@tabler/icons-react";
 import {
   IconAlertTriangle,
   IconArchive,
@@ -109,39 +112,18 @@ const COLLAPSED_LIBRARIES_STORAGE_KEY = "bookmarks.collapsedLibraries";
 const COLLAPSED_FOLDERS_STORAGE_KEY = "bookmarks.collapsedFolders";
 const DEFAULT_FOLDER_ICON_NAME = "IconFolder";
 const DEFAULT_FOLDER_ICON_COLOR = "#697080";
+type TablerIconComponent = typeof IconFolder;
 
-const FOLDER_ICON_COMPONENTS = {
-  IconArchive,
-  IconBook,
-  IconBookmark,
-  IconBriefcase,
-  IconBulb,
-  IconCalendar,
-  IconCode,
-  IconCoffee,
-  IconDeviceGamepad2,
-  IconFileText,
-  IconFolder,
-  IconHeart,
-  IconHome,
-  IconInbox,
-  IconLink,
-  IconMap,
-  IconMovie,
-  IconMusic,
-  IconPalette,
-  IconPhoto,
-  IconPlane,
-  IconSchool,
-  IconShoppingCart,
-  IconStar,
-  IconTag,
-  IconWorld
-};
+const TABLER_ICON_COMPONENTS = TablerIcons as unknown as Record<
+  string,
+  TablerIconComponent | undefined
+>;
+const TABLER_ICON_IDS =
+  ((TablerIcons.iconsList as unknown as { default?: string[] }).default ?? []).filter(Boolean);
 
-type FolderIconName = keyof typeof FOLDER_ICON_COMPONENTS;
+type FolderIconOption = { id?: string; name: string; label: string };
 
-const FOLDER_ICON_OPTIONS: Array<{ name: FolderIconName; label: string }> = [
+const FOLDER_ICON_OPTIONS: FolderIconOption[] = [
   { name: "IconFolder", label: "Folder" },
   { name: "IconInbox", label: "Inbox" },
   { name: "IconArchive", label: "Archive" },
@@ -169,6 +151,14 @@ const FOLDER_ICON_OPTIONS: Array<{ name: FolderIconName; label: string }> = [
   { name: "IconTag", label: "Tag" },
   { name: "IconWorld", label: "World" }
 ];
+const FOLDER_ICON_RESULT_LIMIT = FOLDER_ICON_OPTIONS.length;
+const ALL_FOLDER_ICON_OPTIONS = TABLER_ICON_IDS.map((id) => ({
+  id,
+  name: toFolderIconComponentName(id),
+  label: formatFolderIconLabel(id)
+}))
+  .filter(({ name }) => TABLER_ICON_COMPONENTS[name])
+  .sort((first, second) => first.label.localeCompare(second.label));
 
 const FOLDER_ICON_COLORS = [
   "#697080",
@@ -514,19 +504,24 @@ const FolderSidebar = ({
                   >
                     {creatingTarget?.libraryId === library.id &&
                     creatingTarget.parentId === null ? (
-                      <InlineFolderForm
-                        error={createFolderMutation.isError ? "Folder could not be created." : null}
-                        isPending={createFolderMutation.isPending}
-                        submitLabel="Create"
-                        onCancel={() => setCreatingTarget(null)}
-                        onSubmit={(folder) =>
-                          createFolderMutation.mutate({
-                            libraryId: library.id,
-                            ...folder,
-                            parentId: null
-                          })
-                        }
-                      />
+                      <div style={{ marginLeft: `${folderRowIndent(1)}px` }}>
+                        <InlineFolderForm
+                          error={
+                            createFolderMutation.isError ? "Folder could not be created." : null
+                          }
+                          isPending={createFolderMutation.isPending}
+                          leadingSlot={<FolderDisclosurePlaceholder />}
+                          submitLabel="Create"
+                          onCancel={() => setCreatingTarget(null)}
+                          onSubmit={(folder) =>
+                            createFolderMutation.mutate({
+                              libraryId: library.id,
+                              ...folder,
+                              parentId: null
+                            })
+                          }
+                        />
+                      </div>
                     ) : null}
                     {roots.map((folder) => (
                       <FolderTreeRow
@@ -654,7 +649,7 @@ const FolderTreeRow = ({
   const isCollapsed = hasChildren && collapsedFolderIds.has(folder.id) && !isFiltering;
   const FolderIcon = getFolderIconComponent(folder.iconName);
   const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
-  const indent = 8 + level * 18;
+  const indent = folderRowIndent(level);
 
   return (
     <Fragment>
@@ -677,6 +672,14 @@ const FolderTreeRow = ({
               defaultIconName={folder.iconName}
               error={editError}
               isPending={editPending}
+              leadingSlot={
+                <FolderDisclosureControl
+                  folderName={folder.name}
+                  isCollapsed={isCollapsed}
+                  hasChildren={hasChildren}
+                  onToggle={() => onToggleFolder(folder.id)}
+                />
+              }
               submitLabel="Save"
               onCancel={onCancelEdit}
               onSubmit={(value) => onEditFolder(folder.id, value)}
@@ -750,10 +753,11 @@ const FolderTreeRow = ({
         <div className="overflow-hidden">
           <div className={isCollapsed ? "pointer-events-none" : ""}>
             {isCreatingChild ? (
-              <div style={{ marginLeft: `${8 + (level + 1) * 18}px` }}>
+              <div style={{ marginLeft: `${folderRowIndent(level + 1)}px` }}>
                 <InlineFolderForm
                   error={createError}
                   isPending={createPending}
+                  leadingSlot={<FolderDisclosurePlaceholder />}
                   submitLabel="Create"
                   onCancel={onCancelCreate}
                   onSubmit={(value) => onCreateFolder(folder.libraryId, folder.id, value)}
@@ -844,13 +848,64 @@ const writeStringSet = (storageKey: string, items: ReadonlySet<string>) => {
   }
 };
 
-const normalizeFolderIconName = (iconName: string | null | undefined): FolderIconName =>
-  iconName && iconName in FOLDER_ICON_COMPONENTS
-    ? (iconName as FolderIconName)
-    : DEFAULT_FOLDER_ICON_NAME;
+function formatFolderIconLabel(iconNameOrId: string) {
+  return iconNameOrId
+    .replace(/^Icon/, "")
+    .replace(/-/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/(\d+)/g, " $1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toFolderIconComponentName(iconId: string) {
+  return `Icon${iconId
+    .split("-")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : ""))
+    .join("")}`;
+}
+
+const normalizeFolderIconName = (iconName: string | null | undefined) =>
+  iconName && TABLER_ICON_COMPONENTS[iconName] ? iconName : DEFAULT_FOLDER_ICON_NAME;
 
 const getFolderIconComponent = (iconName: string | null | undefined) =>
-  FOLDER_ICON_COMPONENTS[normalizeFolderIconName(iconName)];
+  TABLER_ICON_COMPONENTS[normalizeFolderIconName(iconName)] ?? IconFolder;
+
+const folderRowIndent = (level: number) => 8 + level * 18;
+
+const FolderDisclosurePlaceholder = () => <span className="h-7 w-6 shrink-0" aria-hidden="true" />;
+
+const FolderDisclosureControl = ({
+  folderName,
+  hasChildren,
+  isCollapsed,
+  onToggle
+}: {
+  folderName: string;
+  hasChildren: boolean;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) => {
+  if (!hasChildren) {
+    return <FolderDisclosurePlaceholder />;
+  }
+
+  return (
+    <button
+      className="grid h-7 w-6 shrink-0 place-items-center rounded-lg text-gray-500 outline-none hover:bg-gray-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+      aria-expanded={!isCollapsed}
+      aria-label={`${isCollapsed ? "Expand" : "Collapse"} folder ${folderName}`}
+      type="button"
+      onClick={onToggle}
+    >
+      {isCollapsed ? (
+        <IconChevronRight size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+      ) : (
+        <IconChevronDown size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+      )}
+    </button>
+  );
+};
 
 const InlineFolderForm = ({
   defaultValue = "",
@@ -858,6 +913,7 @@ const InlineFolderForm = ({
   defaultIconName = null,
   error,
   isPending,
+  leadingSlot,
   submitLabel,
   onCancel,
   onSubmit
@@ -867,6 +923,7 @@ const InlineFolderForm = ({
   defaultIconName?: string | null;
   error: string | null;
   isPending: boolean;
+  leadingSlot?: ReactNode;
   submitLabel: string;
   onCancel: () => void;
   onSubmit: (value: FolderFormValue) => void;
@@ -876,7 +933,6 @@ const InlineFolderForm = ({
   const [iconName, setIconName] = useState(defaultIconName ?? DEFAULT_FOLDER_ICON_NAME);
   const [iconColor, setIconColor] = useState(defaultIconColor ?? DEFAULT_FOLDER_ICON_COLOR);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
-  const Icon = getFolderIconComponent(iconName);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -885,7 +941,7 @@ const InlineFolderForm = ({
 
   return (
     <form
-      className="flex min-w-0 flex-1 items-center gap-1"
+      className="grid min-h-9 min-w-0 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1"
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -900,15 +956,20 @@ const InlineFolderForm = ({
         }
       }}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-1">
-        <button
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent bg-transparent outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          aria-label="Choose folder icon"
-          type="button"
-          onClick={() => setIsIconPickerOpen(true)}
-        >
-          <Icon size={19} stroke={1.5} color={iconColor} aria-hidden="true" focusable="false" />
-        </button>
+      <div className="flex min-w-0 items-center gap-1">
+        {leadingSlot}
+        <FolderIconPickerDropdown
+          iconColor={iconColor}
+          iconName={iconName}
+          isOpen={isIconPickerOpen}
+          onCancel={() => setIsIconPickerOpen(false)}
+          onCommit={(nextIconName, nextIconColor) => {
+            setIconName(nextIconName);
+            setIconColor(nextIconColor);
+            setIsIconPickerOpen(false);
+          }}
+          onOpenChange={setIsIconPickerOpen}
+        />
         <input
           className="min-h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 text-sm font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]"
           aria-label="Folder title"
@@ -920,57 +981,52 @@ const InlineFolderForm = ({
           onChange={(event) => setName(event.target.value)}
         />
       </div>
-      <FolderIconPickerDialog
-        iconColor={iconColor}
-        iconName={iconName}
-        isOpen={isIconPickerOpen}
-        onChangeColor={setIconColor}
-        onChangeIcon={setIconName}
-        onOpenChange={setIsIconPickerOpen}
-      />
-      {error ? <p className="m-0 text-xs font-bold text-[#9a4d0a]">{error}</p> : null}
-      <div className="flex shrink-0 items-center gap-1">
-        <button
-          className="grid h-8 w-8 place-items-center rounded-lg border border-transparent bg-transparent text-[#697080] outline-none hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          aria-label="Cancel"
-          disabled={isPending}
-          title="Cancel"
-          type="button"
-          onClick={onCancel}
-        >
-          <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
-        </button>
-        <button
-          className="grid h-8 w-8 place-items-center rounded-lg border border-transparent bg-transparent text-[#3b8df5] outline-none hover:bg-[#eef6ff] disabled:cursor-not-allowed disabled:text-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          aria-label={isPending ? "Saving" : submitLabel}
-          disabled={isPending}
-          title={isPending ? "Saving" : submitLabel}
-          type="submit"
-        >
-          <IconCheck size={17} stroke={1.8} aria-hidden="true" focusable="false" />
-        </button>
-      </div>
+      <button
+        className="grid h-8 w-7 place-items-center rounded-lg border border-transparent bg-transparent text-[#697080] outline-none hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+        aria-label="Cancel"
+        disabled={isPending}
+        title="Cancel"
+        type="button"
+        onClick={onCancel}
+      >
+        <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+      </button>
+      <button
+        className="grid h-8 w-8 place-items-center rounded-lg border border-transparent bg-transparent text-[#3b8df5] outline-none hover:bg-[#eef6ff] disabled:cursor-not-allowed disabled:text-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+        aria-label={isPending ? "Saving" : submitLabel}
+        disabled={isPending}
+        title={isPending ? "Saving" : submitLabel}
+        type="submit"
+      >
+        <IconCheck size={17} stroke={1.8} aria-hidden="true" focusable="false" />
+      </button>
+      {error ? (
+        <p className="col-span-3 m-0 text-xs font-bold text-[#9a4d0a]">{error}</p>
+      ) : null}
     </form>
   );
 };
 
-const FolderIconPickerDialog = ({
+const FolderIconPickerDropdown = ({
   iconColor,
   iconName,
   isOpen,
-  onChangeColor,
-  onChangeIcon,
+  onCancel,
+  onCommit,
   onOpenChange
 }: {
   iconColor: string;
   iconName: string;
   isOpen: boolean;
-  onChangeColor: (color: string) => void;
-  onChangeIcon: (iconName: string) => void;
+  onCancel: () => void;
+  onCommit: (iconName: string, iconColor: string) => void;
   onOpenChange: (open: boolean) => void;
 }) => {
   const [search, setSearch] = useState("");
-  const selectedIcon = normalizeFolderIconName(iconName);
+  const [draftIconName, setDraftIconName] = useState(iconName);
+  const [draftIconColor, setDraftIconColor] = useState(iconColor);
+  const TriggerIcon = getFolderIconComponent(iconName);
+  const selectedIcon = normalizeFolderIconName(draftIconName);
   const filteredIcons = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -978,95 +1034,125 @@ const FolderIconPickerDialog = ({
       return FOLDER_ICON_OPTIONS;
     }
 
-    return FOLDER_ICON_OPTIONS.filter(
+    return ALL_FOLDER_ICON_OPTIONS.filter(
       (icon) =>
-        icon.label.toLowerCase().includes(query) || icon.name.toLowerCase().includes(query)
-    );
+        icon.label.toLowerCase().includes(query) ||
+        icon.name.toLowerCase().includes(query) ||
+        icon.id?.toLowerCase().includes(query)
+    ).slice(0, FOLDER_ICON_RESULT_LIMIT);
   }, [search]);
 
-  return (
-    <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 z-40 bg-[#101522]/45" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid max-h-[min(680px,calc(100vh-32px))] w-[min(calc(100vw-32px),520px)] -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_auto_minmax(0,1fr)] gap-4 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none">
-          <div className="grid gap-1 pr-9">
-            <Dialog.Title className="text-lg leading-[1.25] font-extrabold">
-              Folder icon
-            </Dialog.Title>
-          </div>
-          <Dialog.Close
-            className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-            aria-label="Close folder icon picker"
-            type="button"
-          >
-            <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
-          </Dialog.Close>
-          <div className="grid gap-3">
-            <label className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-lg border border-[#dfe4ef] bg-white px-2.5 text-[#697080] outline-none focus-within:border-[#3b8df5] focus-within:ring-3 focus-within:ring-[#d9eaff]">
-              <IconSearch size={20} stroke={1.5} aria-hidden="true" focusable="false" />
-              <input
-                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]"
-                aria-label="Search icons"
-                placeholder="Search icons..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            <div className="flex flex-wrap gap-2" aria-label="Icon colors">
-              {FOLDER_ICON_COLORS.map((color) => (
-                <button
-                  className={[
-                    "grid h-8 w-8 place-items-center rounded-full border outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
-                    iconColor === color ? "border-[#242833]" : "border-[#dfe4ef]"
-                  ].join(" ")}
-                  aria-label={`Select color ${color}`}
-                  key={color}
-                  type="button"
-                  onClick={() => onChangeColor(color)}
-                >
-                  <span
-                    className="block h-5 w-5 rounded-full"
-                    style={{ backgroundColor: color }}
-                    aria-hidden="true"
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
-              {filteredIcons.map(({ label, name }) => {
-                const PickerIcon = FOLDER_ICON_COMPONENTS[name];
-                const isSelected = selectedIcon === name;
+  useEffect(() => {
+    if (isOpen) {
+      setSearch("");
+      setDraftIconName(normalizeFolderIconName(iconName));
+      setDraftIconColor(iconColor);
+    }
+  }, [iconColor, iconName, isOpen]);
 
-                return (
+  return (
+    <Popover.Root open={isOpen} onOpenChange={onOpenChange}>
+      <Popover.Trigger
+        className="grid h-8 w-[21px] shrink-0 place-items-center rounded-lg border border-transparent bg-transparent outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+        aria-label="Choose folder icon"
+        type="button"
+      >
+        <TriggerIcon
+          size={19}
+          stroke={1.5}
+          color={iconColor}
+          aria-hidden="true"
+          focusable="false"
+        />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Positioner className="z-[80]" side="bottom" align="start" sideOffset={6}>
+          <Popover.Popup
+            className="grid max-h-[min(420px,calc(100vh-24px))] w-[312px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[#dfe4ef] bg-white text-[#242833] shadow-[0_16px_48px_rgb(22_28_43_/_0.18)] outline-none"
+            aria-label="Folder icon picker"
+          >
+            <div className="grid gap-2 border-b border-[#eef1f6] p-2.5">
+              <label className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-lg border border-[#dfe4ef] bg-white px-2.5 text-[#697080] outline-none focus-within:border-[#3b8df5] focus-within:ring-3 focus-within:ring-[#d9eaff]">
+                <IconSearch size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-xs font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]"
+                  aria-label="Search icons"
+                  placeholder="Search icons..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
+              <div className="flex flex-wrap gap-1.5" aria-label="Icon colors">
+                {FOLDER_ICON_COLORS.map((color) => (
                   <button
                     className={[
-                      "grid min-h-[74px] gap-1 rounded-lg border bg-white p-2 text-center text-xs font-medium text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
-                      isSelected ? "border-[#3b8df5] ring-3 ring-[#d9eaff]" : "border-[#dfe4ef]"
+                      "grid h-6 w-6 place-items-center rounded-full border outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
+                      draftIconColor === color ? "border-[#242833]" : "border-[#dfe4ef]"
                     ].join(" ")}
-                    aria-pressed={isSelected}
-                    key={name}
+                    aria-label={`Select color ${color}`}
+                    key={color}
                     type="button"
-                    onClick={() => onChangeIcon(name)}
+                    onClick={() => setDraftIconColor(color)}
                   >
-                    <PickerIcon
-                      className="mx-auto"
-                      size={24}
-                      stroke={1.5}
-                      color={iconColor}
+                    <span
+                      className="block h-4 w-4 rounded-full"
+                      style={{ backgroundColor: color }}
                       aria-hidden="true"
-                      focusable="false"
                     />
-                    <span className="truncate">{label}</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-        </Dialog.Popup>
-      </Dialog.Portal>
-    </Dialog.Root>
+            <div className="min-h-0 overflow-y-auto p-2">
+              <div className="grid grid-cols-[repeat(auto-fill,40px)] justify-start gap-1.5">
+                {filteredIcons.map(({ label, name }) => {
+                  const PickerIcon = getFolderIconComponent(name);
+                  const isSelected = selectedIcon === name;
+
+                  return (
+                    <button
+                      className={[
+                        "grid h-9 w-10 place-items-center rounded-md border bg-white p-1 text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
+                        isSelected ? "border-[#3b8df5] ring-3 ring-[#d9eaff]" : "border-[#dfe4ef]"
+                      ].join(" ")}
+                      aria-label={label}
+                      aria-pressed={isSelected}
+                      key={name}
+                      type="button"
+                      onClick={() => setDraftIconName(name)}
+                    >
+                      <PickerIcon
+                        size={18}
+                        stroke={1.5}
+                        color={draftIconColor}
+                        aria-hidden="true"
+                        focusable="false"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[#eef1f6] bg-white p-2">
+              <button
+                className="h-8 rounded-md px-3 text-xs font-medium text-[#697080] outline-none hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                type="button"
+                onClick={onCancel}
+              >
+                Cancel
+              </button>
+              <button
+                className="h-8 rounded-md bg-[#3b8df5] px-3 text-xs font-medium text-white outline-none hover:bg-[#2f7fe6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                type="button"
+                onClick={() => onCommit(selectedIcon, draftIconColor)}
+              >
+                Okay
+              </button>
+            </div>
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 };
 

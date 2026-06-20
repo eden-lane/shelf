@@ -20,6 +20,7 @@ setGlobal("HTMLElement", window.HTMLElement);
 setGlobal("Element", window.Element);
 setGlobal("Node", window.Node);
 setGlobal("MutationObserver", window.MutationObserver);
+setGlobal("getComputedStyle", window.getComputedStyle.bind(window));
 setGlobal("requestAnimationFrame", window.requestAnimationFrame.bind(window));
 setGlobal("cancelAnimationFrame", window.cancelAnimationFrame.bind(window));
 
@@ -452,15 +453,15 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Choose folder icon" }));
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Folder icon" })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Folder icon picker" })).toBeTruthy();
     });
     const iconSearchInput = screen.getByLabelText("Search icons") as HTMLInputElement;
     fireEvent.change(iconSearchInput, { target: { value: "book" } });
     fireEvent.click(screen.getByRole("button", { name: "Book" }));
     fireEvent.click(screen.getByRole("button", { name: "Select color #3b82f6" }));
-    fireEvent.click(screen.getByRole("button", { name: "Close folder icon picker" }));
+    fireEvent.click(screen.getByRole("button", { name: "Okay" }));
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Folder icon" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Folder icon picker" })).toBeNull();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
