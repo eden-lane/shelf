@@ -12,4 +12,5 @@ apps/web/.vite
 apps/web/dist
 apps/extensions/.wxt
 apps/extensions/.output
+apps/extensions/safari-web-extension
 apps/extensions/safari-extension

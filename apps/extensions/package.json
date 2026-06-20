@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "wxt build",
+    "build:safari": "bun run build:safari:web && bun scripts/build-safari-project.mjs",
+    "build:safari:web": "wxt build --browser safari",
     "dev": "wxt",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json"
   },
