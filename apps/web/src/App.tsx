@@ -1,11 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
+  type InfiniteData,
   QueryClient,
   QueryClientProvider,
+  useMutation,
   useInfiniteQuery,
+  useQueryClient,
   useQuery
 } from "@tanstack/react-query";
-import type { BookmarkItem, CurrentUserResponse, HealthResponse } from "@bookmarks/shared";
+import type {
+  BookmarkItem,
+  BookmarksPageResponse,
+  CurrentUserResponse,
+  HealthResponse
+} from "@bookmarks/shared";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   IconAlertTriangle,
@@ -17,7 +25,7 @@ import {
   IconRefresh,
   IconX
 } from "@tabler/icons-react";
-import { getBookmarks, getCurrentUser, getHealth } from "./api";
+import { createBookmark, getBookmarks, getCurrentUser, getHealth } from "./api";
 
 const navItems = [
   { label: "Items", icon: IconBookmark }
@@ -282,9 +290,39 @@ const formatBookmarkDate = (date: string) =>
 
 const AddBookmarkDialog = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const queryClient = useQueryClient();
+  const addBookmark = useMutation({
+    mutationFn: createBookmark,
+    onSuccess: (bookmark) => {
+      queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+        ["bookmarks"],
+        (data) => insertBookmarkIntoPages(data, bookmark)
+      );
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      formRef.current?.reset();
+      setIsOpen(false);
+    }
+  });
+
+  const submitBookmark = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const url = String(formData.get("url") ?? "");
+
+    addBookmark.mutate({ url });
+  };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => setIsOpen(open)}>
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) {
+          addBookmark.reset();
+        }
+      }}
+    >
       <Dialog.Trigger
         className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 py-[11px] text-sm font-extrabold text-white shadow-[0_12px_28px_rgb(59_141_245_/_0.22)] outline-none hover:bg-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
         type="button"
@@ -310,7 +348,7 @@ const AddBookmarkDialog = () => {
           >
             <IconX size={17} stroke={2.2} aria-hidden="true" focusable="false" />
           </Dialog.Close>
-          <form className="grid gap-4" onSubmit={(event) => event.preventDefault()}>
+          <form className="grid gap-4" ref={formRef} onSubmit={submitBookmark}>
             <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
               Page URL
               <input
@@ -318,21 +356,29 @@ const AddBookmarkDialog = () => {
                 id="bookmark-url"
                 name="url"
                 placeholder="https://example.com/article"
+                required
                 type="url"
               />
             </label>
+            {addBookmark.isError ? (
+              <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">
+                Bookmark could not be saved.
+              </p>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Dialog.Close
                 className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                disabled={addBookmark.isPending}
                 type="button"
               >
                 Cancel
               </Dialog.Close>
               <button
-                className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] disabled:cursor-not-allowed disabled:border-[#91bff8] disabled:bg-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                disabled={addBookmark.isPending}
                 type="submit"
               >
-                Save
+                {addBookmark.isPending ? "Saving" : "Save"}
               </button>
             </div>
           </form>
@@ -340,6 +386,40 @@ const AddBookmarkDialog = () => {
       </Dialog.Portal>
     </Dialog.Root>
   );
+};
+
+const insertBookmarkIntoPages = (
+  data: InfiniteData<BookmarksPageResponse, string | null> | undefined,
+  bookmark: BookmarkItem
+): InfiniteData<BookmarksPageResponse, string | null> => {
+  if (!data) {
+    return {
+      pageParams: [null],
+      pages: [
+        {
+          items: [bookmark],
+          nextCursor: null
+        }
+      ]
+    };
+  }
+
+  const pagesWithoutDuplicate = data.pages.map((page) => ({
+    ...page,
+    items: page.items.filter((item) => item.id !== bookmark.id)
+  }));
+  const [firstPage, ...restPages] = pagesWithoutDuplicate;
+
+  return {
+    ...data,
+    pages: [
+      {
+        ...(firstPage ?? { nextCursor: null }),
+        items: [bookmark, ...(firstPage?.items ?? [])]
+      },
+      ...restPages
+    ]
+  };
 };
 
 const HealthSummary = ({

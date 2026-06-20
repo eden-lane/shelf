@@ -1,5 +1,7 @@
 import type {
+  BookmarkItem,
   BookmarksPageResponse,
+  CreateBookmarkInput,
   CurrentUserResponse,
   HealthResponse
 } from "@bookmarks/shared";
@@ -21,6 +23,7 @@ interface WebRpcClient extends Record<string, NestedClient<Record<never, never>>
 }
 
 interface BookmarksRpcClient extends Record<string, NestedClient<Record<never, never>>> {
+  create: RpcProcedure<CreateBookmarkInput, BookmarkItem>;
   list: RpcProcedure<{ cursor?: string | null; limit?: number }, BookmarksPageResponse>;
 }
 
@@ -40,3 +43,6 @@ export const getBookmarks = async ({
     limit
   });
 };
+
+export const createBookmark = async (input: CreateBookmarkInput): Promise<BookmarkItem> =>
+  rpc.bookmarks.create(input);

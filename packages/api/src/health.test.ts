@@ -155,6 +155,9 @@ describe("bookmarks RPC", () => {
   test("returns cursor-paginated bookmark items through oRPC", async () => {
     const calls: Parameters<BookmarksStore["listBookmarks"]>[0][] = [];
     const bookmarksStore: BookmarksStore = {
+      async createBookmark() {
+        throw new Error("not used");
+      },
       async listBookmarks(input) {
         calls.push(input);
 
@@ -213,6 +216,9 @@ describe("bookmarks RPC", () => {
   test("rejects bookmark RPC calls without a current user", async () => {
     const app = createApp({
       bookmarksStore: {
+        async createBookmark() {
+          throw new Error("not used");
+        },
         async listBookmarks() {
           return [];
         }
@@ -229,5 +235,77 @@ describe("bookmarks RPC", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+
+  test("creates a bookmark through oRPC in the personal inbox", async () => {
+    const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
+    const bookmarksStore: BookmarksStore = {
+      async createBookmark(input) {
+        calls.push(input);
+
+        return {
+          id: "00000000-0000-4000-8000-000000000010",
+          libraryId: input.libraryId,
+          folderId: input.folderId,
+          folderName: "Inbox",
+          url: input.url,
+          title: null,
+          description: null,
+          createdAt: "2026-06-20T12:00:00.000Z",
+          updatedAt: "2026-06-20T12:00:00.000Z"
+        };
+      },
+      async listBookmarks() {
+        return [];
+      }
+    };
+    const app = createApp({
+      bookmarksStore,
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/create", {
+      body: JSON.stringify({ json: { url: "https://example.com/article" } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.url).toBe("https://example.com/article");
+    expect(calls[0]).toEqual({
+      createdByUserId: DEV_USER_ID,
+      folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+      libraryId: DEV_PERSONAL_LIBRARY_ID,
+      url: "https://example.com/article"
+    });
+  });
+
+  test("rejects invalid bookmark URLs", async () => {
+    const app = createApp({
+      bookmarksStore: {
+        async createBookmark() {
+          throw new Error("not used");
+        },
+        async listBookmarks() {
+          return [];
+        }
+      },
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/create", {
+      body: JSON.stringify({ json: { url: "not-a-url" } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+
+    expect(response.status).toBe(400);
   });
 });

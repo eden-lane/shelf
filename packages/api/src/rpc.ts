@@ -1,4 +1,4 @@
-import type { CurrentUserResponse } from "@bookmarks/shared";
+import type { CreateBookmarkInput, CurrentUserResponse } from "@bookmarks/shared";
 import { ORPCError, os } from "@orpc/server";
 import {
   decodeBookmarkCursor,
@@ -29,6 +29,34 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     return currentUserResponse(options.currentUser);
   }),
   bookmarks: {
+    create: os.handler(async ({ input }) => {
+      if (!options.currentUser) {
+        throw new ORPCError("UNAUTHORIZED", {
+          message: "No current user is configured"
+        });
+      }
+
+      if (!options.bookmarksStore) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR", {
+          message: "Bookmarks storage is not configured"
+        });
+      }
+
+      const bookmark = parseCreateBookmarkInput(input);
+
+      if (!bookmark) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a valid URL"
+        });
+      }
+
+      return options.bookmarksStore.createBookmark({
+        createdByUserId: options.currentUser.userId,
+        folderId: options.currentUser.personalInboxFolderId,
+        libraryId: options.currentUser.personalLibraryId,
+        url: bookmark.url
+      });
+    }),
     list: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
@@ -117,3 +145,23 @@ const parseBookmarksInput = (
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null => {
+  if (!isRecord(input) || typeof input.url !== "string") {
+    return null;
+  }
+
+  try {
+    const url = new URL(input.url);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
+
+    return {
+      url: url.toString()
+    };
+  } catch {
+    return null;
+  }
+};

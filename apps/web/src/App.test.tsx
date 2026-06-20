@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { BookmarkItem } from "@bookmarks/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
 
@@ -31,6 +32,20 @@ afterEach(() => {
 
 describe("App", () => {
   test("boots into the authenticated product shell", async () => {
+    const savedItems: BookmarkItem[] = [
+      {
+        id: "00000000-0000-4000-8000-000000000010",
+        libraryId: "00000000-0000-4000-8000-000000000003",
+        folderId: "00000000-0000-4000-8000-000000000005",
+        folderName: "Inbox",
+        url: "https://example.com/article",
+        title: "Example Article",
+        description: "A saved bookmark from the API.",
+        createdAt: "2026-06-19T12:00:00.000Z",
+        updatedAt: "2026-06-19T12:00:00.000Z"
+      }
+    ];
+
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       const url = new URL(request.url);
@@ -65,19 +80,7 @@ describe("App", () => {
         return new Response(
           JSON.stringify({
             json: {
-              items: [
-                {
-                  id: "00000000-0000-4000-8000-000000000010",
-                  libraryId: "00000000-0000-4000-8000-000000000003",
-                  folderId: "00000000-0000-4000-8000-000000000005",
-                  folderName: "Inbox",
-                  url: "https://example.com/article",
-                  title: "Example Article",
-                  description: "A saved bookmark from the API.",
-                  createdAt: "2026-06-19T12:00:00.000Z",
-                  updatedAt: "2026-06-19T12:00:00.000Z"
-                }
-              ],
+              items: savedItems,
               nextCursor: null
             }
           }),
@@ -87,6 +90,28 @@ describe("App", () => {
             }
           }
         );
+      }
+
+      if (url.pathname === "/rpc/bookmarks/create") {
+        const body = (await request.json()) as { json?: { url?: string } };
+        const savedItem = {
+          id: "00000000-0000-4000-8000-000000000011",
+          libraryId: "00000000-0000-4000-8000-000000000003",
+          folderId: "00000000-0000-4000-8000-000000000005",
+          folderName: "Inbox",
+          url: body.json?.url || "https://added.example/post",
+          title: null,
+          description: null,
+          createdAt: "2026-06-20T12:00:00.000Z",
+          updatedAt: "2026-06-20T12:00:00.000Z"
+        };
+        savedItems.unshift(savedItem);
+
+        return new Response(JSON.stringify({ json: savedItem }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
       }
 
       return new Response(

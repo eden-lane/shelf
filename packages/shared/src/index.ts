@@ -48,3 +48,7 @@ export interface BookmarksPageResponse {
   items: BookmarkItem[];
   nextCursor: string | null;
 }
+
+export interface CreateBookmarkInput {
+  url: string;
+}
