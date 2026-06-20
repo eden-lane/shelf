@@ -140,6 +140,11 @@ export const savedItems = pgTable(
   (table) => [
     index("saved_items_library_idx").on(table.libraryId),
     index("saved_items_folder_idx").on(table.folderId),
+    index("saved_items_library_created_at_id_idx").on(
+      table.libraryId,
+      table.createdAt,
+      table.id
+    ),
     uniqueIndex("saved_items_id_library_unique_idx").on(table.id, table.libraryId),
     foreignKey({
       columns: [table.folderId, table.libraryId],

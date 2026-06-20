@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { BookmarksStore } from "./bookmarks";
 import { createApp } from "./app";
 import {
   DEV_ORGANIZATION_ID,
@@ -30,6 +31,21 @@ const dependencies = (overrides: Partial<HealthDependencies> = {}): HealthDepend
   },
   ...overrides
 });
+
+const currentUser = {
+  userId: DEV_USER_ID,
+  organizationId: DEV_ORGANIZATION_ID,
+  personalLibraryId: DEV_PERSONAL_LIBRARY_ID,
+  organizationLibraryId: DEV_ORGANIZATION_LIBRARY_ID,
+  personalInboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+  organizationInboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+  personalLibraryName: DEV_PERSONAL_LIBRARY_NAME,
+  organizationLibraryName: DEV_ORGANIZATION_LIBRARY_NAME,
+  email: DEV_USER_EMAIL,
+  name: DEV_USER_NAME,
+  organizationName: DEV_ORGANIZATION_NAME,
+  organizationSlug: DEV_ORGANIZATION_SLUG
+};
 
 describe("checkHealth", () => {
   test("reports ok when all dependencies are available", async () => {
@@ -86,20 +102,7 @@ describe("current user endpoint", () => {
   test("returns the configured current user", async () => {
     const app = createApp({
       dependencies: dependencies(),
-      currentUser: {
-        userId: DEV_USER_ID,
-        organizationId: DEV_ORGANIZATION_ID,
-        personalLibraryId: DEV_PERSONAL_LIBRARY_ID,
-        organizationLibraryId: DEV_ORGANIZATION_LIBRARY_ID,
-        personalInboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID,
-        organizationInboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
-        personalLibraryName: DEV_PERSONAL_LIBRARY_NAME,
-        organizationLibraryName: DEV_ORGANIZATION_LIBRARY_NAME,
-        email: DEV_USER_EMAIL,
-        name: DEV_USER_NAME,
-        organizationName: DEV_ORGANIZATION_NAME,
-        organizationSlug: DEV_ORGANIZATION_SLUG
-      }
+      currentUser
     });
 
     const response = await app.request("/me");
@@ -143,6 +146,87 @@ describe("current user endpoint", () => {
     });
 
     const response = await app.request("/me");
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("bookmarks RPC", () => {
+  test("returns cursor-paginated bookmark items through oRPC", async () => {
+    const calls: Parameters<BookmarksStore["listBookmarks"]>[0][] = [];
+    const bookmarksStore: BookmarksStore = {
+      async listBookmarks(input) {
+        calls.push(input);
+
+        return [
+          {
+            id: "00000000-0000-4000-8000-000000000010",
+            libraryId: DEV_PERSONAL_LIBRARY_ID,
+            folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+            folderName: "Inbox",
+            url: "https://example.com/first",
+            title: "First",
+            description: null,
+            createdAt: "2026-06-19T12:00:00.000Z",
+            updatedAt: "2026-06-19T12:00:00.000Z"
+          },
+          {
+            id: "00000000-0000-4000-8000-000000000009",
+            libraryId: DEV_PERSONAL_LIBRARY_ID,
+            folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+            folderName: "Inbox",
+            url: "https://example.com/second",
+            title: "Second",
+            description: null,
+            createdAt: "2026-06-18T12:00:00.000Z",
+            updatedAt: "2026-06-18T12:00:00.000Z"
+          }
+        ];
+      }
+    };
+    const app = createApp({
+      bookmarksStore,
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/list", {
+      body: JSON.stringify({ json: { limit: 1 } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.items).toHaveLength(1);
+    expect(body.json.items[0].title).toBe("First");
+    expect(typeof body.json.nextCursor).toBe("string");
+    expect(calls[0]).toEqual({
+      cursor: undefined,
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      limit: 1
+    });
+  });
+
+  test("rejects bookmark RPC calls without a current user", async () => {
+    const app = createApp({
+      bookmarksStore: {
+        async listBookmarks() {
+          return [];
+        }
+      },
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/list", {
+      body: JSON.stringify({ json: { limit: 1 } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
 
     expect(response.status).toBe(401);
   });

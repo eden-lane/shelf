@@ -31,24 +31,54 @@ afterEach(() => {
 
 describe("App", () => {
   test("boots into the authenticated product shell", async () => {
-    const { App } = await import("./App");
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
 
-    globalThis.fetch = (async (input: RequestInfo | URL) => {
-      const url = new URL(input.toString());
-
-      if (url.pathname === "/me") {
+      if (url.pathname === "/rpc/currentUser") {
         return new Response(
           JSON.stringify({
-            user: {
-              id: "00000000-0000-4000-8000-000000000001",
-              email: "dev@localhost",
-              name: "Dev User"
-            },
-            organization: {
-              id: "00000000-0000-4000-8000-000000000002",
-              name: "Dev Workspace",
-              slug: "dev",
-              role: "owner"
+            json: {
+              user: {
+                id: "00000000-0000-4000-8000-000000000001",
+                email: "dev@localhost",
+                name: "Dev User"
+              },
+              organization: {
+                id: "00000000-0000-4000-8000-000000000002",
+                name: "Dev Workspace",
+                slug: "dev",
+                role: "owner"
+              },
+              libraries: []
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/bookmarks/list") {
+        return new Response(
+          JSON.stringify({
+            json: {
+              items: [
+                {
+                  id: "00000000-0000-4000-8000-000000000010",
+                  libraryId: "00000000-0000-4000-8000-000000000003",
+                  folderId: "00000000-0000-4000-8000-000000000005",
+                  folderName: "Inbox",
+                  url: "https://example.com/article",
+                  title: "Example Article",
+                  description: "A saved bookmark from the API.",
+                  createdAt: "2026-06-19T12:00:00.000Z",
+                  updatedAt: "2026-06-19T12:00:00.000Z"
+                }
+              ],
+              nextCursor: null
             }
           }),
           {
@@ -61,13 +91,15 @@ describe("App", () => {
 
       return new Response(
         JSON.stringify({
-          status: "ok",
-          services: {
-            database: "ok",
-            queue: "ok",
-            search: "ok"
-          },
-          checkedAt: "2026-06-19T12:00:00.000Z"
+          json: {
+            status: "ok",
+            services: {
+              database: "ok",
+              queue: "ok",
+              search: "ok"
+            },
+            checkedAt: "2026-06-19T12:00:00.000Z"
+          }
         }),
         {
           headers: {
@@ -76,6 +108,7 @@ describe("App", () => {
         }
       );
     }) as unknown as typeof fetch;
+    const { App } = await import("./App");
 
     const screen = render(<App />);
 
@@ -83,17 +116,19 @@ describe("App", () => {
       expect(screen.getAllByText("Dev User")).toHaveLength(2);
     });
 
-    for (const item of [
-      "Inbox",
-      "Folders",
-      "Search",
-      "Tags",
-      "System labels",
-      "Sources",
-      "Settings"
-    ]) {
-      expect(screen.getByRole("link", { name: item })).toBeTruthy();
-    }
+    expect(screen.getByRole("link", { name: "Items" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Inbox" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Tags" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "System labels" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Sources" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+
+    await waitFor(() => {
+      expect(screen.getByText("Example Article")).toBeTruthy();
+      expect(screen.getByText("https://example.com/article")).toBeTruthy();
+    });
 
     expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
 

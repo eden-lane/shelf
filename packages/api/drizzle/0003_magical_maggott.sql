@@ -1,0 +1,1 @@
+CREATE INDEX "saved_items_library_created_at_id_idx" ON "saved_items" USING btree ("library_id","created_at","id");

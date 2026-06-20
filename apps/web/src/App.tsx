@@ -1,31 +1,26 @@
-import { useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import type { CurrentUserResponse, HealthResponse } from "@bookmarks/shared";
+import { useEffect, useRef, useState } from "react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useInfiniteQuery,
+  useQuery
+} from "@tanstack/react-query";
+import type { BookmarkItem, CurrentUserResponse, HealthResponse } from "@bookmarks/shared";
 import { Dialog } from "@base-ui/react/dialog";
 import {
   IconAlertTriangle,
   IconBookmark,
   IconCircleCheck,
-  IconDatabase,
+  IconExternalLink,
   IconFolder,
-  IconInbox,
   IconPlus,
-  IconSearch,
-  IconSettings,
-  IconTag,
-  IconTags,
+  IconRefresh,
   IconX
 } from "@tabler/icons-react";
-import { getCurrentUser, getHealth } from "./api";
+import { getBookmarks, getCurrentUser, getHealth } from "./api";
 
 const navItems = [
-  { label: "Inbox", icon: IconInbox },
-  { label: "Folders", icon: IconFolder },
-  { label: "Search", icon: IconSearch },
-  { label: "Tags", icon: IconTag },
-  { label: "System labels", icon: IconTags },
-  { label: "Sources", icon: IconDatabase },
-  { label: "Settings", icon: IconSettings }
+  { label: "Items", icon: IconBookmark }
 ];
 
 const queryClient = new QueryClient();
@@ -83,52 +78,16 @@ const ProductShell = () => {
         </nav>
       </aside>
 
-      <section
-        className="flex min-w-0 flex-col gap-7 p-5 md:p-7"
-        aria-label="Bookmarks workspace"
-      >
+      <section className="flex min-w-0 flex-col gap-7 p-5 md:p-7" aria-label="Items workspace">
         <header className="flex flex-col items-start justify-between gap-5 md:flex-row">
           <div>
             <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
-            <h1 className="m-0 text-[34px] leading-[1.1] font-bold">Inbox</h1>
+            <h1 className="m-0 text-[34px] leading-[1.1] font-bold">Items</h1>
           </div>
           <HealthSummary health={health.data} isLoading={health.isLoading} isError={health.isError} />
         </header>
 
-        <section
-          className="grid items-start gap-7 rounded-lg border border-[#e4e7ef] bg-white p-7 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)] lg:grid-cols-[minmax(0,0.85fr)_minmax(280px,0.55fr)]"
-          aria-labelledby="empty-state-title"
-        >
-          <div>
-            <h2 id="empty-state-title" className="mb-2.5 text-2xl leading-[1.2] font-bold">
-              Ready for saved links
-            </h2>
-            <p className="mb-0 max-w-[56ch] text-[#697080]">
-              This authenticated shell is connected to the local API and waiting for the
-              first bookmark workflow.
-            </p>
-          </div>
-          <div className="grid gap-2" aria-label="Upcoming app areas">
-            {navItems.slice(1, 6).map(({ label, icon: Icon }) => (
-              <div
-                className="flex min-h-11 items-center justify-between gap-4 rounded-lg border border-[#e7eaf1] bg-[#fbfcff] px-3.5 text-sm font-bold text-[#2d313b]"
-                key={label}
-              >
-                <span className="flex items-center gap-2">
-                  <Icon
-                    className="text-[#858b9a]"
-                    size={17}
-                    stroke={2}
-                    aria-hidden="true"
-                    focusable="false"
-                  />
-                  {label}
-                </span>
-                <span className="text-xs font-bold text-[#858b9a]">Placeholder</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        <BookmarksWorkspace />
       </section>
     </main>
   );
@@ -136,6 +95,190 @@ const ProductShell = () => {
 
 const displayUsername = (currentUser?: CurrentUserResponse) =>
   currentUser?.user.name || currentUser?.user.email || "User";
+
+const BookmarksWorkspace = () => {
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const bookmarks = useInfiniteQuery({
+    queryKey: ["bookmarks"],
+    queryFn: ({ pageParam }) => getBookmarks({ cursor: pageParam, limit: 20 }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor
+  });
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = bookmarks;
+  const items = bookmarks.data?.pages.flatMap((page) => page.items) ?? [];
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+
+    if (
+      !node ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: "360px 0px" }
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  if (bookmarks.isLoading) {
+    return (
+      <section
+        className="grid gap-3 rounded-lg border border-[#e4e7ef] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        aria-label="Loading items"
+      >
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div className="grid gap-2 rounded-lg border border-[#edf0f6] p-4" key={index}>
+            <div className="h-4 w-2/5 rounded bg-[#eef1f6]" />
+            <div className="h-3 w-4/5 rounded bg-[#f3f5f9]" />
+          </div>
+        ))}
+      </section>
+    );
+  }
+
+  if (bookmarks.isError) {
+    return (
+      <section
+        className="grid gap-4 rounded-lg border border-[#f0b37e] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        aria-labelledby="items-error-title"
+      >
+        <div className="flex items-start gap-3">
+          <IconAlertTriangle
+            className="mt-0.5 text-[#d97706]"
+            size={20}
+            stroke={2.2}
+            aria-hidden="true"
+            focusable="false"
+          />
+          <div>
+            <h2 id="items-error-title" className="m-0 text-lg font-extrabold">
+              Items could not be loaded
+            </h2>
+            <p className="mt-1 mb-0 text-sm leading-6 text-[#697080]">
+              The API did not return the bookmark list.
+            </p>
+          </div>
+        </div>
+        <button
+          className="flex min-h-10 w-fit items-center gap-2 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+          type="button"
+          onClick={() => void bookmarks.refetch()}
+        >
+          <IconRefresh size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+          <span>Retry</span>
+        </button>
+      </section>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <section
+        className="grid gap-3 rounded-lg border border-[#e4e7ef] bg-white p-7 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        aria-labelledby="empty-items-title"
+      >
+        <IconBookmark
+          className="text-[#3b8df5]"
+          size={24}
+          stroke={2.2}
+          aria-hidden="true"
+          focusable="false"
+        />
+        <div>
+          <h2 id="empty-items-title" className="mb-2 text-2xl leading-[1.2] font-bold">
+            No items yet
+          </h2>
+          <p className="mb-0 max-w-[56ch] text-[#697080]">
+            Added bookmarks will appear here as soon as they are saved.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className="grid gap-3"
+      aria-label="Saved items"
+      aria-busy={bookmarks.isFetchingNextPage}
+    >
+      {items.map((item) => (
+        <BookmarkRow item={item} key={item.id} />
+      ))}
+      <div ref={loadMoreRef} className="min-h-6" aria-hidden="true" />
+      {bookmarks.isFetchingNextPage ? (
+        <p className="m-0 rounded-lg border border-[#e4e7ef] bg-white px-4 py-3 text-sm font-bold text-[#697080]">
+          Loading more items
+        </p>
+      ) : null}
+      {!bookmarks.hasNextPage ? (
+        <p className="m-0 px-1 py-2 text-sm font-bold text-[#858b9a]">All items loaded</p>
+      ) : null}
+    </section>
+  );
+};
+
+const BookmarkRow = ({ item }: { item: BookmarkItem }) => {
+  const host = hostFromUrl(item.url);
+
+  return (
+    <article className="grid gap-3 rounded-lg border border-[#e4e7ef] bg-white p-4 shadow-[0_14px_40px_rgb(46_54_77_/_0.045)]">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <h2 className="m-0 truncate text-lg leading-[1.25] font-extrabold">
+            {item.title || host || item.url}
+          </h2>
+          <a
+            className="mt-1 flex min-w-0 items-center gap-1.5 text-sm font-semibold text-[#2f80ed] no-underline hover:underline"
+            href={item.url}
+            rel="noreferrer"
+            target="_blank"
+          >
+            <IconExternalLink size={15} stroke={2.2} aria-hidden="true" focusable="false" />
+            <span className="truncate">{item.url}</span>
+          </a>
+        </div>
+        <span className="flex w-fit items-center gap-1.5 rounded-lg border border-[#e7eaf1] bg-[#fbfcff] px-2.5 py-1 text-xs font-extrabold text-[#697080]">
+          <IconFolder size={14} stroke={2.1} aria-hidden="true" focusable="false" />
+          {item.folderName}
+        </span>
+      </div>
+      {item.description ? (
+        <p className="m-0 max-w-[74ch] text-sm leading-6 text-[#697080]">{item.description}</p>
+      ) : null}
+      <time className="text-xs font-bold text-[#858b9a]" dateTime={item.createdAt}>
+        Added {formatBookmarkDate(item.createdAt)}
+      </time>
+    </article>
+  );
+};
+
+const hostFromUrl = (url: string) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
+};
+
+const formatBookmarkDate = (date: string) =>
+  new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(date));
 
 const AddBookmarkDialog = () => {
   const [isOpen, setIsOpen] = useState(false);

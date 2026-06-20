@@ -2,19 +2,31 @@ import { RPCHandler } from "@orpc/server/fetch";
 import type { CurrentUserResponse } from "@bookmarks/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { createDatabaseBookmarksStore, type BookmarksStore } from "./bookmarks";
+import type { Database } from "./db";
 import type { DevIdentity } from "./devIdentity";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
 import { createRpcRouter } from "./rpc";
 
 export interface AppOptions {
-  dependencies: HealthDependencies;
+  dependencies: HealthDependencies & { db?: Database };
   currentUser?: DevIdentity;
+  bookmarksStore?: BookmarksStore;
 }
 
 export const createApp = (options: AppOptions) => {
   const app = new Hono();
-  const rpcHandler = new RPCHandler(createRpcRouter(options.dependencies));
+  const bookmarksStore =
+    options.bookmarksStore ??
+    (options.dependencies.db ? createDatabaseBookmarksStore(options.dependencies.db) : undefined);
+  const rpcHandler = new RPCHandler(
+    createRpcRouter({
+      bookmarksStore,
+      currentUser: options.currentUser,
+      dependencies: options.dependencies
+    })
+  );
 
   app.use("*", cors());
 

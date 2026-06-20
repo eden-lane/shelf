@@ -21,6 +21,7 @@
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@bookmarks/shared": "workspace:*",
+        "@orpc/client": "1.14.6",
         "@tabler/icons-react": "latest",
         "@tanstack/react-query": "latest",
         "@vitejs/plugin-react": "latest",

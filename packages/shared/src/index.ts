@@ -31,3 +31,20 @@ export interface CurrentUserResponse {
     organizationSlug?: string;
   }>;
 }
+
+export interface BookmarkItem {
+  id: string;
+  libraryId: string;
+  folderId: string;
+  folderName: string;
+  url: string;
+  title: string | null;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookmarksPageResponse {
+  items: BookmarkItem[];
+  nextCursor: string | null;
+}
