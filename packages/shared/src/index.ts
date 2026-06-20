@@ -50,6 +50,15 @@ export interface BookmarkItem {
   updatedAt: string;
 }
 
+export interface BookmarkLocationItem {
+  id: string;
+  libraryId: string;
+  folderId: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FolderItem {
   id: string;
   libraryId: string;

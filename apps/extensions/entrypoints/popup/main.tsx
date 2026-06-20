@@ -32,6 +32,15 @@ interface TagItem {
   bookmarkCount: number;
 }
 
+interface BookmarkLocationItem {
+  id: string;
+  libraryId: string;
+  folderId: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ActivePage {
   title: string;
   url: string;
@@ -47,6 +56,7 @@ const App = () => {
   const [currentUser, setCurrentUser] = createSignal<CurrentUserResponse | null>(null);
   const [folders, setFolders] = createSignal<FolderItem[]>([]);
   const [tags, setTags] = createSignal<TagItem[]>([]);
+  const [savedLocations, setSavedLocations] = createSignal<BookmarkLocationItem[]>([]);
   const [selectedFolderId, setSelectedFolderId] = createSignal("");
   const [selectedTagIds, setSelectedTagIds] = createSignal<string[]>([]);
   const [pickerLibraryId, setPickerLibraryId] = createSignal<string | null>(null);
@@ -64,6 +74,9 @@ const App = () => {
 
   const folderById = createMemo(() => new Map(folders().map((folder) => [folder.id, folder])));
   const selectedFolder = createMemo(() => folderById().get(selectedFolderId()) ?? null);
+  const libraryById = createMemo(
+    () => new Map(currentUser()?.libraries.map((library) => [library.id, library]) ?? [])
+  );
   const selectedFolderLabel = createMemo(() => {
     const folder = selectedFolder();
 
@@ -75,6 +88,21 @@ const App = () => {
   });
 
   const folderTree = createMemo(() => buildFolderTree(folders()));
+  const savedLocationLabels = createMemo(() =>
+    savedLocations()
+      .map((location) => {
+        const library = libraryById().get(location.libraryId);
+        const folder = folderById().get(location.folderId);
+
+        if (!library || !folder) {
+          return null;
+        }
+
+        return `${library.name} / ${folderPath(folder, folders())}`;
+      })
+      .filter((label): label is string => Boolean(label))
+      .sort((left, right) => left.localeCompare(right))
+  );
 
   const visibleTags = createMemo(() => {
     const folder = selectedFolder();
@@ -104,15 +132,20 @@ const App = () => {
     try {
       const apiUrl = await getApiBaseUrl();
 
-      const [userResponse, folderResponse, tagResponse] = await Promise.all([
+      const page = activePage();
+      const [userResponse, folderResponse, tagResponse, locationResponse] = await Promise.all([
         rpcCall<CurrentUserResponse>(apiUrl, "currentUser", undefined),
         rpcCall<FolderItem[]>(apiUrl, "folders/list", null),
-        rpcCall<TagItem[]>(apiUrl, "tags/list", null)
+        rpcCall<TagItem[]>(apiUrl, "tags/list", null),
+        page
+          ? rpcCall<BookmarkLocationItem[]>(apiUrl, "bookmarks/locations", { url: page.url })
+          : Promise.resolve([])
       ]);
 
       setCurrentUser(userResponse);
       setFolders(folderResponse);
       setTags(tagResponse);
+      setSavedLocations(locationResponse);
       setSelectedFolderId(userResponse.libraries[0]?.inboxFolderId ?? "");
       setSelectedTagIds([]);
       setPickerLibraryId(userResponse.libraries[0]?.id ?? null);
@@ -123,6 +156,7 @@ const App = () => {
       setCurrentUser(null);
       setFolders([]);
       setTags([]);
+      setSavedLocations([]);
       setSelectedFolderId("");
       setSelectedTagIds([]);
       setPickerLibraryId(null);
@@ -270,6 +304,15 @@ const App = () => {
             </Show>
           </Show>
         </section>
+
+        <Show when={savedLocationLabels().length > 0}>
+          <section class="saved-locations-banner" aria-label="Existing saved locations">
+            <p>Already saved in:</p>
+            <ul>
+              <For each={savedLocationLabels()}>{(label) => <li>{label}</li>}</For>
+            </ul>
+          </section>
+        </Show>
 
         <form
           class="save-form"

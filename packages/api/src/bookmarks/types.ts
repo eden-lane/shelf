@@ -1,4 +1,4 @@
-import type { BookmarkItem, FolderItem, TagItem } from "@bookmarks/shared";
+import type { BookmarkItem, BookmarkLocationItem, FolderItem, TagItem } from "@bookmarks/shared";
 import type { Buffer } from "node:buffer";
 
 export interface BookmarkCursor {
@@ -11,6 +11,11 @@ export interface ListBookmarksInput {
   limit: number;
   folderId?: string;
   cursor?: BookmarkCursor;
+}
+
+export interface ListBookmarkLocationsInput {
+  libraryIds: string[];
+  url: string;
 }
 
 export interface CreateBookmarkInput {
@@ -60,6 +65,7 @@ export interface DeleteFolderInput {
 
 export interface BookmarksStore {
   listBookmarks(input: ListBookmarksInput): Promise<BookmarkItem[]>;
+  listBookmarkLocations(input: ListBookmarkLocationsInput): Promise<BookmarkLocationItem[]>;
   createBookmark(input: CreateBookmarkInput): Promise<BookmarkItem>;
   deleteBookmark(input: DeleteBookmarkInput): Promise<{ deletedBookmarkId: string }>;
   getFavicon(id: string): Promise<{ contentType: string; imageBytes: Buffer } | null>;

@@ -65,6 +65,9 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async listBookmarks() {
     return [];
   },
+  async listBookmarkLocations() {
+    return [];
+  },
   async listFolders() {
     return [];
   },
@@ -231,6 +234,54 @@ describe("bookmarks RPC", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+
+  test("lists existing bookmark locations for the current URL", async () => {
+    const calls: Parameters<BookmarksStore["listBookmarkLocations"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async listBookmarkLocations(input) {
+          calls.push(input);
+
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000010",
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+              url: input.url,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            },
+            {
+              id: "00000000-0000-4000-8000-000000000011",
+              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+              folderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+              url: input.url,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/locations", {
+      body: JSON.stringify({ json: { url: "https://example.com/article" } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json).toHaveLength(2);
+    expect(calls[0]).toEqual({
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      url: "https://example.com/article"
+    });
   });
 
   test("creates a bookmark through oRPC in the personal inbox", async () => {

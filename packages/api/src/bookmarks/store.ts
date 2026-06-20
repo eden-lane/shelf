@@ -4,6 +4,7 @@ import { createFolder } from "./createFolder";
 import { deleteBookmark } from "./deleteBookmark";
 import { deleteFolder } from "./deleteFolder";
 import { getFavicon } from "./getFavicon";
+import { listBookmarkLocations } from "./listBookmarkLocations";
 import { listBookmarks } from "./listBookmarks";
 import { listFolders } from "./listFolders";
 import { listTags } from "./listTags";
@@ -16,6 +17,7 @@ export const createDatabaseBookmarksStore = (db: Database): BookmarksStore => ({
   deleteBookmark: (input) => deleteBookmark(db, input),
   deleteFolder: (input) => deleteFolder(db, input),
   getFavicon: (id) => getFavicon(db, id),
+  listBookmarkLocations: (input) => listBookmarkLocations(db, input),
   listBookmarks: (input) => listBookmarks(db, input),
   listFolders: (input) => listFolders(db, input),
   listTags: (input) => listTags(db, input),

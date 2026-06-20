@@ -148,6 +148,23 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         ...pagination,
         libraryIds: currentUserLibraryIds(options.currentUser)
       });
+    }),
+    locations: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const lookup = parseBookmarkLocationsInput(input);
+
+      if (!lookup) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a valid URL"
+        });
+      }
+
+      return options.bookmarksStore.listBookmarkLocations({
+        libraryIds: currentUserLibraryIds(options.currentUser),
+        url: lookup.url
+      });
     })
   },
   tags: {
@@ -256,18 +273,38 @@ const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null =>
     return null;
   }
 
+  const url = parseHttpUrl(input.url);
+
+  if (!url) {
+    return null;
+  }
+
+  return {
+    folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
+    tagIds: parseSelectedTagIds(input.tagIds),
+    url
+  };
+};
+
+const parseBookmarkLocationsInput = (input: unknown): { url: string } | null => {
+  if (!isRecord(input) || typeof input.url !== "string") {
+    return null;
+  }
+
+  const url = parseHttpUrl(input.url);
+
+  return url ? { url } : null;
+};
+
+const parseHttpUrl = (value: string) => {
   try {
-    const url = new URL(input.url);
+    const url = new URL(value);
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return null;
     }
 
-    return {
-      folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
-      tagIds: parseSelectedTagIds(input.tagIds),
-      url: url.toString()
-    };
+    return url.toString();
   } catch {
     return null;
   }

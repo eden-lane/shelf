@@ -102,6 +102,41 @@ h1 {
   line-height: 1.35;
 }
 
+.saved-locations-banner {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #1e3a8a;
+  background: #eff6ff;
+}
+
+.saved-locations-banner p,
+.saved-locations-banner ul {
+  margin: 0;
+}
+
+.saved-locations-banner p {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.saved-locations-banner ul {
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  list-style: none;
+}
+
+.saved-locations-banner li {
+  overflow-wrap: anywhere;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .save-form {
   display: grid;
   gap: 12px;

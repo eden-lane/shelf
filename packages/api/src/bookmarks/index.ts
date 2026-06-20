@@ -6,6 +6,7 @@ export * from "./deleteFolder";
 export * from "./folderUtils";
 export * from "./getFavicon";
 export * from "./enrichment";
+export * from "./listBookmarkLocations";
 export * from "./listBookmarks";
 export * from "./listFolders";
 export * from "./listTags";
