@@ -8,6 +8,7 @@ export * from "./getFavicon";
 export * from "./enrichment";
 export * from "./listBookmarks";
 export * from "./listFolders";
+export * from "./listTags";
 export * from "./store";
 export * from "./types";
 export * from "./updateFolder";

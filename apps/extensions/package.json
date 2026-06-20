@@ -1,9 +1,12 @@
 {
   "name": "@bookmarks/extensions",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "wxt build",
+    "dev": "wxt",
+    "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "typescript": "latest",

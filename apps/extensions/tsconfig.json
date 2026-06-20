@@ -1,8 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "composite": true,
     "noEmit": true
-  },
-  "include": []
+  }
 }

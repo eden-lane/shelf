@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Save to Bookmarks</title>
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <div>
+          <p class="eyebrow">Bookmarks</p>
+          <h1>Save page</h1>
+        </div>
+        <div id="status-pill" class="status-pill" hidden></div>
+      </header>
+
+      <section class="page-preview" aria-label="Current page">
+        <p id="page-title" class="page-title">Loading current tab</p>
+        <p id="page-url" class="page-url"></p>
+      </section>
+
+      <form id="save-form" class="save-form">
+        <label class="field">
+          <span>API URL</span>
+          <input id="api-url" name="apiUrl" type="url" autocomplete="url" spellcheck="false" />
+        </label>
+
+        <label class="field">
+          <span>Folder</span>
+          <select id="folder-select" name="folderId"></select>
+        </label>
+
+        <section class="field">
+          <div class="field-row">
+            <span>Tags</span>
+            <button id="refresh-button" class="icon-button" type="button" title="Refresh folders and tags">
+              Refresh
+            </button>
+          </div>
+          <div id="tag-list" class="tag-list" aria-live="polite"></div>
+        </section>
+
+        <p id="message" class="message" role="status"></p>
+
+        <button id="save-button" class="save-button" type="submit">Save bookmark</button>
+      </form>
+    </main>
+  </body>
+</html>

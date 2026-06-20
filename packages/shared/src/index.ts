@@ -62,6 +62,15 @@ export interface FolderItem {
   updatedAt: string;
 }
 
+export interface TagItem {
+  id: string;
+  libraryId: string;
+  name: string;
+  bookmarkCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BookmarksPageResponse {
   items: BookmarkItem[];
   nextCursor: string | null;
@@ -70,6 +79,7 @@ export interface BookmarksPageResponse {
 export interface CreateBookmarkInput {
   url: string;
   folderId?: string;
+  tagIds?: string[];
 }
 
 export interface DeleteBookmarkInput {

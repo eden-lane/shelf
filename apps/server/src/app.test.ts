@@ -68,6 +68,9 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async listFolders() {
     return [];
   },
+  async listTags() {
+    return [];
+  },
   async updateFolder() {
     throw new Error("not used");
   },
@@ -282,9 +285,91 @@ describe("bookmarks RPC", () => {
       createdByUserId: DEV_USER_ID,
       folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
       libraryId: DEV_PERSONAL_LIBRARY_ID,
+      tagIds: undefined,
       url: "https://example.com/article"
     });
     expect(queuedIds).toEqual(["00000000-0000-4000-8000-000000000010"]);
+  });
+
+  test("creates a bookmark with selected tags from the target folder library", async () => {
+    const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async createBookmark(input) {
+          calls.push(input);
+
+          return {
+            id: "00000000-0000-4000-8000-000000000010",
+            libraryId: input.libraryId,
+            folderId: input.folderId,
+            folderName: "Reading",
+            url: input.url,
+            title: null,
+            description: null,
+            siteName: null,
+            imageUrl: null,
+            metadataStatus: "fetched",
+            metadataFetchedAt: "2026-06-20T12:00:00.000Z",
+            faviconId: null,
+            faviconUrl: null,
+            createdAt: "2026-06-20T12:00:00.000Z",
+            updatedAt: "2026-06-20T12:00:00.000Z"
+          };
+        },
+        async listFolders() {
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000020",
+              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+              parentId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+              name: "Reading",
+              iconName: null,
+              iconColor: null,
+              bookmarkCount: 0,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        },
+        async listTags() {
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000030",
+              libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+              name: "Research",
+              bookmarkCount: 0,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/create", {
+      body: JSON.stringify({
+        json: {
+          folderId: "00000000-0000-4000-8000-000000000020",
+          tagIds: ["00000000-0000-4000-8000-000000000030"],
+          url: "https://example.com/article"
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toEqual({
+      createdByUserId: DEV_USER_ID,
+      folderId: "00000000-0000-4000-8000-000000000020",
+      libraryId: DEV_ORGANIZATION_LIBRARY_ID,
+      tagIds: ["00000000-0000-4000-8000-000000000030"],
+      url: "https://example.com/article"
+    });
   });
 
   test("rejects invalid bookmark URLs", async () => {
@@ -501,6 +586,47 @@ describe("folders RPC", () => {
       destinationFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
       folderId: DEV_PERSONAL_INBOX_FOLDER_ID,
       mode: "move"
+    });
+  });
+});
+
+describe("tags RPC", () => {
+  test("lists tags for the current user's libraries", async () => {
+    const calls: Parameters<BookmarksStore["listTags"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async listTags(input) {
+          calls.push(input);
+
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000030",
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              name: "Research",
+              bookmarkCount: 2,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/tags/list", {
+      body: JSON.stringify({ json: null }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json[0].name).toBe("Research");
+    expect(calls[0]).toEqual({
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID]
     });
   });
 });

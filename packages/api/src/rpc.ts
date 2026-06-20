@@ -73,10 +73,26 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
+      const targetFolderId = targetFolder?.id ?? options.currentUser.personalInboxFolderId;
+      const targetLibraryId = targetFolder?.libraryId ?? options.currentUser.personalLibraryId;
+      const selectedTagIds = bookmark.tagIds;
+
+      if (selectedTagIds && selectedTagIds.length > 0) {
+        const tags = await options.bookmarksStore.listTags({ libraryIds: [targetLibraryId] });
+        const availableTagIds = new Set(tags.map((tag) => tag.id));
+
+        if (selectedTagIds.some((tagId) => !availableTagIds.has(tagId))) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Choose available tags"
+          });
+        }
+      }
+
       const createdBookmark = await options.bookmarksStore.createBookmark({
         createdByUserId: options.currentUser.userId,
-        folderId: targetFolder?.id ?? options.currentUser.personalInboxFolderId,
-        libraryId: targetFolder?.libraryId ?? options.currentUser.personalLibraryId,
+        folderId: targetFolderId,
+        libraryId: targetLibraryId,
+        tagIds: selectedTagIds,
         url: bookmark.url
       });
 
@@ -130,6 +146,16 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       return listBookmarksPage(options.bookmarksStore, {
         ...pagination,
+        libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    })
+  },
+  tags: {
+    list: os.handler(() => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      return options.bookmarksStore.listTags({
         libraryIds: currentUserLibraryIds(options.currentUser)
       });
     })
@@ -239,6 +265,7 @@ const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null =>
 
     return {
       folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
+      tagIds: parseSelectedTagIds(input.tagIds),
       url: url.toString()
     };
   } catch {
@@ -342,6 +369,24 @@ const parseFolderIconColor = (value: unknown) => {
   const color = value.trim();
 
   return /^#[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : null;
+};
+
+const parseSelectedTagIds = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const tagIds = new Set<string>();
+
+  for (const tagId of value) {
+    if (typeof tagId !== "string" || !tagId) {
+      return undefined;
+    }
+
+    tagIds.add(tagId);
+  }
+
+  return [...tagIds].slice(0, 50);
 };
 
 const currentUserLibraryIds = (currentUser: DevIdentity) => [
