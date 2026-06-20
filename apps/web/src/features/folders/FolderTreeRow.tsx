@@ -90,7 +90,7 @@ export const FolderTreeRow = ({
     },
     disabled: isEditing
   });
-  const dragStyle = transform
+  const dragStyle = transform && !isDragging
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`
       }

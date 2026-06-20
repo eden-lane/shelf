@@ -96,6 +96,8 @@ export const ProductShell = () => {
     }
   });
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
+  const activeFolderDragItem =
+    folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
   const moveBookmarksMutation = useMutation({
     mutationFn: ({ destinationFolder, ...input }: MoveBookmarksMutationInput) =>
@@ -514,11 +516,11 @@ export const ProductShell = () => {
       <main className="min-h-dvh w-full max-w-full overflow-x-hidden bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-30 h-dvh max-h-dvh w-[min(300px,calc(100vw-48px))] touch-pan-y overflow-hidden overscroll-contain bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:static md:h-screen md:max-h-none md:w-[300px] md:shrink-0",
+          "fixed inset-y-0 left-0 z-30 h-dvh max-h-dvh w-[min(300px,calc(100vw-48px))] touch-pan-y overflow-hidden overscroll-contain bg-gray-50 text-slate-950 transition-[transform,opacity,width,border-color] duration-300 ease-out md:static md:h-screen md:max-h-none md:shrink-0",
           sidebarDragOffset < 0 ? "transition-none" : "",
           isSidebarVisible
-            ? "translate-x-0 border-r border-gray-200 opacity-100 shadow-[16px_0_44px_rgb(15_23_42_/_0.14)] md:shadow-none"
-            : "pointer-events-none -translate-x-full border-r-0 opacity-0 md:hidden"
+            ? "translate-x-0 border-r border-gray-200 opacity-100 shadow-[16px_0_44px_rgb(15_23_42_/_0.14)] md:w-[300px] md:shadow-none"
+            : "pointer-events-none -translate-x-full border-r-0 opacity-0 md:w-0"
         ].join(" ")}
         aria-label="Primary"
         aria-hidden={!isSidebarVisible}
@@ -553,7 +555,14 @@ export const ProductShell = () => {
         className="flex w-full min-w-0 max-w-full flex-col gap-5 overflow-x-hidden p-5 md:h-screen md:flex-1 md:overflow-y-auto md:p-7"
         aria-label="Items workspace"
       >
-        <header className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
+        <header
+          className={[
+            "grid items-center gap-3",
+            isSidebarVisible
+              ? "grid-cols-[minmax(0,1fr)_2.5rem]"
+              : "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+          ].join(" ")}
+        >
           {!isSidebarVisible ? (
             <button
               className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -569,9 +578,7 @@ export const ProductShell = () => {
                 focusable="false"
               />
             </button>
-          ) : (
-            <span className="h-10 w-10" aria-hidden="true" />
-          )}
+          ) : null}
           <div className="min-w-0">
             <FolderBreadcrumbs folders={activeFolderPath} />
           </div>
@@ -607,6 +614,9 @@ export const ProductShell = () => {
       </main>
       <DragOverlay zIndex={1000}>
         {activeBookmarkDragItem ? <BookmarkDragPreview item={activeBookmarkDragItem} /> : null}
+        {!activeBookmarkDragItem && activeFolderDragItem ? (
+          <FolderDragPreview folder={activeFolderDragItem} />
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
@@ -900,6 +910,35 @@ const BookmarkDragPreview = ({ item }: { item: BookmarkItem }) => {
         </div>
       </div>
     </article>
+  );
+};
+
+const FolderDragPreview = ({ folder }: { folder: FolderItem }) => {
+  const FolderIcon = getFolderIconComponent(folder.iconName);
+  const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
+
+  return (
+    <div className="grid w-[min(280px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl border border-blue-500 bg-white py-0.5 text-slate-950 opacity-95 shadow-[0_24px_80px_rgb(15_23_42_/_0.24)]">
+      <div className="flex min-h-9 min-w-0 items-center gap-1">
+        <span className="grid h-7 w-6 shrink-0 place-items-center text-gray-400" aria-hidden="true">
+          <IconGripVertical size={15} stroke={1.5} aria-hidden="true" focusable="false" />
+        </span>
+        <span className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5 text-sm font-medium">
+          <FolderIcon
+            size={21}
+            stroke={1.5}
+            color={folderIconColor}
+            aria-hidden="true"
+            focusable="false"
+          />
+          <span className="truncate">{folder.name}</span>
+        </span>
+      </div>
+      <span className="grid h-9 place-items-center text-xs font-extrabold text-gray-400">
+        {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
+      </span>
+      <span aria-hidden="true" />
+    </div>
   );
 };
 

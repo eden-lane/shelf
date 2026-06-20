@@ -478,9 +478,20 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Show sidebar" })).toBeTruthy();
     });
 
+    const workspaceHeader = screen.getByLabelText("Items workspace").querySelector("header");
+    expect(workspaceHeader).toBeTruthy();
+    expect((workspaceHeader as HTMLElement).className).toContain(
+      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+    );
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+    expect((workspaceHeader as HTMLElement).className).toContain(
+      "grid-cols-[minmax(0,1fr)_2.5rem]"
+    );
+    expect((workspaceHeader as HTMLElement).className).not.toContain(
+      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+    );
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Inbox" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close sidebar" })).toBeNull();
@@ -510,14 +521,26 @@ describe("App", () => {
     fireEvent.touchEnd(sidebar as HTMLElement, {
       changedTouches: [{ clientX: 160, clientY: 88 }]
     });
+    expect((workspaceHeader as HTMLElement).className).toContain(
+      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+    );
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
     window.dispatchEvent(new window.Event("resize"));
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
+    expect((sidebar as HTMLElement).className).toContain(
+      "transition-[transform,opacity,width,border-color]"
+    );
+    expect((sidebar as HTMLElement).className).toContain("md:w-0");
+    expect((sidebar as HTMLElement).className).not.toContain("md:hidden");
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+    expect((sidebar as HTMLElement).className).toContain("md:w-[300px]");
+    expect((workspaceHeader as HTMLElement).className).toContain(
+      "grid-cols-[minmax(0,1fr)_2.5rem]"
+    );
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
