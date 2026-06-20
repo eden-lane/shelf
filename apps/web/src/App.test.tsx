@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
-import { App } from "./App";
 
 const window = new Window();
 
@@ -17,7 +16,11 @@ setGlobal("window", window);
 setGlobal("document", window.document);
 setGlobal("navigator", window.navigator);
 setGlobal("HTMLElement", window.HTMLElement);
+setGlobal("Element", window.Element);
+setGlobal("Node", window.Node);
 setGlobal("MutationObserver", window.MutationObserver);
+setGlobal("requestAnimationFrame", window.requestAnimationFrame.bind(window));
+setGlobal("cancelAnimationFrame", window.cancelAnimationFrame.bind(window));
 
 const originalFetch = globalThis.fetch;
 
@@ -28,8 +31,35 @@ afterEach(() => {
 
 describe("App", () => {
   test("boots into the authenticated product shell", async () => {
-    globalThis.fetch = (async () =>
-      new Response(
+    const { App } = await import("./App");
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(input.toString());
+
+      if (url.pathname === "/me") {
+        return new Response(
+          JSON.stringify({
+            user: {
+              id: "00000000-0000-4000-8000-000000000001",
+              email: "dev@localhost",
+              name: "Dev User"
+            },
+            organization: {
+              id: "00000000-0000-4000-8000-000000000002",
+              name: "Dev Workspace",
+              slug: "dev",
+              role: "owner"
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      return new Response(
         JSON.stringify({
           status: "ok",
           services: {
@@ -44,12 +74,14 @@ describe("App", () => {
             "content-type": "application/json"
           }
         }
-      )) as unknown as typeof fetch;
+      );
+    }) as unknown as typeof fetch;
 
     const screen = render(<App />);
 
-    expect(screen.getByText("Bookmarks")).toBeTruthy();
-    expect(screen.getByText("Dev user")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getAllByText("Dev User")).toHaveLength(2);
+    });
 
     for (const item of [
       "Inbox",
@@ -62,6 +94,13 @@ describe("App", () => {
     ]) {
       expect(screen.getByRole("link", { name: item })).toBeTruthy();
     }
+
+    fireEvent.click(screen.getByRole("button", { name: "Add bookmark" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
+      expect(screen.getByLabelText("Page URL")).toBeTruthy();
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Healthy")).toBeTruthy();

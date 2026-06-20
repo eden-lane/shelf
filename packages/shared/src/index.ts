@@ -9,3 +9,17 @@ export interface HealthResponse {
   };
   checkedAt: string;
 }
+
+export interface CurrentUserResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    role: "owner";
+  };
+}

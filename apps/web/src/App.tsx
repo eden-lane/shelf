@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import type { HealthResponse } from "@bookmarks/shared";
+import type { CurrentUserResponse, HealthResponse } from "@bookmarks/shared";
+import { Dialog } from "@base-ui/react/dialog";
 import {
   IconAlertTriangle,
   IconBookmark,
@@ -7,12 +8,14 @@ import {
   IconDatabase,
   IconFolder,
   IconInbox,
+  IconPlus,
   IconSearch,
   IconSettings,
   IconTag,
-  IconTags
+  IconTags,
+  IconX
 } from "@tabler/icons-react";
-import { getHealth } from "./api";
+import { getCurrentUser, getHealth } from "./api";
 
 const navItems = [
   { label: "Inbox", icon: IconInbox },
@@ -38,6 +41,11 @@ const ProductShell = () => {
     queryFn: getHealth,
     refetchInterval: 15_000
   });
+  const currentUser = useQuery({
+    queryKey: ["current-user"],
+    queryFn: getCurrentUser
+  });
+  const username = displayUsername(currentUser.data);
 
   return (
     <main className="grid min-h-screen grid-cols-1 bg-[#f7f8fc] font-sans text-[#242833] md:grid-cols-[260px_minmax(0,1fr)]">
@@ -52,8 +60,9 @@ const ProductShell = () => {
           >
             <IconBookmark size={18} stroke={2.4} aria-hidden="true" focusable="false" />
           </span>
-          <span>Bookmarks</span>
+          <span>{username}</span>
         </div>
+        <AddBookmarkDialog />
         <nav className="grid grid-cols-2 gap-1 md:grid-cols-1">
           {navItems.map(({ label, icon: Icon }, index) => (
             <a
@@ -79,7 +88,7 @@ const ProductShell = () => {
       >
         <header className="flex flex-col items-start justify-between gap-5 md:flex-row">
           <div>
-            <p className="mb-1 text-[13px] font-bold text-[#858b9a]">Dev user</p>
+            <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
             <h1 className="m-0 text-[34px] leading-[1.1] font-bold">Inbox</h1>
           </div>
           <HealthSummary health={health.data} isLoading={health.isLoading} isError={health.isError} />
@@ -123,6 +132,60 @@ const ProductShell = () => {
     </main>
   );
 };
+
+const displayUsername = (currentUser?: CurrentUserResponse) =>
+  currentUser?.user.name || currentUser?.user.email || "User";
+
+const AddBookmarkDialog = () => (
+  <Dialog.Root>
+    <Dialog.Trigger className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 py-[11px] text-sm font-extrabold text-white shadow-[0_12px_28px_rgb(59_141_245_/_0.22)] outline-none hover:bg-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]">
+      <IconPlus size={18} stroke={2.4} aria-hidden="true" focusable="false" />
+      <span>Add bookmark</span>
+    </Dialog.Trigger>
+    <Dialog.Portal>
+      <Dialog.Backdrop className="fixed inset-0 z-40 bg-[#101522]/45" />
+      <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid w-[min(calc(100vw-32px),420px)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none">
+        <div className="grid gap-1 pr-9">
+          <Dialog.Title className="text-lg leading-[1.25] font-extrabold">
+            Add bookmark
+          </Dialog.Title>
+          <Dialog.Description className="text-sm leading-6 text-[#697080]">
+            Paste the page link you want to save.
+          </Dialog.Description>
+        </div>
+        <Dialog.Close
+          className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+          aria-label="Close add bookmark dialog"
+        >
+          <IconX size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+        </Dialog.Close>
+        <form className="grid gap-4" onSubmit={(event) => event.preventDefault()}>
+          <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
+            Page URL
+            <input
+              className="min-h-11 rounded-lg border border-[#dfe4ef] bg-white px-3 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
+              id="bookmark-url"
+              name="url"
+              placeholder="https://example.com/article"
+              type="url"
+            />
+          </label>
+          <div className="flex justify-end gap-2">
+            <Dialog.Close className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]">
+              Cancel
+            </Dialog.Close>
+            <button
+              className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+              type="submit"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      </Dialog.Popup>
+    </Dialog.Portal>
+  </Dialog.Root>
+);
 
 const HealthSummary = ({
   health,

@@ -1,12 +1,15 @@
 import { RPCHandler } from "@orpc/server/fetch";
+import type { CurrentUserResponse } from "@bookmarks/shared";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import type { DevIdentity } from "./devIdentity";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
 import { createRpcRouter } from "./rpc";
 
 export interface AppOptions {
   dependencies: HealthDependencies;
+  currentUser?: DevIdentity;
 }
 
 export const createApp = (options: AppOptions) => {
@@ -19,6 +22,28 @@ export const createApp = (options: AppOptions) => {
     const health = await checkHealth(options.dependencies);
 
     return context.json(health, health.status === "ok" ? 200 : 503);
+  });
+
+  app.get("/me", (context) => {
+    if (!options.currentUser) {
+      return context.json({ error: "No current user is configured" }, 401);
+    }
+
+    const response: CurrentUserResponse = {
+      user: {
+        id: options.currentUser.userId,
+        email: options.currentUser.email,
+        name: options.currentUser.name
+      },
+      organization: {
+        id: options.currentUser.organizationId,
+        name: options.currentUser.organizationName,
+        slug: options.currentUser.organizationSlug,
+        role: "owner"
+      }
+    };
+
+    return context.json(response);
   });
 
   app.all("/rpc/*", async (context) => {

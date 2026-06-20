@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "./app";
+import {
+  DEV_ORGANIZATION_ID,
+  DEV_ORGANIZATION_NAME,
+  DEV_ORGANIZATION_SLUG,
+  DEV_USER_EMAIL,
+  DEV_USER_ID,
+  DEV_USER_NAME
+} from "./devIdentity";
 import { checkHealth, type HealthDependencies } from "./health";
 
 const now = new Date("2026-06-19T12:00:00.000Z");
@@ -65,5 +73,49 @@ describe("health endpoint", () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe("ok");
     expect(body.services.database).toBe("ok");
+  });
+});
+
+describe("current user endpoint", () => {
+  test("returns the configured current user", async () => {
+    const app = createApp({
+      dependencies: dependencies(),
+      currentUser: {
+        userId: DEV_USER_ID,
+        organizationId: DEV_ORGANIZATION_ID,
+        email: DEV_USER_EMAIL,
+        name: DEV_USER_NAME,
+        organizationName: DEV_ORGANIZATION_NAME,
+        organizationSlug: DEV_ORGANIZATION_SLUG
+      }
+    });
+
+    const response = await app.request("/me");
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      user: {
+        id: DEV_USER_ID,
+        email: DEV_USER_EMAIL,
+        name: DEV_USER_NAME
+      },
+      organization: {
+        id: DEV_ORGANIZATION_ID,
+        name: DEV_ORGANIZATION_NAME,
+        slug: DEV_ORGANIZATION_SLUG,
+        role: "owner"
+      }
+    });
+  });
+
+  test("returns unauthorized when no current user is configured", async () => {
+    const app = createApp({
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/me");
+
+    expect(response.status).toBe(401);
   });
 });

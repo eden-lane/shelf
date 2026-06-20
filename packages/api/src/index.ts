@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { createRuntimeClients } from "./clients";
 import { getConfig } from "./config";
+import { ensureDevIdentity, type DevIdentity } from "./devIdentity";
 
 const config = getConfig();
 const clients = createRuntimeClients({
@@ -9,8 +10,18 @@ const clients = createRuntimeClients({
   meilisearchUrl: config.meilisearchUrl
 });
 
+let currentUser: DevIdentity | undefined;
+
+if (config.authMode === "dev") {
+  currentUser = await ensureDevIdentity(clients.pool);
+  console.log(
+    `Dev identity ready: ${currentUser.email} (${currentUser.userId}) in ${currentUser.organizationSlug}`
+  );
+}
+
 const app = createApp({
-  dependencies: clients
+  dependencies: clients,
+  currentUser
 });
 
 Bun.serve({

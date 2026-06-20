@@ -34,6 +34,19 @@ The oRPC endpoint is mounted at `http://localhost:3000/rpc`.
 
 MinIO is available at [http://localhost:9001](http://localhost:9001) using the credentials from `.env.example`.
 
+## Dev identity
+
+The API defaults to `AUTH_MODE=dev` outside production. In this mode, startup creates
+one idempotent local user and workspace so feature work can rely on real foreign keys
+before registration and authorization exist:
+
+- user: `dev@localhost`
+- user id: `00000000-0000-4000-8000-000000000001`
+- workspace: `dev`
+- workspace id: `00000000-0000-4000-8000-000000000002`
+
+Set `AUTH_MODE=none` to disable the bootstrap.
+
 ## Development
 
 Install dependencies:
