@@ -414,12 +414,34 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 420 });
+    window.dispatchEvent(new window.Event("resize"));
+    await waitFor(() => {
+      expect(document.body.style.position).toBe("fixed");
+      expect(document.body.style.overflow).toBe("hidden");
+      expect(document.documentElement.style.overflow).toBe("hidden");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    await waitFor(() => {
+      expect(document.body.style.position).toBe("");
+      expect(document.body.style.overflow).toBe("");
+      expect(document.documentElement.style.overflow).toBe("");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
+    await waitFor(() => {
+      expect(document.body.style.position).toBe("fixed");
+      expect(document.body.style.overflow).toBe("hidden");
+      expect(document.documentElement.style.overflow).toBe("hidden");
+    });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    window.dispatchEvent(new window.Event("resize"));
+    await waitFor(() => {
+      expect(document.body.style.position).toBe("");
+      expect(document.body.style.overflow).toBe("");
+      expect(document.documentElement.style.overflow).toBe("");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse folder Research" }));
     expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();

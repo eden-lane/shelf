@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FolderItem } from "@bookmarks/shared";
 import {
@@ -28,6 +28,7 @@ export const ProductShell = () => {
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isStackedSidebar, setIsStackedSidebar] = useState(isStackedSidebarViewport);
   const currentUser = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser
@@ -46,6 +47,46 @@ export const ProductShell = () => {
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
 
+  useEffect(() => {
+    const syncSidebarViewport = () => setIsStackedSidebar(isStackedSidebarViewport());
+
+    syncSidebarViewport();
+    window.addEventListener("resize", syncSidebarViewport);
+
+    return () => window.removeEventListener("resize", syncSidebarViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarVisible || !isStackedSidebar) {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+    const previousBodyStyles = {
+      overflow: style.overflow,
+      position: style.position,
+      top: style.top,
+      width: style.width
+    };
+    const previousRootOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    style.overflow = "hidden";
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = previousRootOverflow;
+      style.overflow = previousBodyStyles.overflow;
+      style.position = previousBodyStyles.position;
+      style.top = previousBodyStyles.top;
+      style.width = previousBodyStyles.width;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isSidebarVisible, isStackedSidebar]);
+
   const openBookmarkDialog = (folder: FolderItem | null) => {
     setBookmarkTargetFolder(folder);
     setBookmarkDialogOpen(true);
@@ -54,16 +95,16 @@ export const ProductShell = () => {
   const selectFolder = (folderId: string | null) => {
     setActiveFolderId(folderId);
 
-    if (isStackedSidebarViewport()) {
+    if (isStackedSidebar) {
       setIsSidebarVisible(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
+    <main className="min-h-dvh bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-30 w-[min(300px,calc(100vw-48px))] overflow-hidden bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:static md:h-screen md:w-[300px] md:shrink-0",
+          "fixed inset-y-0 left-0 z-30 h-dvh max-h-dvh w-[min(300px,calc(100vw-48px))] touch-pan-y overflow-hidden overscroll-contain bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:static md:h-screen md:max-h-none md:w-[300px] md:shrink-0",
           isSidebarVisible
             ? "translate-x-0 border-r border-gray-200 opacity-100 shadow-[16px_0_44px_rgb(15_23_42_/_0.14)] md:shadow-none"
             : "pointer-events-none -translate-x-full border-r-0 opacity-0 md:hidden"
@@ -71,7 +112,7 @@ export const ProductShell = () => {
         aria-label="Primary"
         aria-hidden={!isSidebarVisible}
       >
-        <div className="h-full w-[min(300px,calc(100vw-48px))] min-w-0 overflow-y-auto px-3 py-3 md:w-[300px] md:px-4 md:py-4">
+        <div className="h-full w-[min(300px,calc(100vw-48px))] min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 md:w-[300px] md:px-4 md:py-4">
           <FolderSidebar
             activeFolderId={activeFolderId}
             currentUser={currentUser.data}
