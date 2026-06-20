@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { BookmarksStore } from "./bookmarks";
-import { createApp } from "./app";
+import type { BookmarksStore } from "@bookmarks/api/bookmarks";
+import type { HealthDependencies } from "@bookmarks/api/health";
 import {
   DEV_ORGANIZATION_ID,
   DEV_ORGANIZATION_INBOX_FOLDER_ID,
@@ -14,10 +14,8 @@ import {
   DEV_USER_EMAIL,
   DEV_USER_ID,
   DEV_USER_NAME
-} from "./devIdentity";
-import { checkHealth, type HealthDependencies } from "./health";
-
-const now = new Date("2026-06-19T12:00:00.000Z");
+} from "@bookmarks/api/identity";
+import { createApp } from "./app";
 
 const dependencies = (overrides: Partial<HealthDependencies> = {}): HealthDependencies => ({
   database: {
@@ -46,42 +44,6 @@ const currentUser = {
   organizationName: DEV_ORGANIZATION_NAME,
   organizationSlug: DEV_ORGANIZATION_SLUG
 };
-
-describe("checkHealth", () => {
-  test("reports ok when all dependencies are available", async () => {
-    const health = await checkHealth(dependencies(), {
-      now: () => now
-    });
-
-    expect(health).toEqual({
-      status: "ok",
-      services: {
-        database: "ok",
-        queue: "ok",
-        search: "ok"
-      },
-      checkedAt: "2026-06-19T12:00:00.000Z"
-    });
-  });
-
-  test("reports individual dependency failures", async () => {
-    const health = await checkHealth(
-      dependencies({
-        queue: {
-          check: async () => {
-            throw new Error("redis offline");
-          }
-        }
-      }),
-      {
-        now: () => now
-      }
-    );
-
-    expect(health.status).toBe("degraded");
-    expect(health.services.queue).toBe("error");
-  });
-});
 
 describe("health endpoint", () => {
   test("returns the health response from the Hono app", async () => {

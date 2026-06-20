@@ -1,0 +1,21 @@
+{
+  "name": "@bookmarks/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --hot src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bookmarks/api": "workspace:*",
+    "@orpc/server": "latest",
+    "hono": "latest",
+    "ioredis": "latest",
+    "pg": "latest"
+  },
+  "devDependencies": {
+    "@types/pg": "latest",
+    "typescript": "latest"
+  }
+}

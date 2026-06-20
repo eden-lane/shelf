@@ -4,10 +4,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./bookmarks": "./src/bookmarks/index.ts",
+    "./currentUser": "./src/currentUser/index.ts",
+    "./db": "./src/db/index.ts",
+    "./health": "./src/health/index.ts",
+    "./identity": "./src/identity/index.ts",
     "./rpc": "./src/rpc.ts"
   },
   "scripts": {
-    "dev": "bun --hot src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },
@@ -15,8 +19,6 @@
     "@bookmarks/shared": "workspace:*",
     "@orpc/server": "latest",
     "drizzle-orm": "latest",
-    "hono": "latest",
-    "ioredis": "latest",
     "pg": "latest"
   },
   "devDependencies": {

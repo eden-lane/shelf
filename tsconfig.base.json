@@ -15,6 +15,8 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "paths": {
+      "@bookmarks/api": ["packages/api/src/index.ts"],
+      "@bookmarks/api/*": ["packages/api/src/*"],
       "@bookmarks/shared": ["packages/shared/src/index.ts"]
     }
   }

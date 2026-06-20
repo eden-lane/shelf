@@ -14,7 +14,7 @@ import {
   DEV_USER_ID,
   DEV_USER_NAME,
   ensureDevIdentity
-} from "./devIdentity";
+} from "./ensureDevIdentity";
 
 const createPool = (options: { failOnOrganizations?: boolean } = {}) => {
   const queries: Array<{ sql: string; values?: readonly unknown[] }> = [];

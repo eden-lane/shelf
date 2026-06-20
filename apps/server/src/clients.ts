@@ -1,11 +1,11 @@
-import Redis from "ioredis";
-import pg from "pg";
-import { createDatabase, type Database } from "./db";
+import { createDatabase, type Database } from "@bookmarks/api/db";
 import type {
   DatabaseHealthClient,
   QueueHealthClient,
   SearchHealthClient
-} from "./health";
+} from "@bookmarks/api/health";
+import Redis from "ioredis";
+import pg from "pg";
 
 const { Pool } = pg;
 

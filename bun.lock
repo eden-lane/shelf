@@ -16,6 +16,20 @@
         "wxt": "latest",
       },
     },
+    "apps/server": {
+      "name": "@bookmarks/server",
+      "dependencies": {
+        "@bookmarks/api": "workspace:*",
+        "@orpc/server": "latest",
+        "hono": "latest",
+        "ioredis": "latest",
+        "pg": "latest",
+      },
+      "devDependencies": {
+        "@types/pg": "latest",
+        "typescript": "latest",
+      },
+    },
     "apps/web": {
       "name": "@bookmarks/web",
       "dependencies": {
@@ -46,8 +60,6 @@
         "@bookmarks/shared": "workspace:*",
         "@orpc/server": "latest",
         "drizzle-orm": "latest",
-        "hono": "latest",
-        "ioredis": "latest",
         "pg": "latest",
       },
       "devDependencies": {
@@ -88,6 +100,8 @@
     "@bookmarks/api": ["@bookmarks/api@workspace:packages/api"],
 
     "@bookmarks/extensions": ["@bookmarks/extensions@workspace:apps/extensions"],
+
+    "@bookmarks/server": ["@bookmarks/server@workspace:apps/server"],
 
     "@bookmarks/shared": ["@bookmarks/shared@workspace:packages/shared"],
 

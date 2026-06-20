@@ -24,7 +24,7 @@ curl http://localhost:3000/health
 The Compose stack starts:
 
 - React/Vite web app
-- Hono/Bun API
+- Hono/Bun server from `apps/server`
 - Postgres
 - Redis queue backend
 - Meilisearch search service

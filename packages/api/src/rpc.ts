@@ -1,4 +1,4 @@
-import type { CreateBookmarkInput, CurrentUserResponse } from "@bookmarks/shared";
+import type { CreateBookmarkInput } from "@bookmarks/shared";
 import { ORPCError, os } from "@orpc/server";
 import {
   decodeBookmarkCursor,
@@ -7,7 +7,8 @@ import {
   type BookmarkCursor,
   type BookmarksStore
 } from "./bookmarks";
-import type { DevIdentity } from "./devIdentity";
+import { getCurrentUserResponse } from "./currentUser";
+import type { DevIdentity } from "./identity";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
 
@@ -26,7 +27,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       });
     }
 
-    return currentUserResponse(options.currentUser);
+    return getCurrentUserResponse(options.currentUser);
   }),
   bookmarks: {
     create: os.handler(async ({ input }) => {
@@ -90,36 +91,6 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 });
 
 export type RpcRouter = ReturnType<typeof createRpcRouter>;
-
-const currentUserResponse = (currentUser: DevIdentity): CurrentUserResponse => ({
-  user: {
-    id: currentUser.userId,
-    email: currentUser.email,
-    name: currentUser.name
-  },
-  organization: {
-    id: currentUser.organizationId,
-    name: currentUser.organizationName,
-    slug: currentUser.organizationSlug,
-    role: "owner"
-  },
-  libraries: [
-    {
-      id: currentUser.personalLibraryId,
-      kind: "personal",
-      name: currentUser.personalLibraryName,
-      inboxFolderId: currentUser.personalInboxFolderId
-    },
-    {
-      id: currentUser.organizationLibraryId,
-      kind: "organization",
-      name: currentUser.organizationLibraryName,
-      inboxFolderId: currentUser.organizationInboxFolderId,
-      organizationId: currentUser.organizationId,
-      organizationSlug: currentUser.organizationSlug
-    }
-  ]
-});
 
 const parseBookmarksInput = (
   input: unknown

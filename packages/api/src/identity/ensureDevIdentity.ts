@@ -44,9 +44,7 @@ interface DevIdentityPool {
   connect(): Promise<DevIdentityClient>;
 }
 
-export const ensureDevIdentity = async (
-  pool: DevIdentityPool
-): Promise<DevIdentity> => {
+export const ensureDevIdentity = async (pool: DevIdentityPool): Promise<DevIdentity> => {
   const client = await pool.connect();
 
   try {

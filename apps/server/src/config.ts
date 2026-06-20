@@ -1,12 +1,12 @@
-export interface ApiConfig {
+export type AuthMode = "dev" | "none";
+
+export interface ServerConfig {
   port: number;
   databaseUrl: string;
   redisUrl: string;
   meilisearchUrl: string;
   authMode: AuthMode;
 }
-
-export type AuthMode = "dev" | "none";
 
 const numberFromEnv = (name: string, fallback: number): number => {
   const value = Bun.env[name];
@@ -15,11 +15,11 @@ const numberFromEnv = (name: string, fallback: number): number => {
   }
 
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`${name} must be a number`);
+  if (Number.isFinite(parsed)) {
+    return parsed;
   }
 
-  return parsed;
+  throw new Error(`${name} must be a number`);
 };
 
 const authModeFromEnv = (): AuthMode => {
@@ -36,7 +36,7 @@ const authModeFromEnv = (): AuthMode => {
   throw new Error("AUTH_MODE must be either dev or none");
 };
 
-export const getConfig = (): ApiConfig => ({
+export const getConfig = (): ServerConfig => ({
   port: numberFromEnv("PORT", 3000),
   databaseUrl:
     Bun.env.DATABASE_URL ?? "postgres://bookmarks:bookmarks@localhost:5432/bookmarks",
