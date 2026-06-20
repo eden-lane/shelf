@@ -111,12 +111,12 @@ const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
 
   return (
     <h1
-      className="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[34px] leading-[1.1] font-bold"
+      className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm leading-5 font-semibold"
       aria-label={label}
     >
       <IconDatabase
         className="shrink-0 text-gray-500"
-        size={31}
+        size={16}
         stroke={1.5}
         aria-hidden="true"
         focusable="false"
@@ -127,10 +127,10 @@ const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
           <BreadcrumbFolder folder={folder} key={folder.id} isLast={index === folders.length - 1} />
         ))
       ) : (
-        <span className="inline-flex min-w-0 items-center gap-2">
+        <span className="inline-flex min-w-0 items-center gap-1">
           <IconBookmark
             className="shrink-0 text-[#3b8df5]"
-            size={31}
+            size={16}
             stroke={1.5}
             aria-hidden="true"
             focusable="false"
@@ -147,10 +147,10 @@ const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: bool
 
   return (
     <>
-      <span className="inline-flex min-w-0 items-center gap-2">
+      <span className="inline-flex min-w-0 items-center gap-1">
         <FolderIcon
           className="shrink-0"
-          size={31}
+          size={16}
           stroke={1.5}
           color={folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR}
           aria-hidden="true"
@@ -164,7 +164,7 @@ const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: bool
 };
 
 const BreadcrumbSeparator = () => (
-  <span className="shrink-0 text-[28px] leading-none font-medium text-gray-300" aria-hidden="true">
+  <span className="shrink-0 text-xs leading-none font-medium text-gray-300" aria-hidden="true">
     /
   </span>
 );
