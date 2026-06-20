@@ -114,11 +114,11 @@ export const BookmarksWorkspace = ({
   if (bookmarks.isLoading) {
     return (
       <section
-        className="grid gap-3 rounded-lg border border-[#e4e7ef] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
         aria-label="Loading items"
       >
         {Array.from({ length: 4 }).map((_, index) => (
-          <div className="grid gap-2 rounded-lg border border-[#edf0f6] p-4" key={index}>
+          <div className="grid min-w-0 gap-2 rounded-lg border border-[#edf0f6] p-4" key={index}>
             <div className="h-4 w-2/5 rounded bg-[#eef1f6]" />
             <div className="h-3 w-4/5 rounded bg-[#f3f5f9]" />
           </div>
@@ -130,7 +130,7 @@ export const BookmarksWorkspace = ({
   if (bookmarks.isError) {
     return (
       <section
-        className="grid gap-4 rounded-lg border border-[#f0b37e] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-[#f0b37e] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
         aria-labelledby="items-error-title"
       >
         <div className="flex items-start gap-3">
@@ -141,7 +141,7 @@ export const BookmarksWorkspace = ({
             aria-hidden="true"
             focusable="false"
           />
-          <div>
+          <div className="min-w-0">
             <h2 id="items-error-title" className="m-0 text-lg font-extrabold">
               Items could not be loaded
             </h2>
@@ -165,7 +165,7 @@ export const BookmarksWorkspace = ({
   if (items.length === 0) {
     return (
       <section
-        className="grid gap-3 rounded-lg border border-[#e4e7ef] bg-white p-7 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
+        className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-7 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
         aria-labelledby="empty-items-title"
       >
         <IconBookmark
@@ -175,11 +175,11 @@ export const BookmarksWorkspace = ({
           aria-hidden="true"
           focusable="false"
         />
-        <div>
+        <div className="min-w-0">
           <h2 id="empty-items-title" className="mb-2 text-2xl leading-[1.2] font-bold">
             No items yet
           </h2>
-          <p className="mb-0 max-w-[56ch] text-[#697080]">
+          <p className="mb-0 max-w-full text-[#697080] sm:max-w-[56ch]">
             {folderName
               ? "Bookmarks added to this folder will appear here."
               : "Bookmarks without a folder will appear here as soon as they are saved."}
@@ -192,7 +192,7 @@ export const BookmarksWorkspace = ({
   return (
     <>
       <section
-        className="grid gap-3"
+        className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden"
         aria-label={folderName ? `${folderName} items` : "Inbox items"}
         aria-busy={bookmarks.isFetchingNextPage}
       >

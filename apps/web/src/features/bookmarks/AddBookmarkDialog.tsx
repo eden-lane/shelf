@@ -168,8 +168,8 @@ export const AddBookmarkDialog = ({
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-[#101522]/45" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid w-[min(calc(100vw-32px),420px)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none">
-          <div className="grid gap-1 pr-9">
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid w-[min(calc(100vw-32px),420px)] -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_minmax(0,1fr)] gap-5 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none max-md:inset-0 max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:p-0 max-md:shadow-none">
+          <div className="grid gap-1 pr-9 max-md:border-b max-md:border-[#eef1f6] max-md:px-4 max-md:pt-[calc(1rem+env(safe-area-inset-top))] max-md:pb-3">
             <Dialog.Title className="text-lg leading-[1.25] font-extrabold">
               {targetFolder ? `Add to ${targetFolder.name}` : "Add bookmark"}
             </Dialog.Title>
@@ -178,56 +178,63 @@ export const AddBookmarkDialog = ({
             </Dialog.Description>
           </div>
           <Dialog.Close
-            className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+            className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:top-[calc(1rem+env(safe-area-inset-top))]"
             aria-label="Close add bookmark dialog"
             type="button"
           >
             <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           </Dialog.Close>
-          <form className="grid gap-4" ref={formRef} noValidate onSubmit={submitBookmark}>
-            <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
-              Page URL
-              <input
-                className={[
-                  "min-h-11 rounded-lg border bg-white px-3 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]",
-                  isUrlInvalid ? "border-[#ef4444] ring-3 ring-[#fee2e2]" : "border-[#dfe4ef]",
-                  isUrlShaking ? "field-shake" : ""
-                ].join(" ")}
-                aria-invalid={isUrlInvalid}
-                id="bookmark-url"
-                inputMode="url"
-                name="url"
-                placeholder="https://example.com/article"
-                ref={urlInputRef}
-                type="text"
-                onAnimationEnd={() => setIsUrlShaking(false)}
-                onChange={(event) => {
-                  if (isValidBookmarkUrl(event.target.value.trim())) {
-                    setIsUrlInvalid(false);
-                  }
-                }}
-                onInput={(event) => {
-                  if (isValidBookmarkUrl(event.currentTarget.value.trim())) {
-                    setIsUrlInvalid(false);
-                  }
-                }}
-              />
-            </label>
-            {addBookmark.isError ? (
-              <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">
-                Bookmark could not be saved.
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2">
+          <form
+            className="grid min-h-0 gap-4 max-md:grid-rows-[minmax(0,1fr)_auto]"
+            ref={formRef}
+            noValidate
+            onSubmit={submitBookmark}
+          >
+            <div className="grid min-h-0 content-start gap-4 overflow-y-auto overscroll-contain max-md:px-4 max-md:py-4">
+              <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
+                Page URL
+                <input
+                  className={[
+                    "min-h-11 rounded-lg border bg-white px-3 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]",
+                    isUrlInvalid ? "border-[#ef4444] ring-3 ring-[#fee2e2]" : "border-[#dfe4ef]",
+                    isUrlShaking ? "field-shake" : ""
+                  ].join(" ")}
+                  aria-invalid={isUrlInvalid}
+                  id="bookmark-url"
+                  inputMode="url"
+                  name="url"
+                  placeholder="https://example.com/article"
+                  ref={urlInputRef}
+                  type="text"
+                  onAnimationEnd={() => setIsUrlShaking(false)}
+                  onChange={(event) => {
+                    if (isValidBookmarkUrl(event.target.value.trim())) {
+                      setIsUrlInvalid(false);
+                    }
+                  }}
+                  onInput={(event) => {
+                    if (isValidBookmarkUrl(event.currentTarget.value.trim())) {
+                      setIsUrlInvalid(false);
+                    }
+                  }}
+                />
+              </label>
+              {addBookmark.isError ? (
+                <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">
+                  Bookmark could not be saved.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex justify-end gap-2 max-md:border-t max-md:border-[#eef1f6] max-md:bg-white max-md:px-4 max-md:pt-3 max-md:pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <Dialog.Close
-                className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:flex-1"
                 disabled={addBookmark.isPending}
                 type="button"
               >
                 Cancel
               </Dialog.Close>
               <button
-                className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] disabled:cursor-not-allowed disabled:border-[#91bff8] disabled:bg-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] disabled:cursor-not-allowed disabled:border-[#91bff8] disabled:bg-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:flex-1"
                 disabled={addBookmark.isPending}
                 type="submit"
               >

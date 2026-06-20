@@ -8,6 +8,16 @@
 :root,
 body {
   font-family: "Open Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  width: 100%;
+}
+
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 @keyframes field-shake {

@@ -18,7 +18,9 @@ import { RPCLink } from "@orpc/client/fetch";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const runtimeApiBaseUrl =
-  typeof window === "undefined" ? "http://localhost:3000" : `${window.location.protocol}//${window.location.hostname}:3000`;
+  typeof window === "undefined" || !["http:", "https:"].includes(window.location.protocol)
+    ? "http://localhost:3000"
+    : `${window.location.protocol}//${window.location.hostname}:3000`;
 const apiBaseUrl = configuredApiBaseUrl || runtimeApiBaseUrl;
 const rpcLink = new RPCLink({
   fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),

@@ -56,7 +56,7 @@ export const BookmarkRow = ({
   };
 
   return (
-    <article className="rounded-lg border border-[#e4e7ef] bg-white p-4 shadow-[0_14px_40px_rgb(46_54_77_/_0.045)]">
+    <article className="w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-4 shadow-[0_14px_40px_rgb(46_54_77_/_0.045)]">
       <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 sm:grid-cols-[144px_minmax(0,1fr)]">
         <div className="aspect-[4/3] overflow-hidden rounded-lg border border-[#e7eaf1] bg-[#f3f5f9] sm:aspect-[3/2]">
           {item.imageUrl ? (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FolderItem } from "@bookmarks/shared";
 import {
@@ -24,6 +24,7 @@ const isStackedSidebarViewport = () =>
 
 export const ProductShell = () => {
   const queryClient = useQueryClient();
+  const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
@@ -77,7 +78,72 @@ export const ProductShell = () => {
     style.top = `-${scrollY}px`;
     style.width = "100%";
 
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const preventScroll = (event: Event) => event.preventDefault();
+    const captureTouchStart = (event: Event) => {
+      const touch = (event as TouchEvent).touches[0];
+
+      if (!touch) {
+        return;
+      }
+
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    };
+    const containTouchMove = (event: Event) => {
+      const touchEvent = event as TouchEvent;
+
+      if (touchEvent.touches.length !== 1) {
+        return;
+      }
+
+      const touch = touchEvent.touches[0];
+      const scrollContainer = sidebarScrollRef.current;
+
+      if (!touch || !scrollContainer || !(event.target instanceof Node)) {
+        event.preventDefault();
+        return;
+      }
+
+      if (!scrollContainer.contains(event.target)) {
+        event.preventDefault();
+        return;
+      }
+
+      const deltaX = touch.clientX - touchStartX;
+      const deltaY = touch.clientY - touchStartY;
+
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        event.preventDefault();
+        return;
+      }
+
+      const canScrollVertically = scrollContainer.scrollHeight > scrollContainer.clientHeight;
+
+      if (!canScrollVertically) {
+        event.preventDefault();
+        return;
+      }
+
+      const isPullingPastTop = deltaY > 0 && scrollContainer.scrollTop <= 0;
+      const isPullingPastBottom =
+        deltaY < 0 &&
+        scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 1;
+
+      if (isPullingPastTop || isPullingPastBottom) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("scroll", preventScroll, { passive: false });
+    document.addEventListener("touchstart", captureTouchStart, { passive: true });
+    document.addEventListener("touchmove", containTouchMove, { passive: false, capture: true });
+
     return () => {
+      window.removeEventListener("scroll", preventScroll);
+      document.removeEventListener("touchstart", captureTouchStart);
+      document.removeEventListener("touchmove", containTouchMove, { capture: true });
       document.documentElement.style.overflow = previousRootOverflow;
       style.overflow = previousBodyStyles.overflow;
       style.position = previousBodyStyles.position;
@@ -101,7 +167,7 @@ export const ProductShell = () => {
   };
 
   return (
-    <main className="min-h-dvh bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
+    <main className="min-h-dvh w-full max-w-full overflow-x-hidden bg-gray-50 font-sans text-slate-950 md:flex md:h-screen md:overflow-hidden">
       <aside
         className={[
           "fixed inset-y-0 left-0 z-30 h-dvh max-h-dvh w-[min(300px,calc(100vw-48px))] touch-pan-y overflow-hidden overscroll-contain bg-gray-50 text-slate-950 transition-[transform,opacity] duration-300 ease-out md:static md:h-screen md:max-h-none md:w-[300px] md:shrink-0",
@@ -112,7 +178,10 @@ export const ProductShell = () => {
         aria-label="Primary"
         aria-hidden={!isSidebarVisible}
       >
-        <div className="h-full w-[min(300px,calc(100vw-48px))] min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 md:w-[300px] md:px-4 md:py-4">
+        <div
+          className="h-full w-[min(300px,calc(100vw-48px))] min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 md:w-[300px] md:px-4 md:py-4"
+          ref={sidebarScrollRef}
+        >
           <FolderSidebar
             activeFolderId={activeFolderId}
             currentUser={currentUser.data}
@@ -127,7 +196,7 @@ export const ProductShell = () => {
       </aside>
 
       <section
-        className="flex min-w-0 flex-col gap-5 p-5 md:h-screen md:flex-1 md:overflow-y-auto md:p-7"
+        className="flex w-full min-w-0 max-w-full flex-col gap-5 overflow-x-hidden p-5 md:h-screen md:flex-1 md:overflow-y-auto md:p-7"
         aria-label="Items workspace"
       >
         <header className="grid grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
