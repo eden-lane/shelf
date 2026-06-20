@@ -933,27 +933,47 @@ const InlineFolderForm = ({
   const [iconName, setIconName] = useState(defaultIconName ?? DEFAULT_FOLDER_ICON_NAME);
   const [iconColor, setIconColor] = useState(defaultIconColor ?? DEFAULT_FOLDER_ICON_COLOR);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+  const [isNameInvalid, setIsNameInvalid] = useState(false);
+  const [isNameShaking, setIsNameShaking] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
   }, []);
 
+  const triggerNameValidation = () => {
+    setIsNameInvalid(true);
+    setIsNameShaking(false);
+    requestAnimationFrame(() => setIsNameShaking(true));
+    inputRef.current?.focus();
+  };
+
+  const updateName = (value: string) => {
+    setName(value);
+    if (value.trim()) {
+      setIsNameInvalid(false);
+    }
+  };
+
   return (
     <form
       className="grid min-h-9 min-w-0 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
         const trimmedName = String(formData.get("name") ?? "").trim();
 
-        if (trimmedName) {
-          onSubmit({
-            iconColor,
-            iconName,
-            name: trimmedName
-          });
+        if (!trimmedName) {
+          triggerNameValidation();
+          return;
         }
+
+        onSubmit({
+          iconColor,
+          iconName,
+          name: trimmedName
+        });
       }}
     >
       <div className="flex min-w-0 items-center gap-1">
@@ -971,14 +991,22 @@ const InlineFolderForm = ({
           onOpenChange={setIsIconPickerOpen}
         />
         <input
-          className="min-h-8 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 text-sm font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]"
+          className={[
+            "min-h-8 min-w-0 flex-1 rounded-md border bg-transparent px-1.5 text-sm font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]",
+            isNameInvalid
+              ? "border-[#ef4444] ring-3 ring-[#fee2e2]"
+              : "border-transparent",
+            isNameShaking ? "field-shake" : ""
+          ].join(" ")}
           aria-label="Folder title"
+          aria-invalid={isNameInvalid}
           name="name"
           placeholder="Folder title"
           ref={inputRef}
-          required
           value={name}
-          onChange={(event) => setName(event.target.value)}
+          onAnimationEnd={() => setIsNameShaking(false)}
+          onChange={(event) => updateName(event.target.value)}
+          onInput={(event) => updateName(event.currentTarget.value)}
         />
       </div>
       <button
@@ -1828,6 +1856,15 @@ const hostFromUrl = (url: string) => {
   }
 };
 
+const isValidBookmarkUrl = (url: string) => {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 const formatBookmarkDate = (date: string) =>
   new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -1846,6 +1883,9 @@ const AddBookmarkDialog = ({
   onOpenChange: (open: boolean) => void;
 }) => {
   const formRef = useRef<HTMLFormElement | null>(null);
+  const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUrlInvalid, setIsUrlInvalid] = useState(false);
+  const [isUrlShaking, setIsUrlShaking] = useState(false);
   const queryClient = useQueryClient();
   const addBookmark = useMutation({
     mutationFn: ({ optimisticFolder: _optimisticFolder, ...input }: AddBookmarkMutationInput) =>
@@ -1931,6 +1971,8 @@ const AddBookmarkDialog = ({
       }
 
       formRef.current?.reset();
+      setIsUrlInvalid(false);
+      setIsUrlShaking(false);
       onOpenChange(false);
     },
     onSettled: (bookmark, _error, input, context) => {
@@ -1959,7 +2001,15 @@ const AddBookmarkDialog = ({
   const submitBookmark = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-    const url = String(formData.get("url") ?? "");
+    const url = (urlInputRef.current?.value ?? String(formData.get("url") ?? "")).trim();
+
+    if (!isValidBookmarkUrl(url)) {
+      setIsUrlInvalid(true);
+      setIsUrlShaking(false);
+      requestAnimationFrame(() => setIsUrlShaking(true));
+      urlInputRef.current?.focus();
+      return;
+    }
 
     addBookmark.mutate({ folderId: targetFolder?.id, optimisticFolder: targetFolder, url });
   };
@@ -1971,6 +2021,8 @@ const AddBookmarkDialog = ({
         onOpenChange(open);
         if (open) {
           addBookmark.reset();
+          setIsUrlInvalid(false);
+          setIsUrlShaking(false);
         }
       }}
     >
@@ -1992,16 +2044,33 @@ const AddBookmarkDialog = ({
           >
             <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           </Dialog.Close>
-          <form className="grid gap-4" ref={formRef} onSubmit={submitBookmark}>
+          <form className="grid gap-4" ref={formRef} noValidate onSubmit={submitBookmark}>
             <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
               Page URL
               <input
-                className="min-h-11 rounded-lg border border-[#dfe4ef] bg-white px-3 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
+                className={[
+                  "min-h-11 rounded-lg border bg-white px-3 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]",
+                  isUrlInvalid ? "border-[#ef4444] ring-3 ring-[#fee2e2]" : "border-[#dfe4ef]",
+                  isUrlShaking ? "field-shake" : ""
+                ].join(" ")}
+                aria-invalid={isUrlInvalid}
                 id="bookmark-url"
+                inputMode="url"
                 name="url"
                 placeholder="https://example.com/article"
-                required
-                type="url"
+                ref={urlInputRef}
+                type="text"
+                onAnimationEnd={() => setIsUrlShaking(false)}
+                onChange={(event) => {
+                  if (isValidBookmarkUrl(event.target.value.trim())) {
+                    setIsUrlInvalid(false);
+                  }
+                }}
+                onInput={(event) => {
+                  if (isValidBookmarkUrl(event.currentTarget.value.trim())) {
+                    setIsUrlInvalid(false);
+                  }
+                }}
               />
             </label>
             {addBookmark.isError ? (

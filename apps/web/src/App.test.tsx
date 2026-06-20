@@ -451,6 +451,17 @@ describe("App", () => {
       expect(screen.getByLabelText("Folder title")).toBeTruthy();
     });
 
+    const folderTitleInput = screen.getByLabelText("Folder title");
+    expect(folderTitleInput.hasAttribute("required")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    await waitFor(() => {
+      expect(folderTitleInput.getAttribute("aria-invalid")).toBe("true");
+    });
+    fireEvent.input(folderTitleInput, { target: { value: "Github" } });
+    await waitFor(() => {
+      expect(folderTitleInput.getAttribute("aria-invalid")).toBe("false");
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "Choose folder icon" }));
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "Folder icon picker" })).toBeTruthy();
@@ -474,6 +485,7 @@ describe("App", () => {
       expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
       expect(screen.getByLabelText("Page URL")).toBeTruthy();
     });
+    expect(screen.getByLabelText("Page URL").hasAttribute("required")).toBe(false);
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
