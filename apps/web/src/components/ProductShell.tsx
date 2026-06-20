@@ -1,6 +1,6 @@
 import { type CSSProperties, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { CurrentUserResponse, FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@bookmarks/shared";
 import { IconBookmark, IconDatabase, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { getCurrentUser, getFolders } from "../api";
 import { AddBookmarkDialog } from "../features/bookmarks/AddBookmarkDialog";
@@ -26,7 +26,6 @@ export const ProductShell = () => {
     queryKey: ["folders"],
     queryFn: getFolders
   });
-  const username = displayUsername(currentUser.data);
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
 
@@ -65,7 +64,7 @@ export const ProductShell = () => {
       </aside>
 
       <section
-        className="flex min-w-0 flex-col gap-7 p-5 transition-[margin-left] duration-300 ease-out md:ml-[var(--sidebar-width)] md:h-screen md:overflow-y-auto md:p-7"
+        className="flex min-w-0 flex-col gap-5 p-5 transition-[margin-left] duration-300 ease-out md:ml-[var(--sidebar-width)] md:h-screen md:overflow-y-auto md:p-7"
         aria-label="Items workspace"
       >
         <header className="flex items-start gap-3">
@@ -86,7 +85,6 @@ export const ProductShell = () => {
             </button>
           ) : null}
           <div className="col-span-3 min-w-0">
-            <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
             <FolderBreadcrumbs folders={activeFolderPath} />
           </div>
         </header>
@@ -103,15 +101,12 @@ export const ProductShell = () => {
   );
 };
 
-const displayUsername = (currentUser?: CurrentUserResponse) =>
-  currentUser?.user.name || currentUser?.user.email || "User";
-
 const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
   const label = folders.length > 0 ? folders.map((folder) => folder.name).join(" / ") : "Items";
 
   return (
     <h1
-      className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm leading-5 font-semibold"
+      className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[15px] leading-5 font-semibold"
       aria-label={label}
     >
       <IconDatabase
@@ -164,7 +159,7 @@ const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: bool
 };
 
 const BreadcrumbSeparator = () => (
-  <span className="shrink-0 text-xs leading-none font-medium text-gray-300" aria-hidden="true">
+  <span className="shrink-0 text-sm leading-none font-medium text-gray-300" aria-hidden="true">
     /
   </span>
 );
