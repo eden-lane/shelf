@@ -1,4 +1,5 @@
 import {
+  type CSSProperties,
   Fragment,
   type FormEvent,
   type KeyboardEvent,
@@ -24,7 +25,6 @@ import type {
 } from "@bookmarks/shared";
 import { Dialog } from "@base-ui/react/dialog";
 import {
-  IconAdjustmentsHorizontal,
   IconAlertTriangle,
   IconBookmark,
   IconChevronDown,
@@ -33,6 +33,8 @@ import {
   IconExternalLink,
   IconFolder,
   IconFolderPlus,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
   IconPencil,
   IconPhoto,
   IconPlus,
@@ -70,6 +72,7 @@ const ProductShell = () => {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const currentUser = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser
@@ -88,12 +91,21 @@ const ProductShell = () => {
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-gray-50 font-sans text-slate-950 md:grid-cols-[328px_minmax(0,1fr)]">
+    <main
+      className="grid min-h-screen grid-cols-1 bg-gray-50 font-sans text-slate-950 transition-[grid-template-columns] duration-300 ease-out md:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]"
+      style={{ "--sidebar-width": isSidebarVisible ? "300px" : "0px" } as CSSProperties}
+    >
       <aside
-        className="border-b border-gray-200 bg-gray-50 text-slate-950 md:min-h-screen md:border-r md:border-b-0"
+        className={[
+          "overflow-hidden bg-gray-50 text-slate-950 transition-[max-height,opacity] duration-300 ease-out md:min-h-screen md:max-h-none md:transition-opacity",
+          isSidebarVisible
+            ? "max-h-[80vh] border-b border-gray-200 opacity-100 md:border-r md:border-b-0"
+            : "max-h-0 border-b-0 opacity-0 md:border-r-0"
+        ].join(" ")}
         aria-label="Primary"
+        aria-hidden={!isSidebarVisible}
       >
-        <div className="min-w-0 px-4 py-4 md:px-5 md:py-5">
+        <div className="min-w-0 px-3 py-3 md:px-4 md:py-4">
           <FolderSidebar
             activeFolderId={activeFolderId}
             currentUser={currentUser.data}
@@ -101,14 +113,31 @@ const ProductShell = () => {
             isError={folders.isError}
             isLoading={folders.isLoading}
             onAddBookmark={openBookmarkDialog}
+            onHideSidebar={() => setIsSidebarVisible(false)}
             onSelectFolder={setActiveFolderId}
           />
         </div>
       </aside>
 
       <section className="flex min-w-0 flex-col gap-7 p-5 md:p-7" aria-label="Items workspace">
-        <header>
-          <div>
+        <header className="flex items-start gap-3">
+          {!isSidebarVisible ? (
+            <button
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              aria-label="Show sidebar"
+              title="Show sidebar"
+              type="button"
+              onClick={() => setIsSidebarVisible(true)}
+            >
+              <IconLayoutSidebarLeftExpand
+                size={23}
+                stroke={1.5}
+                aria-hidden="true"
+                focusable="false"
+              />
+            </button>
+          ) : null}
+          <div className="min-w-0">
             <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
             <h1 className="m-0 text-[34px] leading-[1.1] font-bold">
               {activeFolder?.name ?? "Items"}
@@ -138,6 +167,7 @@ const FolderSidebar = ({
   isError,
   isLoading,
   onAddBookmark,
+  onHideSidebar,
   onSelectFolder
 }: {
   activeFolderId: string | null;
@@ -146,6 +176,7 @@ const FolderSidebar = ({
   isError: boolean;
   isLoading: boolean;
   onAddBookmark: (folder: FolderItem | null) => void;
+  onHideSidebar: () => void;
   onSelectFolder: (folderId: string | null) => void;
 }) => {
   const queryClient = useQueryClient();
@@ -208,10 +239,10 @@ const FolderSidebar = ({
   const menuFolder = menu ? folders.find((folder) => folder.id === menu.folderId) ?? null : null;
 
   return (
-    <nav className="flex min-h-full flex-col gap-5" aria-label="Folders">
+    <nav className="flex min-h-full flex-col gap-4" aria-label="Folders">
       <div className="flex items-center gap-2">
-        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 text-gray-500 outline-none focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-100">
-          <IconSearch size={22} stroke={2.1} aria-hidden="true" focusable="false" />
+        <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-2.5 text-gray-500 outline-none focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-100">
+          <IconSearch size={22} stroke={1.5} aria-hidden="true" focusable="false" />
           <input
             className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-950 outline-none placeholder:text-gray-500"
             aria-label="Search folders"
@@ -222,25 +253,31 @@ const FolderSidebar = ({
           />
         </label>
         <button
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-red-500 text-white shadow-sm outline-none hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-red-500 text-white shadow-sm outline-none hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           aria-label="Add bookmark"
           title="Add bookmark"
           type="button"
           onClick={() => onAddBookmark(null)}
         >
-          <IconPlus size={25} stroke={2.4} aria-hidden="true" focusable="false" />
+          <IconPlus size={25} stroke={1.5} aria-hidden="true" focusable="false" />
         </button>
         <button
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          aria-label="Folder display options"
-          title="Folder display options"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Hide sidebar"
+          title="Hide sidebar"
           type="button"
+          onClick={onHideSidebar}
         >
-          <IconAdjustmentsHorizontal size={23} stroke={2.2} aria-hidden="true" focusable="false" />
+          <IconLayoutSidebarLeftCollapse
+            size={23}
+            stroke={1.5}
+            aria-hidden="true"
+            focusable="false"
+          />
         </button>
       </div>
-      <div className="grid gap-4">
-        <div className="flex items-center justify-between px-3">
+      <div className="grid gap-3">
+        <div className="flex items-center justify-between px-2.5">
           <span className="text-sm font-medium text-gray-500">My organization</span>
           {currentUser?.libraries[0] ? (
             <button
@@ -254,28 +291,28 @@ const FolderSidebar = ({
                 })
               }
             >
-              <IconFolderPlus size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+              <IconFolderPlus size={16} stroke={1.5} aria-hidden="true" focusable="false" />
             </button>
           ) : null}
         </div>
         <button
           className={[
-            "flex min-h-11 items-center gap-2 rounded-2xl px-3 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
+            "flex min-h-10 items-center gap-2 rounded-xl px-2.5 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
             activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700"
           ].join(" ")}
           type="button"
           onClick={() => onSelectFolder(null)}
         >
-          <IconBookmark size={21} stroke={2.1} aria-hidden="true" focusable="false" />
+          <IconBookmark size={21} stroke={1.5} aria-hidden="true" focusable="false" />
           <span>Items</span>
         </button>
         {isLoading ? (
-          <p className="m-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-500">
+          <p className="m-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-bold text-gray-500">
             Loading folders
           </p>
         ) : null}
         {isError ? (
-          <p className="m-0 rounded-2xl border border-orange-200 bg-white px-3 py-2 text-sm font-bold text-orange-700">
+          <p className="m-0 rounded-xl border border-orange-200 bg-white px-2.5 py-2 text-sm font-bold text-orange-700">
             Folders could not be loaded.
           </p>
         ) : null}
@@ -284,19 +321,19 @@ const FolderSidebar = ({
 
           return (
             <section className="grid gap-1" key={library.id} aria-label={`${library.name} folders`}>
-              <div className="grid min-h-9 grid-cols-[minmax(0,1fr)_2rem_2.25rem] items-center gap-1">
-                <div className="flex min-w-0 items-center gap-2 pl-3">
+              <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1">
+                <div className="flex min-w-0 items-center gap-2 pl-2.5">
                   <IconChevronDown
                     className="shrink-0 text-gray-500"
-                    size={18}
-                    stroke={2.1}
+                    size={16}
+                    stroke={1.5}
                     aria-hidden="true"
                     focusable="false"
                   />
                   <IconDatabase
                     className="shrink-0 text-gray-500"
                     size={21}
-                    stroke={2}
+                    stroke={1.5}
                     aria-hidden="true"
                     focusable="false"
                   />
@@ -306,12 +343,12 @@ const FolderSidebar = ({
                 </div>
                 <span aria-hidden="true" />
                 <button
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-label={`Create folder in ${library.name}`}
                   type="button"
                   onClick={() => setCreatingTarget({ libraryId: library.id, parentId: null })}
                 >
-                  <IconPlus size={15} stroke={2.2} aria-hidden="true" focusable="false" />
+                  <IconPlus size={16} stroke={1.5} aria-hidden="true" focusable="false" />
                 </button>
               </div>
               {creatingTarget?.libraryId === library.id && creatingTarget.parentId === null ? (
@@ -352,7 +389,7 @@ const FolderSidebar = ({
                 />
               ))}
               {roots.length === 0 ? (
-                <p className="m-0 px-3 py-1 text-xs font-bold text-gray-400">No folders</p>
+                <p className="m-0 px-2.5 py-1 text-xs font-bold text-gray-400">No folders</p>
               ) : null}
             </section>
           );
@@ -434,13 +471,13 @@ const FolderTreeRow = ({
   const isCreatingChild = creatingTarget?.parentId === folder.id;
   const hasChildren = folder.children.length > 0;
   const isActive = activeFolderId === folder.id;
-  const indent = 12 + level * 22;
+  const indent = 8 + level * 18;
 
   return (
     <Fragment>
       <div
         className={[
-          "grid grid-cols-[minmax(0,1fr)_2rem_2.25rem] items-center gap-1 rounded-2xl transition-colors",
+          "grid grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl transition-colors",
           isActive ? "bg-gray-100 text-slate-950" : "text-slate-950 hover:bg-white"
         ].join(" ")}
         style={{ marginLeft: `${indent}px` }}
@@ -463,35 +500,35 @@ const FolderTreeRow = ({
         ) : (
           <>
             <button
-              className="flex min-h-11 min-w-0 items-center gap-2 pr-3 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="flex min-h-9 min-w-0 items-center gap-2 pr-2.5 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               type="button"
               onClick={() => onSelectFolder(folder.id)}
             >
               {hasChildren ? (
                 <IconChevronDown
                   className="shrink-0 text-gray-500"
-                  size={18}
-                  stroke={2.1}
+                  size={16}
+                  stroke={1.5}
                   aria-hidden="true"
                   focusable="false"
                 />
               ) : (
-                <span className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                <span className="h-4 w-4 shrink-0" aria-hidden="true" />
               )}
               <IconFolder
                 className={activeFolderId === folder.id ? "text-slate-950" : "text-gray-500"}
                 size={21}
-                stroke={2}
+                stroke={1.5}
                 aria-hidden="true"
                 focusable="false"
               />
               <span className="truncate">{folder.name}</span>
             </button>
-            <span className="grid h-11 place-items-center text-xs font-extrabold text-gray-400">
+            <span className="grid h-9 place-items-center text-xs font-extrabold text-gray-400">
               {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
             </span>
             <button
-              className="grid h-9 w-9 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label={`Folder actions for ${folder.name}`}
               type="button"
               onClick={(event) => {
@@ -500,13 +537,13 @@ const FolderTreeRow = ({
                 onOpenMenu(folder, rect.left, rect.bottom + 4);
               }}
             >
-              <IconDotsVertical size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+              <IconDotsVertical size={16} stroke={1.5} aria-hidden="true" focusable="false" />
             </button>
           </>
         )}
       </div>
       {isCreatingChild ? (
-        <div style={{ marginLeft: `${12 + (level + 1) * 22}px` }}>
+        <div style={{ marginLeft: `${8 + (level + 1) * 18}px` }}>
           <InlineFolderForm
             error={createError}
             isPending={createPending}
@@ -663,7 +700,7 @@ const ContextMenuButton = ({
     type="button"
     onClick={onClick}
   >
-    <Icon size={16} stroke={2.2} aria-hidden="true" focusable="false" />
+    <Icon size={16} stroke={1.5} aria-hidden="true" focusable="false" />
     <span>{label}</span>
   </button>
 );
@@ -741,7 +778,7 @@ const DeleteFolderDialog = ({
             aria-label="Close delete folder dialog"
             type="button"
           >
-            <IconX size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+            <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           </Dialog.Close>
           <form
             className="grid gap-4"
@@ -899,7 +936,7 @@ const BookmarksWorkspace = ({
           <IconAlertTriangle
             className="mt-0.5 text-[#d97706]"
             size={20}
-            stroke={2.2}
+            stroke={1.5}
             aria-hidden="true"
             focusable="false"
           />
@@ -917,7 +954,7 @@ const BookmarksWorkspace = ({
           type="button"
           onClick={() => void bookmarks.refetch()}
         >
-          <IconRefresh size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+          <IconRefresh size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           <span>Retry</span>
         </button>
       </section>
@@ -933,7 +970,7 @@ const BookmarksWorkspace = ({
         <IconBookmark
           className="text-[#3b8df5]"
           size={24}
-          stroke={2.2}
+          stroke={1.5}
           aria-hidden="true"
           focusable="false"
         />
@@ -995,7 +1032,7 @@ const BookmarkRow = ({ item }: { item: BookmarkItem }) => {
               role="img"
               aria-label="No thumbnail available"
             >
-              <IconPhoto size={28} stroke={1.8} aria-hidden="true" focusable="false" />
+              <IconPhoto size={28} stroke={1.5} aria-hidden="true" focusable="false" />
             </div>
           )}
         </div>
@@ -1012,7 +1049,7 @@ const BookmarkRow = ({ item }: { item: BookmarkItem }) => {
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <IconBookmark size={19} stroke={2.1} aria-hidden="true" focusable="false" />
+                  <IconBookmark size={19} stroke={1.5} aria-hidden="true" focusable="false" />
                 )}
               </div>
               <div className="min-w-0">
@@ -1025,13 +1062,13 @@ const BookmarkRow = ({ item }: { item: BookmarkItem }) => {
                   rel="noreferrer"
                   target="_blank"
                 >
-                  <IconExternalLink size={15} stroke={2.2} aria-hidden="true" focusable="false" />
+                  <IconExternalLink size={16} stroke={1.5} aria-hidden="true" focusable="false" />
                   <span className="truncate">{item.url}</span>
                 </a>
               </div>
             </div>
             <span className="flex w-fit items-center gap-1.5 rounded-lg border border-[#e7eaf1] bg-[#fbfcff] px-2.5 py-1 text-xs font-extrabold text-[#697080]">
-              <IconFolder size={14} stroke={2.1} aria-hidden="true" focusable="false" />
+              <IconFolder size={16} stroke={1.5} aria-hidden="true" focusable="false" />
               {item.folderName}
             </span>
           </div>
@@ -1219,7 +1256,7 @@ const AddBookmarkDialog = ({
             aria-label="Close add bookmark dialog"
             type="button"
           >
-            <IconX size={17} stroke={2.2} aria-hidden="true" focusable="false" />
+            <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           </Dialog.Close>
           <form className="grid gap-4" ref={formRef} onSubmit={submitBookmark}>
             <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">

@@ -272,6 +272,10 @@ describe("App", () => {
 
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Items" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
+    expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
+    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Tags" })).toBeNull();
