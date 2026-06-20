@@ -20,14 +20,15 @@ import type {
   BookmarkItem,
   BookmarksPageResponse,
   CurrentUserResponse,
-  FolderItem,
-  HealthResponse
+  FolderItem
 } from "@bookmarks/shared";
 import { Dialog } from "@base-ui/react/dialog";
 import {
+  IconAdjustmentsHorizontal,
   IconAlertTriangle,
   IconBookmark,
-  IconCircleCheck,
+  IconChevronDown,
+  IconDatabase,
   IconDotsVertical,
   IconExternalLink,
   IconFolder,
@@ -35,6 +36,7 @@ import {
   IconPencil,
   IconPlus,
   IconRefresh,
+  IconSearch,
   IconTrash,
   IconX
 } from "@tabler/icons-react";
@@ -45,7 +47,6 @@ import {
   getBookmarks,
   getCurrentUser,
   getFolders,
-  getHealth,
   updateFolder
 } from "./api";
 
@@ -65,11 +66,6 @@ const ProductShell = () => {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
-  const health = useQuery({
-    queryKey: ["health"],
-    queryFn: getHealth,
-    refetchInterval: 15_000
-  });
   const currentUser = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser
@@ -88,48 +84,32 @@ const ProductShell = () => {
   };
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-[#f7f8fc] font-sans text-[#242833] md:grid-cols-[300px_minmax(0,1fr)]">
+    <main className="grid min-h-screen grid-cols-1 bg-gray-50 font-sans text-slate-950 md:grid-cols-[328px_minmax(0,1fr)]">
       <aside
-        className="flex flex-col gap-[18px] border-b border-[#e6e8ef] bg-[#f7f8fc] px-[18px] py-6 text-[#242833] md:gap-6 md:border-r md:border-b-0"
+        className="border-b border-gray-200 bg-gray-50 text-slate-950 md:min-h-screen md:border-r md:border-b-0"
         aria-label="Primary"
       >
-        <div className="flex items-center gap-3 text-lg font-bold">
-          <span
-            className="grid h-[34px] w-[34px] place-items-center rounded-lg bg-[#e4efff] font-extrabold text-[#3b8df5]"
-            aria-hidden="true"
-          >
-            <IconBookmark size={18} stroke={2.4} aria-hidden="true" focusable="false" />
-          </span>
-          <span>{username}</span>
+        <div className="min-w-0 px-4 py-4 md:px-5 md:py-5">
+          <FolderSidebar
+            activeFolderId={activeFolderId}
+            currentUser={currentUser.data}
+            folders={folders.data ?? []}
+            isError={folders.isError}
+            isLoading={folders.isLoading}
+            onAddBookmark={openBookmarkDialog}
+            onSelectFolder={setActiveFolderId}
+          />
         </div>
-        <button
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 py-[11px] text-sm font-extrabold text-white shadow-[0_12px_28px_rgb(59_141_245_/_0.22)] outline-none hover:bg-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          type="button"
-          onClick={() => openBookmarkDialog(null)}
-        >
-          <IconPlus size={18} stroke={2.4} aria-hidden="true" focusable="false" />
-          <span>Add bookmark</span>
-        </button>
-        <FolderSidebar
-          activeFolderId={activeFolderId}
-          currentUser={currentUser.data}
-          folders={folders.data ?? []}
-          isError={folders.isError}
-          isLoading={folders.isLoading}
-          onAddBookmark={openBookmarkDialog}
-          onSelectFolder={setActiveFolderId}
-        />
       </aside>
 
       <section className="flex min-w-0 flex-col gap-7 p-5 md:p-7" aria-label="Items workspace">
-        <header className="flex flex-col items-start justify-between gap-5 md:flex-row">
+        <header>
           <div>
             <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
             <h1 className="m-0 text-[34px] leading-[1.1] font-bold">
               {activeFolder?.name ?? "Items"}
             </h1>
           </div>
-          <HealthSummary health={health.data} isLoading={health.isLoading} isError={health.isError} />
         </header>
 
         <BookmarksWorkspace folderId={activeFolderId} folderName={activeFolder?.name ?? null} />
@@ -173,6 +153,11 @@ const FolderSidebar = ({
   const [menu, setMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
+  const [folderSearch, setFolderSearch] = useState("");
+  const visibleFolderTree = useMemo(
+    () => filterFolderTree(folderTree, folderSearch),
+    [folderSearch, folderTree]
+  );
 
   const createFolderMutation = useMutation({
     mutationFn: createFolder,
@@ -219,28 +204,43 @@ const FolderSidebar = ({
   const menuFolder = menu ? folders.find((folder) => folder.id === menu.folderId) ?? null : null;
 
   return (
-    <nav className="grid gap-3" aria-label="Folders">
-      <button
-        className={[
-          "flex min-h-10 items-center gap-2 rounded-lg border px-3 text-left text-sm font-semibold outline-none hover:border-[#dfe4ef] hover:bg-white hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
-          activeFolderId === null
-            ? "border-[#d8e7ff] bg-[#eef5ff] text-[#2f80ed]"
-            : "border-transparent text-[#697080]"
-        ].join(" ")}
-        type="button"
-        onClick={() => onSelectFolder(null)}
-      >
-        <IconBookmark size={17} stroke={2} aria-hidden="true" focusable="false" />
-        <span>Items</span>
-      </button>
-      <div className="grid gap-3">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-extrabold tracking-[0.08em] text-[#858b9a] uppercase">
-            Folders
-          </span>
+    <nav className="flex min-h-full flex-col gap-5" aria-label="Folders">
+      <div className="flex items-center gap-2">
+        <label className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 text-gray-500 outline-none focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-100">
+          <IconSearch size={22} stroke={2.1} aria-hidden="true" focusable="false" />
+          <input
+            className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-950 outline-none placeholder:text-gray-500"
+            aria-label="Search folders"
+            placeholder="Type to search..."
+            type="search"
+            value={folderSearch}
+            onChange={(event) => setFolderSearch(event.target.value)}
+          />
+        </label>
+        <button
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-red-500 text-white shadow-sm outline-none hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Add bookmark"
+          title="Add bookmark"
+          type="button"
+          onClick={() => onAddBookmark(null)}
+        >
+          <IconPlus size={25} stroke={2.4} aria-hidden="true" focusable="false" />
+        </button>
+        <button
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Folder display options"
+          title="Folder display options"
+          type="button"
+        >
+          <IconAdjustmentsHorizontal size={23} stroke={2.2} aria-hidden="true" focusable="false" />
+        </button>
+      </div>
+      <div className="grid gap-4">
+        <div className="flex items-center justify-between px-3">
+          <span className="text-sm font-medium text-gray-500">My organization</span>
           {currentUser?.libraries[0] ? (
             <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#dfe4ef] hover:bg-white hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+              className="grid h-8 w-8 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label="Create folder"
               type="button"
               onClick={() =>
@@ -254,25 +254,55 @@ const FolderSidebar = ({
             </button>
           ) : null}
         </div>
+        <button
+          className={[
+            "flex min-h-11 items-center gap-2 rounded-2xl px-3 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
+            activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700"
+          ].join(" ")}
+          type="button"
+          onClick={() => onSelectFolder(null)}
+        >
+          <IconBookmark size={21} stroke={2.1} aria-hidden="true" focusable="false" />
+          <span>Items</span>
+        </button>
         {isLoading ? (
-          <p className="m-0 rounded-lg border border-[#e4e7ef] bg-white px-3 py-2 text-sm font-bold text-[#858b9a]">
+          <p className="m-0 rounded-2xl border border-gray-200 bg-white px-3 py-2 text-sm font-bold text-gray-500">
             Loading folders
           </p>
         ) : null}
         {isError ? (
-          <p className="m-0 rounded-lg border border-[#f0b37e] bg-white px-3 py-2 text-sm font-bold text-[#9a4d0a]">
+          <p className="m-0 rounded-2xl border border-orange-200 bg-white px-3 py-2 text-sm font-bold text-orange-700">
             Folders could not be loaded.
           </p>
         ) : null}
         {currentUser?.libraries.map((library) => {
-          const roots = folderTree.filter((folder) => folder.libraryId === library.id);
+          const roots = visibleFolderTree.filter((folder) => folder.libraryId === library.id);
 
           return (
             <section className="grid gap-1" key={library.id} aria-label={`${library.name} folders`}>
-              <div className="flex min-h-8 items-center justify-between gap-2 px-1">
-                <span className="truncate text-xs font-bold text-[#858b9a]">{library.name}</span>
+              <div className="grid min-h-9 grid-cols-[minmax(0,1fr)_2rem_2.25rem] items-center gap-1">
+                <div className="flex min-w-0 items-center gap-2 pl-3">
+                  <IconChevronDown
+                    className="shrink-0 text-gray-500"
+                    size={18}
+                    stroke={2.1}
+                    aria-hidden="true"
+                    focusable="false"
+                  />
+                  <IconDatabase
+                    className="shrink-0 text-gray-500"
+                    size={21}
+                    stroke={2}
+                    aria-hidden="true"
+                    focusable="false"
+                  />
+                  <span className="truncate text-sm font-medium text-slate-950">
+                    {library.name}
+                  </span>
+                </div>
+                <span aria-hidden="true" />
                 <button
-                  className="grid h-7 w-7 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#dfe4ef] hover:bg-white hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-label={`Create folder in ${library.name}`}
                   type="button"
                   onClick={() => setCreatingTarget({ libraryId: library.id, parentId: null })}
@@ -302,7 +332,7 @@ const FolderSidebar = ({
                   editingFolderId={editingFolderId}
                   folder={folder}
                   key={folder.id}
-                  level={0}
+                  level={1}
                   createError={createFolderMutation.isError ? "Folder could not be created." : null}
                   createPending={createFolderMutation.isPending}
                   editError={updateFolderMutation.isError ? "Folder could not be updated." : null}
@@ -318,7 +348,7 @@ const FolderSidebar = ({
                 />
               ))}
               {roots.length === 0 ? (
-                <p className="m-0 px-3 py-1 text-xs font-bold text-[#9aa1ad]">No folders</p>
+                <p className="m-0 px-3 py-1 text-xs font-bold text-gray-400">No folders</p>
               ) : null}
             </section>
           );
@@ -398,48 +428,66 @@ const FolderTreeRow = ({
 }) => {
   const isEditing = editingFolderId === folder.id;
   const isCreatingChild = creatingTarget?.parentId === folder.id;
+  const hasChildren = folder.children.length > 0;
+  const isActive = activeFolderId === folder.id;
+  const indent = 12 + level * 22;
 
   return (
     <Fragment>
       <div
-        className="flex items-center gap-1"
-        style={{ paddingLeft: `${level * 14}px` }}
+        className={[
+          "grid grid-cols-[minmax(0,1fr)_2rem_2.25rem] items-center gap-1 rounded-2xl transition-colors",
+          isActive ? "bg-gray-100 text-slate-950" : "text-slate-950 hover:bg-white"
+        ].join(" ")}
+        style={{ marginLeft: `${indent}px` }}
         onContextMenu={(event) => {
           event.preventDefault();
           onOpenMenu(folder, event.clientX, event.clientY);
         }}
       >
         {isEditing ? (
-          <InlineFolderForm
-            defaultValue={folder.name}
-            error={editError}
-            isPending={editPending}
-            submitLabel="Save"
-            onCancel={onCancelEdit}
-            onSubmit={(name) => onEditFolder(folder.id, name)}
-          />
+          <div className="min-w-0">
+            <InlineFolderForm
+              defaultValue={folder.name}
+              error={editError}
+              isPending={editPending}
+              submitLabel="Save"
+              onCancel={onCancelEdit}
+              onSubmit={(name) => onEditFolder(folder.id, name)}
+            />
+          </div>
         ) : (
           <>
             <button
-              className={[
-                "flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border px-2.5 text-left text-sm font-semibold outline-none hover:border-[#dfe4ef] hover:bg-white hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
-                activeFolderId === folder.id
-                  ? "border-[#d8e7ff] bg-[#eef5ff] text-[#2f80ed]"
-                  : "border-transparent text-[#697080]"
-              ].join(" ")}
+              className="flex min-h-11 min-w-0 items-center gap-2 pr-3 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               type="button"
               onClick={() => onSelectFolder(folder.id)}
             >
-              <IconFolder size={16} stroke={2.1} aria-hidden="true" focusable="false" />
+              {hasChildren ? (
+                <IconChevronDown
+                  className="shrink-0 text-gray-500"
+                  size={18}
+                  stroke={2.1}
+                  aria-hidden="true"
+                  focusable="false"
+                />
+              ) : (
+                <span className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              )}
+              <IconFolder
+                className={activeFolderId === folder.id ? "text-slate-950" : "text-gray-500"}
+                size={21}
+                stroke={2}
+                aria-hidden="true"
+                focusable="false"
+              />
               <span className="truncate">{folder.name}</span>
-              {folder.bookmarkCount > 0 ? (
-                <span className="ml-auto text-xs font-extrabold text-[#9aa1ad]">
-                  {folder.bookmarkCount}
-                </span>
-              ) : null}
             </button>
+            <span className="grid h-11 place-items-center text-xs font-extrabold text-gray-400">
+              {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
+            </span>
             <button
-              className="grid h-9 w-9 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#dfe4ef] hover:bg-white hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+              className="grid h-9 w-9 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label={`Folder actions for ${folder.name}`}
               type="button"
               onClick={(event) => {
@@ -454,7 +502,7 @@ const FolderTreeRow = ({
         )}
       </div>
       {isCreatingChild ? (
-        <div style={{ paddingLeft: `${(level + 1) * 14}px` }}>
+        <div style={{ marginLeft: `${12 + (level + 1) * 22}px` }}>
           <InlineFolderForm
             error={createError}
             isPending={createPending}
@@ -1097,74 +1145,6 @@ const insertBookmarkIntoPages = (
   };
 };
 
-const HealthSummary = ({
-  health,
-  isLoading,
-  isError
-}: {
-  health?: HealthResponse;
-  isLoading: boolean;
-  isError: boolean;
-}) => {
-  if (isLoading) {
-    return (
-      <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-[#e4e7ef] bg-white px-3 py-2.5 text-[#858b9a] shadow-[0_10px_30px_rgb(46_54_77_/_0.06)] md:min-w-[260px]">
-        <IconCircleCheck size={18} stroke={2} aria-hidden="true" focusable="false" />
-        <span>Checking services</span>
-      </div>
-    );
-  }
-
-  if (isError || !health) {
-    return (
-      <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-[#f0b37e] bg-white px-3 py-2.5 shadow-[0_10px_30px_rgb(46_54_77_/_0.06)] md:min-w-[260px]">
-        <IconAlertTriangle
-          className="text-[#d97706]"
-          size={18}
-          stroke={2}
-          aria-hidden="true"
-          focusable="false"
-        />
-        <span>API unavailable</span>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={[
-        "grid w-full min-w-0 gap-0.5 rounded-lg border bg-white px-3 py-2.5 shadow-[0_10px_30px_rgb(46_54_77_/_0.06)] md:min-w-[260px]",
-        health.status === "ok" ? "border-[#3b8df5]" : "border-[#f0b37e]"
-      ].join(" ")}
-    >
-      <span className="flex items-center gap-2 text-sm font-extrabold">
-        {health.status === "ok" ? (
-          <IconCircleCheck
-            className="text-[#3b8df5]"
-            size={18}
-            stroke={2}
-            aria-hidden="true"
-            focusable="false"
-          />
-        ) : (
-          <IconAlertTriangle
-            className="text-[#d97706]"
-            size={18}
-            stroke={2}
-            aria-hidden="true"
-            focusable="false"
-          />
-        )}
-        {health.status === "ok" ? "Healthy" : "Degraded"}
-      </span>
-      <small className="text-xs text-[#858b9a]">
-        DB {health.services.database} · Queue {health.services.queue} · Search{" "}
-        {health.services.search}
-      </small>
-    </div>
-  );
-};
-
 const buildFolderTree = (folders: FolderItem[]): FolderNode[] => {
   const nodes = new Map<string, FolderNode>();
 
@@ -1194,6 +1174,24 @@ const sortFolderNodes = (nodes: FolderNode[]): FolderNode[] =>
       ...node,
       children: sortFolderNodes(node.children)
     }));
+
+const filterFolderTree = (nodes: FolderNode[], search: string): FolderNode[] => {
+  const query = search.trim().toLocaleLowerCase();
+
+  if (!query) {
+    return nodes;
+  }
+
+  return nodes.flatMap((node) => {
+    const children = filterFolderTree(node.children, query);
+
+    if (node.name.toLocaleLowerCase().includes(query) || children.length > 0) {
+      return [{ ...node, children }];
+    }
+
+    return [];
+  });
+};
 
 const collectFolderSubtreeIds = (folders: FolderItem[], folderId: string): string[] => {
   const ids = [folderId];

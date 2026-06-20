@@ -205,9 +205,10 @@ describe("App", () => {
     const screen = render(<App />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Dev User")).toHaveLength(2);
+      expect(screen.getAllByText("Dev User")).toHaveLength(1);
     });
 
+    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Items" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
@@ -243,8 +244,6 @@ describe("App", () => {
       expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText("Healthy")).toBeTruthy();
-    });
+    expect(screen.queryByText("Healthy")).toBeNull();
   });
 });
