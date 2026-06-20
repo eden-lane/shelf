@@ -3,6 +3,7 @@ import {
   Fragment,
   type FormEvent,
   type KeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -26,22 +27,46 @@ import type {
 import { Dialog } from "@base-ui/react/dialog";
 import {
   IconAlertTriangle,
+  IconArchive,
   IconBookmark,
+  IconBook,
+  IconBriefcase,
+  IconBulb,
+  IconCalendar,
   IconChevronDown,
+  IconChevronRight,
+  IconCode,
+  IconCoffee,
   IconCopy,
   IconDatabase,
+  IconDeviceGamepad2,
   IconDotsVertical,
   IconExternalLink,
+  IconFileText,
   IconFolder,
   IconFolderPlus,
+  IconHeart,
+  IconHome,
+  IconInbox,
   IconLayoutSidebarLeftCollapse,
   IconLayoutSidebarLeftExpand,
+  IconLink,
+  IconMap,
+  IconMovie,
+  IconMusic,
+  IconPalette,
   IconPencil,
   IconPhoto,
+  IconPlane,
   IconPlus,
   IconRefresh,
+  IconSchool,
   IconSearch,
+  IconShoppingCart,
+  IconStar,
+  IconTag,
   IconTrash,
+  IconWorld,
   IconX
 } from "@tabler/icons-react";
 import {
@@ -70,9 +95,92 @@ type FolderNode = FolderItem & {
   children: FolderNode[];
 };
 
+type FolderFormValue = {
+  name: string;
+  iconName: string | null;
+  iconColor: string | null;
+};
+
 const CONTEXT_MENU_MARGIN = 8;
 const FOLDER_CONTEXT_MENU_SIZE = { height: 172, width: 190 };
 const BOOKMARK_CONTEXT_MENU_SIZE = { height: 128, width: 160 };
+const COLLAPSED_LIBRARIES_STORAGE_KEY = "bookmarks.collapsedLibraries";
+const COLLAPSED_FOLDERS_STORAGE_KEY = "bookmarks.collapsedFolders";
+const DEFAULT_FOLDER_ICON_NAME = "IconFolder";
+const DEFAULT_FOLDER_ICON_COLOR = "#697080";
+
+const FOLDER_ICON_COMPONENTS = {
+  IconArchive,
+  IconBook,
+  IconBookmark,
+  IconBriefcase,
+  IconBulb,
+  IconCalendar,
+  IconCode,
+  IconCoffee,
+  IconDeviceGamepad2,
+  IconFileText,
+  IconFolder,
+  IconHeart,
+  IconHome,
+  IconInbox,
+  IconLink,
+  IconMap,
+  IconMovie,
+  IconMusic,
+  IconPalette,
+  IconPhoto,
+  IconPlane,
+  IconSchool,
+  IconShoppingCart,
+  IconStar,
+  IconTag,
+  IconWorld
+};
+
+type FolderIconName = keyof typeof FOLDER_ICON_COMPONENTS;
+
+const FOLDER_ICON_OPTIONS: Array<{ name: FolderIconName; label: string }> = [
+  { name: "IconFolder", label: "Folder" },
+  { name: "IconInbox", label: "Inbox" },
+  { name: "IconArchive", label: "Archive" },
+  { name: "IconBookmark", label: "Bookmark" },
+  { name: "IconBook", label: "Book" },
+  { name: "IconFileText", label: "Document" },
+  { name: "IconBriefcase", label: "Work" },
+  { name: "IconCode", label: "Code" },
+  { name: "IconBulb", label: "Ideas" },
+  { name: "IconHeart", label: "Favorites" },
+  { name: "IconHome", label: "Home" },
+  { name: "IconLink", label: "Links" },
+  { name: "IconPhoto", label: "Photos" },
+  { name: "IconMovie", label: "Movies" },
+  { name: "IconMusic", label: "Music" },
+  { name: "IconPalette", label: "Design" },
+  { name: "IconPlane", label: "Travel" },
+  { name: "IconMap", label: "Places" },
+  { name: "IconSchool", label: "Learning" },
+  { name: "IconShoppingCart", label: "Shopping" },
+  { name: "IconDeviceGamepad2", label: "Games" },
+  { name: "IconCoffee", label: "Coffee" },
+  { name: "IconCalendar", label: "Calendar" },
+  { name: "IconStar", label: "Star" },
+  { name: "IconTag", label: "Tag" },
+  { name: "IconWorld", label: "World" }
+];
+
+const FOLDER_ICON_COLORS = [
+  "#697080",
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#14b8a6",
+  "#3b82f6",
+  "#6366f1",
+  "#a855f7",
+  "#ec4899"
+];
 
 const ProductShell = () => {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
@@ -196,8 +304,15 @@ const FolderSidebar = ({
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
+  const [collapsedLibraryIds, toggleCollapsedLibrary] = usePersistedStringSet(
+    COLLAPSED_LIBRARIES_STORAGE_KEY
+  );
+  const [collapsedFolderIds, toggleCollapsedFolder] = usePersistedStringSet(
+    COLLAPSED_FOLDERS_STORAGE_KEY
+  );
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
   const [folderSearch, setFolderSearch] = useState("");
+  const isFilteringFolders = folderSearch.trim().length > 0;
   const visibleFolderTree = useMemo(
     () => filterFolderTree(folderTree, folderSearch),
     [folderSearch, folderTree]
@@ -330,18 +445,35 @@ const FolderSidebar = ({
         ) : null}
         {currentUser?.libraries.map((library) => {
           const roots = visibleFolderTree.filter((folder) => folder.libraryId === library.id);
+          const isLibraryCollapsed = collapsedLibraryIds.has(library.id) && !isFilteringFolders;
 
           return (
             <section className="grid gap-1" key={library.id} aria-label={`${library.name} folders`}>
               <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1">
-                <div className="flex min-w-0 items-center gap-2 pl-2.5">
-                  <IconChevronDown
-                    className="shrink-0 text-gray-500"
-                    size={16}
-                    stroke={1.5}
-                    aria-hidden="true"
-                    focusable="false"
-                  />
+                <button
+                  className="flex min-w-0 items-center gap-2 rounded-lg py-1 pl-2.5 text-left outline-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  aria-expanded={!isLibraryCollapsed}
+                  aria-label={`${isLibraryCollapsed ? "Expand" : "Collapse"} workspace ${library.name}`}
+                  type="button"
+                  onClick={() => toggleCollapsedLibrary(library.id)}
+                >
+                  {isLibraryCollapsed ? (
+                    <IconChevronRight
+                      className="shrink-0 text-gray-500"
+                      size={16}
+                      stroke={1.5}
+                      aria-hidden="true"
+                      focusable="false"
+                    />
+                  ) : (
+                    <IconChevronDown
+                      className="shrink-0 text-gray-500"
+                      size={16}
+                      stroke={1.5}
+                      aria-hidden="true"
+                      focusable="false"
+                    />
+                  )}
                   <IconDatabase
                     className="shrink-0 text-gray-500"
                     size={21}
@@ -352,7 +484,7 @@ const FolderSidebar = ({
                   <span className="truncate text-sm font-medium text-slate-950">
                     {library.name}
                   </span>
-                </div>
+                </button>
                 <span aria-hidden="true" />
                 <button
                   className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
@@ -363,46 +495,75 @@ const FolderSidebar = ({
                   <IconPlus size={16} stroke={1.5} aria-hidden="true" focusable="false" />
                 </button>
               </div>
-              {creatingTarget?.libraryId === library.id && creatingTarget.parentId === null ? (
-                <InlineFolderForm
-                  error={createFolderMutation.isError ? "Folder could not be created." : null}
-                  isPending={createFolderMutation.isPending}
-                  submitLabel="Create"
-                  onCancel={() => setCreatingTarget(null)}
-                  onSubmit={(name) =>
-                    createFolderMutation.mutate({
-                      libraryId: library.id,
-                      name,
-                      parentId: null
-                    })
-                  }
-                />
-              ) : null}
-              {roots.map((folder) => (
-                <FolderTreeRow
-                  activeFolderId={activeFolderId}
-                  creatingTarget={creatingTarget}
-                  editingFolderId={editingFolderId}
-                  folder={folder}
-                  key={folder.id}
-                  level={1}
-                  createError={createFolderMutation.isError ? "Folder could not be created." : null}
-                  createPending={createFolderMutation.isPending}
-                  editError={updateFolderMutation.isError ? "Folder could not be updated." : null}
-                  editPending={updateFolderMutation.isPending}
-                  onCancelCreate={() => setCreatingTarget(null)}
-                  onCancelEdit={() => setEditingFolderId(null)}
-                  onCreateFolder={(libraryId, parentId, name) =>
-                    createFolderMutation.mutate({ libraryId, parentId, name })
-                  }
-                  onEditFolder={(folderId, name) => updateFolderMutation.mutate({ folderId, name })}
-                  onOpenMenu={openFolderMenu}
-                  onSelectFolder={onSelectFolder}
-                />
-              ))}
-              {roots.length === 0 ? (
-                <p className="m-0 px-2.5 py-1 text-xs font-bold text-gray-400">No folders</p>
-              ) : null}
+              <div
+                className={[
+                  "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
+                  isLibraryCollapsed
+                    ? "grid-rows-[0fr] opacity-0"
+                    : "grid-rows-[1fr] opacity-100"
+                ].join(" ")}
+                aria-hidden={isLibraryCollapsed}
+              >
+                <div className="overflow-hidden">
+                  <div
+                    className={[
+                      "grid gap-1 pt-1",
+                      isLibraryCollapsed ? "pointer-events-none" : ""
+                    ].join(" ")}
+                  >
+                    {creatingTarget?.libraryId === library.id &&
+                    creatingTarget.parentId === null ? (
+                      <InlineFolderForm
+                        error={createFolderMutation.isError ? "Folder could not be created." : null}
+                        isPending={createFolderMutation.isPending}
+                        submitLabel="Create"
+                        onCancel={() => setCreatingTarget(null)}
+                        onSubmit={(folder) =>
+                          createFolderMutation.mutate({
+                            libraryId: library.id,
+                            ...folder,
+                            parentId: null
+                          })
+                        }
+                      />
+                    ) : null}
+                    {roots.map((folder) => (
+                      <FolderTreeRow
+                        activeFolderId={activeFolderId}
+                        collapsedFolderIds={collapsedFolderIds}
+                        creatingTarget={creatingTarget}
+                        editingFolderId={editingFolderId}
+                        folder={folder}
+                        key={folder.id}
+                        level={1}
+                        createError={
+                          createFolderMutation.isError ? "Folder could not be created." : null
+                        }
+                        createPending={createFolderMutation.isPending}
+                        editError={
+                          updateFolderMutation.isError ? "Folder could not be updated." : null
+                        }
+                        editPending={updateFolderMutation.isPending}
+                        isFiltering={isFilteringFolders}
+                        onCancelCreate={() => setCreatingTarget(null)}
+                        onCancelEdit={() => setEditingFolderId(null)}
+                        onCreateFolder={(libraryId, parentId, folder) =>
+                          createFolderMutation.mutate({ libraryId, parentId, ...folder })
+                        }
+                        onEditFolder={(folderId, folder) =>
+                          updateFolderMutation.mutate({ folderId, ...folder })
+                        }
+                        onOpenMenu={openFolderMenu}
+                        onSelectFolder={onSelectFolder}
+                        onToggleFolder={toggleCollapsedFolder}
+                      />
+                    ))}
+                    {roots.length === 0 ? (
+                      <p className="m-0 px-2.5 py-1 text-xs font-bold text-gray-400">No folders</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </section>
           );
         })}
@@ -448,6 +609,7 @@ const FolderSidebar = ({
 
 const FolderTreeRow = ({
   activeFolderId,
+  collapsedFolderIds,
   creatingTarget,
   editingFolderId,
   folder,
@@ -456,14 +618,17 @@ const FolderTreeRow = ({
   createPending,
   editError,
   editPending,
+  isFiltering,
   onCancelCreate,
   onCancelEdit,
   onCreateFolder,
   onEditFolder,
   onOpenMenu,
-  onSelectFolder
+  onSelectFolder,
+  onToggleFolder
 }: {
   activeFolderId: string | null;
+  collapsedFolderIds: ReadonlySet<string>;
   creatingTarget: { libraryId: string; parentId: string | null } | null;
   editingFolderId: string | null;
   folder: FolderNode;
@@ -472,17 +637,22 @@ const FolderTreeRow = ({
   createPending: boolean;
   editError: string | null;
   editPending: boolean;
+  isFiltering: boolean;
   onCancelCreate: () => void;
   onCancelEdit: () => void;
-  onCreateFolder: (libraryId: string, parentId: string, name: string) => void;
-  onEditFolder: (folderId: string, name: string) => void;
+  onCreateFolder: (libraryId: string, parentId: string, value: FolderFormValue) => void;
+  onEditFolder: (folderId: string, value: FolderFormValue) => void;
   onOpenMenu: (folder: FolderItem, x: number, y: number) => void;
   onSelectFolder: (folderId: string) => void;
+  onToggleFolder: (id: string) => void;
 }) => {
   const isEditing = editingFolderId === folder.id;
   const isCreatingChild = creatingTarget?.parentId === folder.id;
   const hasChildren = folder.children.length > 0;
   const isActive = activeFolderId === folder.id;
+  const isCollapsed = hasChildren && collapsedFolderIds.has(folder.id) && !isFiltering;
+  const FolderIcon = getFolderIconComponent(folder.iconName);
+  const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
   const indent = 8 + level * 18;
 
   return (
@@ -502,40 +672,55 @@ const FolderTreeRow = ({
           <div className="min-w-0">
             <InlineFolderForm
               defaultValue={folder.name}
+              defaultIconColor={folder.iconColor}
+              defaultIconName={folder.iconName}
               error={editError}
               isPending={editPending}
               submitLabel="Save"
               onCancel={onCancelEdit}
-              onSubmit={(name) => onEditFolder(folder.id, name)}
+              onSubmit={(value) => onEditFolder(folder.id, value)}
             />
           </div>
         ) : (
           <>
-            <button
-              className="flex min-h-9 min-w-0 items-center gap-2 pr-2.5 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-              type="button"
-              onClick={() => onSelectFolder(folder.id)}
-            >
+            <div className="flex min-h-9 min-w-0 items-center gap-1">
               {hasChildren ? (
-                <IconChevronDown
-                  className="shrink-0 text-gray-500"
-                  size={16}
+                <button
+                  className="grid h-7 w-6 shrink-0 place-items-center rounded-lg text-gray-500 outline-none hover:bg-gray-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  aria-expanded={!isCollapsed}
+                  aria-label={`${isCollapsed ? "Expand" : "Collapse"} folder ${folder.name}`}
+                  type="button"
+                  onClick={() => onToggleFolder(folder.id)}
+                >
+                  {isCollapsed ? (
+                    <IconChevronRight
+                      size={16}
+                      stroke={1.5}
+                      aria-hidden="true"
+                      focusable="false"
+                    />
+                  ) : (
+                    <IconChevronDown size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+                  )}
+                </button>
+              ) : (
+                <span className="h-7 w-6 shrink-0" aria-hidden="true" />
+              )}
+              <button
+                className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                type="button"
+                onClick={() => onSelectFolder(folder.id)}
+              >
+                <FolderIcon
+                  size={21}
                   stroke={1.5}
+                  color={folderIconColor}
                   aria-hidden="true"
                   focusable="false"
                 />
-              ) : (
-                <span className="h-4 w-4 shrink-0" aria-hidden="true" />
-              )}
-              <IconFolder
-                className={activeFolderId === folder.id ? "text-slate-950" : "text-gray-500"}
-                size={21}
-                stroke={1.5}
-                aria-hidden="true"
-                focusable="false"
-              />
-              <span className="truncate">{folder.name}</span>
-            </button>
+                <span className="truncate">{folder.name}</span>
+              </button>
+            </div>
             <span className="grid h-9 place-items-center text-xs font-extrabold text-gray-400">
               {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
             </span>
@@ -554,43 +739,122 @@ const FolderTreeRow = ({
           </>
         )}
       </div>
-      {isCreatingChild ? (
-        <div style={{ marginLeft: `${8 + (level + 1) * 18}px` }}>
-          <InlineFolderForm
-            error={createError}
-            isPending={createPending}
-            submitLabel="Create"
-            onCancel={onCancelCreate}
-            onSubmit={(name) => onCreateFolder(folder.libraryId, folder.id, name)}
-          />
+      <div
+        className={[
+          "grid transition-[grid-template-rows,opacity] duration-200 ease-out motion-reduce:transition-none",
+          isCollapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+        ].join(" ")}
+        aria-hidden={isCollapsed}
+      >
+        <div className="overflow-hidden">
+          <div className={isCollapsed ? "pointer-events-none" : ""}>
+            {isCreatingChild ? (
+              <div style={{ marginLeft: `${8 + (level + 1) * 18}px` }}>
+                <InlineFolderForm
+                  error={createError}
+                  isPending={createPending}
+                  submitLabel="Create"
+                  onCancel={onCancelCreate}
+                  onSubmit={(value) => onCreateFolder(folder.libraryId, folder.id, value)}
+                />
+              </div>
+            ) : null}
+            {folder.children.map((child) => (
+              <FolderTreeRow
+                activeFolderId={activeFolderId}
+                collapsedFolderIds={collapsedFolderIds}
+                creatingTarget={creatingTarget}
+                editingFolderId={editingFolderId}
+                folder={child}
+                key={child.id}
+                level={level + 1}
+                createError={createError}
+                createPending={createPending}
+                editError={editError}
+                editPending={editPending}
+                isFiltering={isFiltering}
+                onCancelCreate={onCancelCreate}
+                onCancelEdit={onCancelEdit}
+                onCreateFolder={onCreateFolder}
+                onEditFolder={onEditFolder}
+                onOpenMenu={onOpenMenu}
+                onSelectFolder={onSelectFolder}
+                onToggleFolder={onToggleFolder}
+              />
+            ))}
+          </div>
         </div>
-      ) : null}
-      {folder.children.map((child) => (
-        <FolderTreeRow
-          activeFolderId={activeFolderId}
-          creatingTarget={creatingTarget}
-          editingFolderId={editingFolderId}
-          folder={child}
-          key={child.id}
-          level={level + 1}
-          createError={createError}
-          createPending={createPending}
-          editError={editError}
-          editPending={editPending}
-          onCancelCreate={onCancelCreate}
-          onCancelEdit={onCancelEdit}
-          onCreateFolder={onCreateFolder}
-          onEditFolder={onEditFolder}
-          onOpenMenu={onOpenMenu}
-          onSelectFolder={onSelectFolder}
-        />
-      ))}
+      </div>
     </Fragment>
   );
 };
 
+const usePersistedStringSet = (storageKey: string): [ReadonlySet<string>, (id: string) => void] => {
+  const [items, setItems] = useState<Set<string>>(() => readStringSet(storageKey));
+
+  useEffect(() => {
+    writeStringSet(storageKey, items);
+  }, [items, storageKey]);
+
+  const toggleItem = useCallback((id: string) => {
+    setItems((current) => {
+      const next = new Set(current);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  }, []);
+
+  return [items, toggleItem];
+};
+
+const readStringSet = (storageKey: string) => {
+  if (typeof window === "undefined") {
+    return new Set<string>();
+  }
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
+
+    if (!Array.isArray(parsed)) {
+      return new Set<string>();
+    }
+
+    return new Set(parsed.filter((item): item is string => typeof item === "string"));
+  } catch {
+    return new Set<string>();
+  }
+};
+
+const writeStringSet = (storageKey: string, items: ReadonlySet<string>) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify([...items]));
+  } catch {
+    // Persisting sidebar preferences is best-effort.
+  }
+};
+
+const normalizeFolderIconName = (iconName: string | null | undefined): FolderIconName =>
+  iconName && iconName in FOLDER_ICON_COMPONENTS
+    ? (iconName as FolderIconName)
+    : DEFAULT_FOLDER_ICON_NAME;
+
+const getFolderIconComponent = (iconName: string | null | undefined) =>
+  FOLDER_ICON_COMPONENTS[normalizeFolderIconName(iconName)];
+
 const InlineFolderForm = ({
   defaultValue = "",
+  defaultIconColor = null,
+  defaultIconName = null,
   error,
   isPending,
   submitLabel,
@@ -598,14 +862,20 @@ const InlineFolderForm = ({
   onSubmit
 }: {
   defaultValue?: string;
+  defaultIconColor?: string | null;
+  defaultIconName?: string | null;
   error: string | null;
   isPending: boolean;
   submitLabel: string;
   onCancel: () => void;
-  onSubmit: (name: string) => void;
+  onSubmit: (value: FolderFormValue) => void;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [name, setName] = useState(defaultValue);
+  const [iconName, setIconName] = useState(defaultIconName ?? DEFAULT_FOLDER_ICON_NAME);
+  const [iconColor, setIconColor] = useState(defaultIconColor ?? DEFAULT_FOLDER_ICON_COLOR);
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+  const Icon = getFolderIconComponent(iconName);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -617,22 +887,45 @@ const InlineFolderForm = ({
       className="grid flex-1 gap-2 rounded-lg border border-[#dfe4ef] bg-white p-2"
       onSubmit={(event) => {
         event.preventDefault();
-        const trimmedName = name.trim();
+        const formData = new FormData(event.currentTarget);
+        const trimmedName = String(formData.get("name") ?? "").trim();
 
         if (trimmedName) {
-          onSubmit(trimmedName);
+          onSubmit({
+            iconColor,
+            iconName,
+            name: trimmedName
+          });
         }
       }}
     >
-      <input
-        className="min-h-9 rounded-lg border border-[#dfe4ef] bg-white px-2.5 text-sm font-semibold text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
-        aria-label="Folder title"
-        name="name"
-        placeholder="Folder title"
-        ref={inputRef}
-        required
-        value={name}
-        onChange={(event) => setName(event.target.value)}
+      <div className="flex gap-2">
+        <button
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#dfe4ef] bg-white outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+          aria-label="Choose folder icon"
+          type="button"
+          onClick={() => setIsIconPickerOpen(true)}
+        >
+          <Icon size={19} stroke={1.5} color={iconColor} aria-hidden="true" focusable="false" />
+        </button>
+        <input
+          className="min-h-9 min-w-0 flex-1 rounded-lg border border-[#dfe4ef] bg-white px-2.5 text-sm font-semibold text-[#242833] outline-none placeholder:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
+          aria-label="Folder title"
+          name="name"
+          placeholder="Folder title"
+          ref={inputRef}
+          required
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+      </div>
+      <FolderIconPickerDialog
+        iconColor={iconColor}
+        iconName={iconName}
+        isOpen={isIconPickerOpen}
+        onChangeColor={setIconColor}
+        onChangeIcon={setIconName}
+        onOpenChange={setIsIconPickerOpen}
       />
       {error ? <p className="m-0 text-xs font-bold text-[#9a4d0a]">{error}</p> : null}
       <div className="flex justify-end gap-2">
@@ -656,6 +949,122 @@ const InlineFolderForm = ({
   );
 };
 
+const FolderIconPickerDialog = ({
+  iconColor,
+  iconName,
+  isOpen,
+  onChangeColor,
+  onChangeIcon,
+  onOpenChange
+}: {
+  iconColor: string;
+  iconName: string;
+  isOpen: boolean;
+  onChangeColor: (color: string) => void;
+  onChangeIcon: (iconName: string) => void;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const [search, setSearch] = useState("");
+  const selectedIcon = normalizeFolderIconName(iconName);
+  const filteredIcons = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return FOLDER_ICON_OPTIONS;
+    }
+
+    return FOLDER_ICON_OPTIONS.filter(
+      (icon) =>
+        icon.label.toLowerCase().includes(query) || icon.name.toLowerCase().includes(query)
+    );
+  }, [search]);
+
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-[#101522]/45" />
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid max-h-[min(680px,calc(100vh-32px))] w-[min(calc(100vw-32px),520px)] -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_auto_minmax(0,1fr)] gap-4 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none">
+          <div className="grid gap-1 pr-9">
+            <Dialog.Title className="text-lg leading-[1.25] font-extrabold">
+              Folder icon
+            </Dialog.Title>
+          </div>
+          <Dialog.Close
+            className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+            aria-label="Close folder icon picker"
+            type="button"
+          >
+            <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+          </Dialog.Close>
+          <div className="grid gap-3">
+            <label className="flex min-h-10 min-w-0 items-center gap-2.5 rounded-lg border border-[#dfe4ef] bg-white px-2.5 text-[#697080] outline-none focus-within:border-[#3b8df5] focus-within:ring-3 focus-within:ring-[#d9eaff]">
+              <IconSearch size={20} stroke={1.5} aria-hidden="true" focusable="false" />
+              <input
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]"
+                aria-label="Search icons"
+                placeholder="Search icons..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <div className="flex flex-wrap gap-2" aria-label="Icon colors">
+              {FOLDER_ICON_COLORS.map((color) => (
+                <button
+                  className={[
+                    "grid h-8 w-8 place-items-center rounded-full border outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
+                    iconColor === color ? "border-[#242833]" : "border-[#dfe4ef]"
+                  ].join(" ")}
+                  aria-label={`Select color ${color}`}
+                  key={color}
+                  type="button"
+                  onClick={() => onChangeColor(color)}
+                >
+                  <span
+                    className="block h-5 w-5 rounded-full"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2">
+              {filteredIcons.map(({ label, name }) => {
+                const PickerIcon = FOLDER_ICON_COMPONENTS[name];
+                const isSelected = selectedIcon === name;
+
+                return (
+                  <button
+                    className={[
+                      "grid min-h-[74px] gap-1 rounded-lg border bg-white p-2 text-center text-xs font-medium text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]",
+                      isSelected ? "border-[#3b8df5] ring-3 ring-[#d9eaff]" : "border-[#dfe4ef]"
+                    ].join(" ")}
+                    aria-pressed={isSelected}
+                    key={name}
+                    type="button"
+                    onClick={() => onChangeIcon(name)}
+                  >
+                    <PickerIcon
+                      className="mx-auto"
+                      size={24}
+                      stroke={1.5}
+                      color={iconColor}
+                      aria-hidden="true"
+                      focusable="false"
+                    />
+                    <span className="truncate">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+};
+
 const FolderContextMenu = ({
   folder,
   x,
@@ -674,7 +1083,7 @@ const FolderContextMenu = ({
   onEditFolder: () => void;
 }) => (
   <div
-    className="fixed z-30 grid w-[190px] gap-1 rounded-lg border border-[#dfe4ef] bg-white p-1.5 text-sm font-bold text-[#4b5262] shadow-[0_18px_55px_rgb(22_28_43_/_0.16)]"
+    className="fixed z-30 grid w-[190px] gap-1 rounded-lg border border-[#dfe4ef] bg-white p-1.5 text-sm font-medium text-[#4b5262] shadow-[0_18px_55px_rgb(22_28_43_/_0.16)]"
     role="menu"
     aria-label={`Folder actions for ${folder.name}`}
     style={{ left: x, top: y }}
@@ -1249,7 +1658,7 @@ const BookmarkContextMenu = ({
   onDelete: () => void;
 }) => (
   <div
-    className="fixed z-30 grid w-[160px] gap-1 rounded-lg border border-[#dfe4ef] bg-white p-1.5 text-sm font-bold text-[#4b5262] shadow-[0_18px_55px_rgb(22_28_43_/_0.16)]"
+    className="fixed z-30 grid w-[160px] gap-1 rounded-lg border border-[#dfe4ef] bg-white p-1.5 text-sm font-medium text-[#4b5262] shadow-[0_18px_55px_rgb(22_28_43_/_0.16)]"
     role="menu"
     aria-label={`Bookmark actions for ${itemTitle}`}
     style={{ left: x, top: y }}

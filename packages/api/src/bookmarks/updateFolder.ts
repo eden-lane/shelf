@@ -19,6 +19,8 @@ export const updateFolder = async (
     .update(schema.folders)
     .set({
       name: input.name,
+      iconName: input.iconName ?? null,
+      iconColor: input.iconColor ?? null,
       updatedAt: sql`now()`
     })
     .where(eq(schema.folders.id, input.folderId))
@@ -27,6 +29,8 @@ export const updateFolder = async (
       libraryId: schema.folders.libraryId,
       parentId: schema.folders.parentId,
       name: schema.folders.name,
+      iconName: schema.folders.iconName,
+      iconColor: schema.folders.iconColor,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     });

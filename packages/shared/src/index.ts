@@ -55,6 +55,8 @@ export interface FolderItem {
   libraryId: string;
   parentId: string | null;
   name: string;
+  iconName: string | null;
+  iconColor: string | null;
   bookmarkCount: number;
   createdAt: string;
   updatedAt: string;
@@ -84,11 +86,15 @@ export interface CreateFolderInput {
   libraryId: string;
   parentId?: string | null;
   name: string;
+  iconName?: string | null;
+  iconColor?: string | null;
 }
 
 export interface UpdateFolderInput {
   folderId: string;
   name: string;
+  iconName?: string | null;
+  iconColor?: string | null;
 }
 
 export interface DeleteFolderInput {

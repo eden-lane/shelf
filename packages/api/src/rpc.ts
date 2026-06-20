@@ -268,6 +268,8 @@ const parseCreateFolderInput = (input: unknown): CreateFolderInput | null => {
   }
 
   return {
+    iconColor: parseFolderIconColor(input.iconColor),
+    iconName: parseFolderIconName(input.iconName),
     libraryId: input.libraryId,
     name,
     parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null
@@ -287,6 +289,8 @@ const parseUpdateFolderInput = (input: unknown): UpdateFolderInput | null => {
 
   return {
     folderId: input.folderId,
+    iconColor: parseFolderIconColor(input.iconColor),
+    iconName: parseFolderIconName(input.iconName),
     name
   };
 };
@@ -318,6 +322,26 @@ const parseFolderName = (value: unknown) => {
   const name = value.trim();
 
   return name ? name : null;
+};
+
+const parseFolderIconName = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const iconName = value.trim();
+
+  return /^Icon[A-Za-z0-9]+$/.test(iconName) ? iconName : null;
+};
+
+const parseFolderIconColor = (value: unknown) => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const color = value.trim();
+
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color.toLowerCase() : null;
 };
 
 const currentUserLibraryIds = (currentUser: DevIdentity) => [

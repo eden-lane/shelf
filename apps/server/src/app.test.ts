@@ -381,6 +381,8 @@ describe("folders RPC", () => {
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               parentId: null,
               name: "Inbox",
+              iconName: "IconInbox",
+              iconColor: "#3b82f6",
               bookmarkCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -420,6 +422,8 @@ describe("folders RPC", () => {
             libraryId: input.libraryId,
             parentId: input.parentId ?? null,
             name: input.name,
+            iconName: input.iconName ?? null,
+            iconColor: input.iconColor ?? null,
             bookmarkCount: 0,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:00:00.000Z"
@@ -434,6 +438,8 @@ describe("folders RPC", () => {
       body: JSON.stringify({
         json: {
           libraryId: DEV_PERSONAL_LIBRARY_ID,
+          iconColor: "#3B82F6",
+          iconName: "IconInbox",
           name: " Reading ",
           parentId: DEV_PERSONAL_INBOX_FOLDER_ID
         }
@@ -450,6 +456,8 @@ describe("folders RPC", () => {
     expect(calls[0]).toEqual({
       allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
       libraryId: DEV_PERSONAL_LIBRARY_ID,
+      iconColor: "#3b82f6",
+      iconName: "IconInbox",
       name: "Reading",
       parentId: DEV_PERSONAL_INBOX_FOLDER_ID
     });

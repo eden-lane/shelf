@@ -34,12 +34,16 @@ export interface CreateFolderInput {
   allowedLibraryIds: string[];
   parentId?: string | null;
   name: string;
+  iconName?: string | null;
+  iconColor?: string | null;
 }
 
 export interface UpdateFolderInput {
   allowedLibraryIds: string[];
   folderId: string;
   name: string;
+  iconName?: string | null;
+  iconColor?: string | null;
 }
 
 export interface DeleteFolderInput {

@@ -19,6 +19,8 @@ export const listFolders = async (
       libraryId: schema.folders.libraryId,
       parentId: schema.folders.parentId,
       name: schema.folders.name,
+      iconName: schema.folders.iconName,
+      iconColor: schema.folders.iconColor,
       bookmarkCount: sql<number>`count(${schema.savedItems.id})`,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
@@ -37,6 +39,8 @@ export const listFolders = async (
       schema.folders.libraryId,
       schema.folders.parentId,
       schema.folders.name,
+      schema.folders.iconName,
+      schema.folders.iconColor,
       schema.folders.createdAt,
       schema.folders.updatedAt
     )

@@ -28,6 +28,7 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   cleanup();
   globalThis.fetch = originalFetch;
+  window.localStorage.clear();
 });
 
 describe("App", () => {
@@ -74,6 +75,8 @@ describe("App", () => {
         libraryId: "00000000-0000-4000-8000-000000000003",
         parentId: null,
         name: "Inbox",
+        iconName: "IconInbox",
+        iconColor: "#3b82f6",
         bookmarkCount: 2,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -83,6 +86,19 @@ describe("App", () => {
         libraryId: "00000000-0000-4000-8000-000000000003",
         parentId: null,
         name: "Read later",
+        iconName: null,
+        iconColor: null,
+        bookmarkCount: 0,
+        createdAt: "2026-06-19T12:00:00.000Z",
+        updatedAt: "2026-06-19T12:00:00.000Z"
+      },
+      {
+        id: "00000000-0000-4000-8000-000000000021",
+        libraryId: "00000000-0000-4000-8000-000000000003",
+        parentId: "00000000-0000-4000-8000-000000000005",
+        name: "Archive",
+        iconName: "IconArchive",
+        iconColor: "#697080",
         bookmarkCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -185,13 +201,21 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/folders/create") {
         const body = (await request.json()) as {
-          json?: { libraryId?: string; name?: string; parentId?: string | null };
+          json?: {
+            iconColor?: string | null;
+            iconName?: string | null;
+            libraryId?: string;
+            name?: string;
+            parentId?: string | null;
+          };
         };
         const folder = {
-          id: "00000000-0000-4000-8000-000000000020",
+          id: "00000000-0000-4000-8000-000000000022",
           libraryId: body.json?.libraryId || "00000000-0000-4000-8000-000000000003",
           parentId: body.json?.parentId ?? null,
           name: body.json?.name || "Reading",
+          iconName: body.json?.iconName ?? null,
+          iconColor: body.json?.iconColor ?? null,
           bookmarkCount: 0,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
@@ -336,8 +360,25 @@ describe("App", () => {
       ).toBeTruthy();
       expect(screen.getByRole("img", { name: "No thumbnail available" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Folder actions for Inbox" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
       expect(screen.getAllByLabelText("Bookmark folder Inbox")).toHaveLength(2);
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse folder Inbox" }));
+    expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
+    expect(window.localStorage.getItem("bookmarks.collapsedFolders")).toBe(
+      '["00000000-0000-4000-8000-000000000005"]'
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Expand folder Inbox" }));
+    expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse workspace Personal" }));
+    expect(screen.queryByRole("button", { name: "Inbox" })).toBeNull();
+    expect(window.localStorage.getItem("bookmarks.collapsedLibraries")).toBe(
+      '["00000000-0000-4000-8000-000000000003"]'
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Expand workspace Personal" }));
+    expect(screen.getByRole("button", { name: "Inbox" })).toBeTruthy();
 
     const exampleActionsButton = screen.getByRole("button", {
       name: "Bookmark actions for Example Article"
@@ -402,6 +443,27 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByRole("menuitem", { name: "Create new folder" })).toBeTruthy();
     });
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Create new folder" }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Folder title")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose folder icon" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Folder icon" })).toBeTruthy();
+    });
+    const iconSearchInput = screen.getByLabelText("Search icons") as HTMLInputElement;
+    fireEvent.change(iconSearchInput, { target: { value: "book" } });
+    fireEvent.click(screen.getByRole("button", { name: "Book" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select color #3b82f6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close folder icon picker" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Folder icon" })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
 

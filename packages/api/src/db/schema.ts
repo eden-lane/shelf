@@ -118,6 +118,8 @@ export const folders = pgTable(
       onDelete: "cascade"
     }),
     name: text("name").notNull(),
+    iconName: text("icon_name"),
+    iconColor: text("icon_color"),
     ...timestamps
   },
   (table) => [

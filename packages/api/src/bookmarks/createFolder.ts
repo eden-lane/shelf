@@ -23,13 +23,17 @@ export const createFolder = async (
     .values({
       libraryId: input.libraryId,
       parentId: input.parentId ?? null,
-      name: input.name
+      name: input.name,
+      iconName: input.iconName ?? null,
+      iconColor: input.iconColor ?? null
     })
     .returning({
       id: schema.folders.id,
       libraryId: schema.folders.libraryId,
       parentId: schema.folders.parentId,
       name: schema.folders.name,
+      iconName: schema.folders.iconName,
+      iconColor: schema.folders.iconColor,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     });
