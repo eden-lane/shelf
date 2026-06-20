@@ -88,6 +88,7 @@ export interface FolderItem {
   name: string;
   iconName: string | null;
   iconColor: string | null;
+  sortOrder: number;
   bookmarkCount: number;
   createdAt: string;
   updatedAt: string;
@@ -117,6 +118,11 @@ export interface DeleteBookmarkInput {
   bookmarkId: string;
 }
 
+export interface MoveBookmarksInput {
+  bookmarkIds: string[];
+  destinationFolderId?: string | null;
+}
+
 export interface ListBookmarksInput {
   cursor?: string | null;
   folderId?: string | null;
@@ -137,6 +143,12 @@ export interface UpdateFolderInput {
   name: string;
   iconName?: string | null;
   iconColor?: string | null;
+}
+
+export interface MoveFolderInput {
+  folderId: string;
+  parentId?: string | null;
+  orderedSiblingIds: string[];
 }
 
 export interface DeleteFolderInput {

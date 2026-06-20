@@ -3,6 +3,8 @@ import type {
   CreateFolderInput,
   DeleteBookmarkInput,
   DeleteFolderInput,
+  MoveFolderInput,
+  MoveBookmarksInput,
   UpdateFolderInput
 } from "@bookmarks/shared";
 import { ORPCError, os } from "@orpc/server";
@@ -179,6 +181,23 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         libraryIds: currentUserLibraryIds(options.currentUser),
         url: lookup.url
       });
+    }),
+    move: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const move = parseMoveBookmarksInput(input);
+
+      if (!move) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose bookmarks to move"
+        });
+      }
+
+      return options.bookmarksStore.moveBookmarks({
+        ...move,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+      });
     })
   },
   tags: {
@@ -232,6 +251,23 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       return options.bookmarksStore.listFolders({
         libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    move: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const folder = parseMoveFolderInput(input);
+
+      if (!folder) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose where to move this folder"
+        });
+      }
+
+      return options.bookmarksStore.moveFolder({
+        ...folder,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     update: os.handler(async ({ input }) => {
@@ -335,6 +371,34 @@ const parseDeleteBookmarkInput = (input: unknown): DeleteBookmarkInput | null =>
   };
 };
 
+const parseMoveBookmarksInput = (input: unknown): MoveBookmarksInput | null => {
+  if (!isRecord(input) || !Array.isArray(input.bookmarkIds)) {
+    return null;
+  }
+
+  const bookmarkIds = new Set<string>();
+
+  for (const bookmarkId of input.bookmarkIds) {
+    if (typeof bookmarkId !== "string" || !bookmarkId) {
+      return null;
+    }
+
+    bookmarkIds.add(bookmarkId);
+  }
+
+  if (bookmarkIds.size === 0) {
+    return null;
+  }
+
+  return {
+    bookmarkIds: [...bookmarkIds].slice(0, 100),
+    destinationFolderId:
+      typeof input.destinationFolderId === "string" && input.destinationFolderId
+        ? input.destinationFolderId
+        : null
+  };
+};
+
 const parseCreateFolderInput = (input: unknown): CreateFolderInput | null => {
   if (!isRecord(input) || typeof input.libraryId !== "string") {
     return null;
@@ -371,6 +435,36 @@ const parseUpdateFolderInput = (input: unknown): UpdateFolderInput | null => {
     iconColor: parseFolderIconColor(input.iconColor),
     iconName: parseFolderIconName(input.iconName),
     name
+  };
+};
+
+const parseMoveFolderInput = (input: unknown): MoveFolderInput | null => {
+  if (!isRecord(input) || typeof input.folderId !== "string" || !input.folderId) {
+    return null;
+  }
+
+  if (!Array.isArray(input.orderedSiblingIds)) {
+    return null;
+  }
+
+  const orderedSiblingIds = new Set<string>();
+
+  for (const folderId of input.orderedSiblingIds) {
+    if (typeof folderId !== "string" || !folderId) {
+      return null;
+    }
+
+    orderedSiblingIds.add(folderId);
+  }
+
+  if (orderedSiblingIds.size === 0) {
+    return null;
+  }
+
+  return {
+    folderId: input.folderId,
+    orderedSiblingIds: [...orderedSiblingIds].slice(0, 200),
+    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null
   };
 };
 

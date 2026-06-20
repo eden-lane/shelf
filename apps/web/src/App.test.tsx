@@ -78,6 +78,7 @@ describe("App", () => {
         name: "Research",
         iconName: "IconBook",
         iconColor: "#3b82f6",
+        sortOrder: 0,
         bookmarkCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -89,6 +90,7 @@ describe("App", () => {
         name: "Read later",
         iconName: null,
         iconColor: null,
+        sortOrder: 1,
         bookmarkCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -100,6 +102,7 @@ describe("App", () => {
         name: "Archive",
         iconName: "IconArchive",
         iconColor: "#697080",
+        sortOrder: 0,
         bookmarkCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -254,6 +257,12 @@ describe("App", () => {
           name: body.json?.name || "Reading",
           iconName: body.json?.iconName ?? null,
           iconColor: body.json?.iconColor ?? null,
+          sortOrder: folders.filter(
+            (existingFolder) =>
+              existingFolder.libraryId ===
+                (body.json?.libraryId || "00000000-0000-4000-8000-000000000003") &&
+              existingFolder.parentId === (body.json?.parentId ?? null)
+          ).length,
           bookmarkCount: 0,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
@@ -261,6 +270,37 @@ describe("App", () => {
         folders.push(folder);
 
         return new Response(JSON.stringify({ json: folder }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.pathname === "/rpc/folders/move") {
+        const body = (await request.json()) as {
+          json?: {
+            folderId?: string;
+            orderedSiblingIds?: string[];
+            parentId?: string | null;
+          };
+        };
+        const folderId = body.json?.folderId ?? "";
+        const parentId = body.json?.parentId ?? null;
+        const orderedSiblingIds = body.json?.orderedSiblingIds ?? [];
+
+        for (const folder of folders) {
+          const nextSortOrder = orderedSiblingIds.indexOf(folder.id);
+
+          if (folder.id === folderId) {
+            folder.parentId = parentId;
+          }
+
+          if (nextSortOrder >= 0) {
+            folder.sortOrder = nextSortOrder;
+          }
+        }
+
+        return new Response(JSON.stringify({ json: folders }), {
           headers: {
             "content-type": "application/json"
           }
@@ -334,6 +374,66 @@ describe("App", () => {
             "content-type": "application/json"
           }
         });
+      }
+
+      if (url.pathname === "/rpc/bookmarks/move") {
+        const body = (await request.json()) as {
+          json?: { bookmarkIds?: string[]; destinationFolderId?: string | null };
+        };
+        const bookmarkIds = [...new Set(body.json?.bookmarkIds ?? [])];
+        const destinationFolder = body.json?.destinationFolderId
+          ? (folders.find((folder) => folder.id === body.json?.destinationFolderId) ?? null)
+          : null;
+
+        for (const bookmarkId of bookmarkIds) {
+          const itemIndex = savedItems.findIndex((item) => item.id === bookmarkId);
+
+          if (itemIndex < 0) {
+            continue;
+          }
+
+          const previousFolderId = savedItems[itemIndex]?.folderId ?? null;
+          savedItems[itemIndex] = {
+            ...savedItems[itemIndex],
+            folderId: destinationFolder?.id ?? null,
+            folderName: destinationFolder?.name ?? null,
+            libraryId: destinationFolder?.libraryId ?? savedItems[itemIndex].libraryId,
+            updatedAt: "2026-06-20T12:00:00.000Z"
+          };
+
+          const previousFolderIndex = folders.findIndex((folder) => folder.id === previousFolderId);
+          const destinationFolderIndex = folders.findIndex(
+            (folder) => folder.id === destinationFolder?.id
+          );
+
+          if (previousFolderIndex >= 0) {
+            folders[previousFolderIndex] = {
+              ...folders[previousFolderIndex],
+              bookmarkCount: Math.max(0, folders[previousFolderIndex].bookmarkCount - 1)
+            };
+          }
+
+          if (destinationFolderIndex >= 0) {
+            folders[destinationFolderIndex] = {
+              ...folders[destinationFolderIndex],
+              bookmarkCount: folders[destinationFolderIndex].bookmarkCount + 1
+            };
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            json: {
+              destinationFolderId: destinationFolder?.id ?? null,
+              movedBookmarkIds: bookmarkIds
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
       }
 
       if (url.pathname === "/rpc/health") {
@@ -555,7 +655,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Copy link" }));
     await waitFor(() => {
       expect(copiedLinks).toEqual(["https://example.com/article"]);
-      expect(screen.getByRole("status").textContent).toBe("Link copied");
+      expect(screen.getByText("Link copied")).toBeTruthy();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Bookmark actions for Plain Bookmark" }));

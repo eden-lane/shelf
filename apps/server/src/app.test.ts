@@ -74,6 +74,12 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async listTags() {
     return [];
   },
+  async moveFolder() {
+    throw new Error("not used");
+  },
+  async moveBookmarks() {
+    throw new Error("not used");
+  },
   async updateFolder() {
     throw new Error("not used");
   },
@@ -369,6 +375,7 @@ describe("bookmarks RPC", () => {
               name: "Reading",
               iconName: null,
               iconColor: null,
+              sortOrder: 0,
               bookmarkCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -467,6 +474,60 @@ describe("bookmarks RPC", () => {
       bookmarkId: "00000000-0000-4000-8000-000000000010"
     });
   });
+
+  test("moves multiple bookmarks through oRPC for the current user's libraries", async () => {
+    const calls: Parameters<BookmarksStore["moveBookmarks"]>[0][] = [];
+    const bookmarksStore = createBookmarksStore({
+      async moveBookmarks(input) {
+        calls.push(input);
+
+        return {
+          destinationFolderId: input.destinationFolderId ?? null,
+          movedBookmarkIds: input.bookmarkIds
+        };
+      }
+    });
+    const app = createApp({
+      bookmarksStore,
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/bookmarks/move", {
+      body: JSON.stringify({
+        json: {
+          bookmarkIds: [
+            "00000000-0000-4000-8000-000000000010",
+            "00000000-0000-4000-8000-000000000011",
+            "00000000-0000-4000-8000-000000000010"
+          ],
+          destinationFolderId: TEST_FOLDER_ID
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json).toEqual({
+      destinationFolderId: TEST_FOLDER_ID,
+      movedBookmarkIds: [
+        "00000000-0000-4000-8000-000000000010",
+        "00000000-0000-4000-8000-000000000011"
+      ]
+    });
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      bookmarkIds: [
+        "00000000-0000-4000-8000-000000000010",
+        "00000000-0000-4000-8000-000000000011"
+      ],
+      destinationFolderId: TEST_FOLDER_ID
+    });
+  });
 });
 
 describe("favicon endpoint", () => {
@@ -512,6 +573,7 @@ describe("folders RPC", () => {
               name: "Inbox",
               iconName: "IconInbox",
               iconColor: "#3b82f6",
+              sortOrder: 0,
               bookmarkCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -553,6 +615,7 @@ describe("folders RPC", () => {
             name: input.name,
             iconName: input.iconName ?? null,
             iconColor: input.iconColor ?? null,
+            sortOrder: 0,
             bookmarkCount: 0,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:00:00.000Z"
@@ -589,6 +652,58 @@ describe("folders RPC", () => {
       iconName: "IconInbox",
       name: "Reading",
       parentId: TEST_FOLDER_ID
+    });
+  });
+
+  test("moves a folder with explicit sibling order", async () => {
+    const calls: Parameters<BookmarksStore["moveFolder"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async moveFolder(input) {
+          calls.push(input);
+
+          return [
+            {
+              id: input.folderId,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              parentId: input.parentId ?? null,
+              name: "Archive",
+              iconName: null,
+              iconColor: null,
+              sortOrder: input.orderedSiblingIds.indexOf(input.folderId),
+              bookmarkCount: 0,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/folders/move", {
+      body: JSON.stringify({
+        json: {
+          folderId: TEST_CHILD_FOLDER_ID,
+          orderedSiblingIds: [TEST_FOLDER_ID, TEST_CHILD_FOLDER_ID],
+          parentId: null
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json[0].parentId).toBeNull();
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      folderId: TEST_CHILD_FOLDER_ID,
+      orderedSiblingIds: [TEST_FOLDER_ID, TEST_CHILD_FOLDER_ID],
+      parentId: null
     });
   });
 

@@ -31,6 +31,7 @@ export const updateFolder = async (
       name: schema.folders.name,
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
+      sortOrder: schema.folders.sortOrder,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     });

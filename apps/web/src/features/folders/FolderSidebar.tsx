@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import type { CurrentUserResponse, FolderItem } from "@bookmarks/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,6 +29,7 @@ const COLLAPSED_FOLDERS_STORAGE_KEY = "bookmarks.collapsedFolders";
 
 export const FolderSidebar = ({
   activeFolderId,
+  activeFolderDragId,
   currentUser,
   folders,
   isError,
@@ -37,6 +39,7 @@ export const FolderSidebar = ({
   onSelectFolder
 }: {
   activeFolderId: string | null;
+  activeFolderDragId: string | null;
   currentUser?: CurrentUserResponse;
   folders: FolderItem[];
   isError: boolean;
@@ -53,6 +56,13 @@ export const FolderSidebar = ({
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
+  const { isOver: isInboxDropTarget, setNodeRef: setInboxDropTargetRef } = useDroppable({
+    id: "folder:inbox",
+    data: {
+      folder: null,
+      type: "folder"
+    }
+  });
   const [collapsedLibraryIds, toggleCollapsedLibrary, collapsedLibraries] = usePersistedStringSet(
     COLLAPSED_LIBRARIES_STORAGE_KEY
   );
@@ -181,9 +191,11 @@ export const FolderSidebar = ({
           ) : null}
         </div>
         <button
+          ref={setInboxDropTargetRef}
           className={[
             "flex min-h-10 items-center gap-2 rounded-xl px-2.5 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
-            activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700"
+            activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700",
+            isInboxDropTarget ? "bg-blue-50 text-slate-950 ring-2 ring-blue-500 ring-inset" : ""
           ].join(" ")}
           type="button"
           onClick={() => onSelectFolder(null)}
@@ -290,9 +302,11 @@ export const FolderSidebar = ({
                         />
                       </div>
                     ) : null}
+                    <LibraryRootDropZone libraryId={library.id} />
                     {roots.map((folder) => (
                       <FolderTreeRow
                         activeFolderId={activeFolderId}
+                        activeFolderDragId={activeFolderDragId}
                         collapsedFolderIds={collapsedFolderIds}
                         creatingTarget={creatingTarget}
                         editingFolderId={editingFolderId}
@@ -367,5 +381,26 @@ export const FolderSidebar = ({
         }}
       />
     </nav>
+  );
+};
+
+const LibraryRootDropZone = ({ libraryId }: { libraryId: string }) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `folder-root:${libraryId}`,
+    data: {
+      libraryId,
+      type: "folder-root"
+    }
+  });
+
+  return (
+    <div
+      className={[
+        "mx-2.5 h-2 rounded-lg border border-transparent transition-[background-color,box-shadow] duration-150",
+        isOver ? "border-blue-500 bg-blue-50 shadow-[inset_0_0_0_1px_#3b82f6]" : ""
+      ].join(" ")}
+      ref={setNodeRef}
+      aria-hidden="true"
+    />
   );
 };

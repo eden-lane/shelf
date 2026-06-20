@@ -50,6 +50,13 @@
       "when": 1781968341086,
       "tag": "0006_funny_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781983200000,
+      "tag": "0007_folder_sort_order",
+      "breakpoints": true
     }
   ]
 }

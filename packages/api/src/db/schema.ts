@@ -4,6 +4,7 @@ import {
   customType,
   foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   primaryKey,
@@ -153,10 +154,12 @@ export const folders = pgTable(
     name: text("name").notNull(),
     iconName: text("icon_name"),
     iconColor: text("icon_color"),
+    sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps
   },
   (table) => [
     index("folders_library_idx").on(table.libraryId),
+    index("folders_library_parent_sort_idx").on(table.libraryId, table.parentId, table.sortOrder),
     uniqueIndex("folders_id_library_unique_idx").on(table.id, table.libraryId),
     uniqueIndex("folders_library_parent_name_unique_idx").on(
       table.libraryId,

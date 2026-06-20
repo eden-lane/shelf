@@ -76,6 +76,23 @@ export const insertBookmarkIntoPages = (
   };
 };
 
+export const removeBookmarksFromPages = (
+  data: InfiniteData<BookmarksPageResponse, string | null> | undefined,
+  bookmarkIds: ReadonlySet<string>
+): InfiniteData<BookmarksPageResponse, string | null> | undefined => {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.filter((item) => !bookmarkIds.has(item.id))
+    }))
+  };
+};
+
 export const bookmarkQueryKeysForFolder = (
   folderId: string | null
 ): Array<["bookmarks", string | null]> =>

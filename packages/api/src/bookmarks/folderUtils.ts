@@ -20,6 +20,7 @@ export const findFolder = async (
       name: schema.folders.name,
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
+      sortOrder: schema.folders.sortOrder,
       bookmarkCount: sql<number>`count(${schema.savedItems.id})`,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
@@ -40,6 +41,7 @@ export const findFolder = async (
       schema.folders.name,
       schema.folders.iconName,
       schema.folders.iconColor,
+      schema.folders.sortOrder,
       schema.folders.createdAt,
       schema.folders.updatedAt
     )
@@ -71,11 +73,13 @@ export const serializeFolder = (row: {
   name: string;
   iconName: string | null;
   iconColor: string | null;
+  sortOrder: number;
   bookmarkCount: number | string;
   createdAt: Date;
   updatedAt: Date;
 }): FolderItem => ({
   ...row,
+  sortOrder: Number(row.sortOrder),
   bookmarkCount: Number(row.bookmarkCount),
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString()

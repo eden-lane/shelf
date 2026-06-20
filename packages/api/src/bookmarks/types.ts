@@ -32,6 +32,12 @@ export interface DeleteBookmarkInput {
   bookmarkId: string;
 }
 
+export interface MoveBookmarksInput {
+  allowedLibraryIds: string[];
+  bookmarkIds: string[];
+  destinationFolderId?: string | null;
+}
+
 export interface ListFoldersInput {
   libraryIds: string[];
 }
@@ -57,6 +63,13 @@ export interface UpdateFolderInput {
   iconColor?: string | null;
 }
 
+export interface MoveFolderInput {
+  allowedLibraryIds: string[];
+  folderId: string;
+  parentId?: string | null;
+  orderedSiblingIds: string[];
+}
+
 export interface DeleteFolderInput {
   allowedLibraryIds: string[];
   folderId: string;
@@ -69,10 +82,15 @@ export interface BookmarksStore {
   listBookmarkLocations(input: ListBookmarkLocationsInput): Promise<BookmarkLocationItem[]>;
   createBookmark(input: CreateBookmarkInput): Promise<BookmarkItem>;
   deleteBookmark(input: DeleteBookmarkInput): Promise<{ deletedBookmarkId: string }>;
+  moveBookmarks(input: MoveBookmarksInput): Promise<{
+    destinationFolderId: string | null;
+    movedBookmarkIds: string[];
+  }>;
   getFavicon(id: string): Promise<{ contentType: string; imageBytes: Buffer } | null>;
   listFolders(input: ListFoldersInput): Promise<FolderItem[]>;
   listTags(input: ListTagsInput): Promise<TagItem[]>;
   createFolder(input: CreateFolderInput): Promise<FolderItem>;
   updateFolder(input: UpdateFolderInput): Promise<FolderItem>;
+  moveFolder(input: MoveFolderInput): Promise<FolderItem[]>;
   deleteFolder(input: DeleteFolderInput): Promise<{ deletedFolderIds: string[] }>;
 }

@@ -21,6 +21,7 @@ export const listFolders = async (
       name: schema.folders.name,
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
+      sortOrder: schema.folders.sortOrder,
       bookmarkCount: sql<number>`count(${schema.savedItems.id})`,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
@@ -41,10 +42,17 @@ export const listFolders = async (
       schema.folders.name,
       schema.folders.iconName,
       schema.folders.iconColor,
+      schema.folders.sortOrder,
       schema.folders.createdAt,
       schema.folders.updatedAt
     )
-    .orderBy(asc(schema.folders.name), asc(schema.folders.id));
+    .orderBy(
+      asc(schema.folders.libraryId),
+      asc(schema.folders.parentId),
+      asc(schema.folders.sortOrder),
+      asc(schema.folders.name),
+      asc(schema.folders.id)
+    );
 
   return rows.map(serializeFolder);
 };

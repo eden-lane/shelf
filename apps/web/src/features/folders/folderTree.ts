@@ -25,7 +25,12 @@ export const buildFolderTree = (folders: FolderItem[]): FolderNode[] => {
 
 const sortFolderNodes = (nodes: FolderNode[]): FolderNode[] =>
   nodes
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort(
+      (left, right) =>
+        left.sortOrder - right.sortOrder ||
+        left.name.localeCompare(right.name) ||
+        left.id.localeCompare(right.id)
+    )
     .map((node) => ({
       ...node,
       children: sortFolderNodes(node.children)

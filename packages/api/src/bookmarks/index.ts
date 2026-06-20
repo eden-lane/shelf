@@ -10,6 +10,8 @@ export * from "./listBookmarkLocations";
 export * from "./listBookmarks";
 export * from "./listFolders";
 export * from "./listTags";
+export * from "./moveFolder";
+export * from "./moveBookmarks";
 export * from "./store";
 export * from "./types";
 export * from "./updateFolder";

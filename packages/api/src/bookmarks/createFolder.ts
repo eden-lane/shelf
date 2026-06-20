@@ -1,4 +1,5 @@
 import type { FolderItem } from "@bookmarks/shared";
+import { and, eq, isNull, max } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
 import { assertAllowedLibrary, findFolder, serializeFolder } from "./folderUtils";
@@ -18,6 +19,25 @@ export const createFolder = async (
     }
   }
 
+  const [maxSortOrderRow] = await db
+    .select({
+      value: max(schema.folders.sortOrder)
+    })
+    .from(schema.folders)
+    .where(
+      and(
+        eq(schema.folders.libraryId, input.libraryId),
+        input.parentId
+          ? eq(schema.folders.parentId, input.parentId)
+          : isNull(schema.folders.parentId)
+      )
+    );
+  const maxSortOrder =
+    typeof maxSortOrderRow?.value === "number"
+      ? maxSortOrderRow.value
+      : Number(maxSortOrderRow?.value ?? -1);
+  const sortOrder = Number.isFinite(maxSortOrder) ? maxSortOrder + 1 : 0;
+
   const [row] = await db
     .insert(schema.folders)
     .values({
@@ -25,7 +45,8 @@ export const createFolder = async (
       parentId: input.parentId ?? null,
       name: input.name,
       iconName: input.iconName ?? null,
-      iconColor: input.iconColor ?? null
+      iconColor: input.iconColor ?? null,
+      sortOrder
     })
     .returning({
       id: schema.folders.id,
@@ -34,6 +55,7 @@ export const createFolder = async (
       name: schema.folders.name,
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
+      sortOrder: schema.folders.sortOrder,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     });

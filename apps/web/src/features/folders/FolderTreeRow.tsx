@@ -1,6 +1,12 @@
 import { Fragment } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { FolderItem } from "@bookmarks/shared";
-import { IconChevronDown, IconChevronRight, IconDotsVertical } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconChevronRight,
+  IconDotsVertical,
+  IconGripVertical
+} from "@tabler/icons-react";
 import {
   DEFAULT_FOLDER_ICON_COLOR,
   folderRowIndent,
@@ -12,6 +18,7 @@ import type { FolderFormValue, FolderNode } from "./types";
 
 export const FolderTreeRow = ({
   activeFolderId,
+  activeFolderDragId,
   collapsedFolderIds,
   creatingTarget,
   editingFolderId,
@@ -31,6 +38,7 @@ export const FolderTreeRow = ({
   onToggleFolder
 }: {
   activeFolderId: string | null;
+  activeFolderDragId: string | null;
   collapsedFolderIds: ReadonlySet<string>;
   creatingTarget: { libraryId: string; parentId: string | null } | null;
   editingFolderId: string | null;
@@ -57,20 +65,68 @@ export const FolderTreeRow = ({
   const FolderIcon = getFolderIconComponent(folder.iconName);
   const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
   const indent = folderRowIndent(level);
+  const { isOver, setNodeRef } = useDroppable({
+    id: `folder:${folder.id}`,
+    data: {
+      folder,
+      type: "folder"
+    },
+    disabled: isEditing
+  });
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef: setDraggableNodeRef,
+    transform,
+    isDragging
+  } = useDraggable({
+    id: `folder-drag:${folder.id}`,
+    data: {
+      folderId: folder.id,
+      libraryId: folder.libraryId,
+      parentId: folder.parentId,
+      type: "folder-drag"
+    },
+    disabled: isEditing
+  });
+  const dragStyle = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`
+      }
+    : undefined;
+  const setRowRefs = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setDraggableNodeRef(node);
+  };
 
   return (
     <Fragment>
       <div
+        ref={setRowRefs}
         className={[
-          "grid grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl transition-colors",
-          isActive ? "bg-gray-100 text-slate-950" : "text-slate-950 hover:bg-white"
+          "relative grid grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl transition-[background-color,box-shadow,opacity]",
+          isActive ? "bg-gray-100 text-slate-950" : "text-slate-950 hover:bg-white",
+          isOver ? "bg-blue-50 ring-2 ring-blue-500 ring-inset" : "",
+          isDragging ? "z-20 opacity-80 shadow-[0_12px_34px_rgb(15_23_42_/_0.14)]" : ""
         ].join(" ")}
-        style={{ marginLeft: `${indent}px` }}
+        data-folder-drop-target={folder.id}
+        style={{ marginLeft: `${indent}px`, ...dragStyle }}
         onContextMenu={(event) => {
           event.preventDefault();
           onOpenMenu(folder, event.clientX, event.clientY);
         }}
       >
+        <FolderPositionDropZone
+          activeFolderDragId={activeFolderDragId}
+          folder={folder}
+          position="before"
+        />
+        <FolderPositionDropZone
+          activeFolderDragId={activeFolderDragId}
+          folder={folder}
+          position="after"
+        />
         {isEditing ? (
           <div className="col-span-3 min-w-0">
             <InlineFolderForm
@@ -117,6 +173,16 @@ export const FolderTreeRow = ({
               ) : (
                 <span className="h-7 w-6 shrink-0" aria-hidden="true" />
               )}
+              <button
+                className="grid h-7 w-6 shrink-0 cursor-grab place-items-center rounded-lg text-gray-400 outline-none hover:bg-gray-100 hover:text-slate-950 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                aria-label={`Drag folder ${folder.name}`}
+                type="button"
+                ref={setActivatorNodeRef}
+                {...attributes}
+                {...listeners}
+              >
+                <IconGripVertical size={15} stroke={1.5} aria-hidden="true" focusable="false" />
+              </button>
               <button
                 className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 type="button"
@@ -189,6 +255,7 @@ export const FolderTreeRow = ({
                 onCancelEdit={onCancelEdit}
                 onCreateFolder={onCreateFolder}
                 onEditFolder={onEditFolder}
+                activeFolderDragId={activeFolderDragId}
                 onOpenMenu={onOpenMenu}
                 onSelectFolder={onSelectFolder}
                 onToggleFolder={onToggleFolder}
@@ -198,5 +265,39 @@ export const FolderTreeRow = ({
         </div>
       </div>
     </Fragment>
+  );
+};
+
+const FolderPositionDropZone = ({
+  activeFolderDragId,
+  folder,
+  position
+}: {
+  activeFolderDragId: string | null;
+  folder: FolderItem;
+  position: "before" | "after";
+}) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `folder-position:${position}:${folder.id}`,
+    data: {
+      libraryId: folder.libraryId,
+      parentId: folder.parentId,
+      position,
+      relativeFolderId: folder.id,
+      type: "folder-position"
+    },
+    disabled: activeFolderDragId === null || activeFolderDragId === folder.id
+  });
+
+  return (
+    <div
+      className={[
+        "pointer-events-none absolute right-2 left-2 z-10 h-1 rounded-full transition-colors duration-150",
+        position === "before" ? "-top-0.5" : "-bottom-0.5",
+        isOver ? "bg-blue-500" : "bg-transparent"
+      ].join(" ")}
+      ref={setNodeRef}
+      aria-hidden="true"
+    />
   );
 };
