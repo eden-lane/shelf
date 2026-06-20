@@ -339,6 +339,7 @@ describe("App", () => {
 
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Items" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Items" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
@@ -364,6 +365,13 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
       expect(screen.getAllByLabelText("Bookmark folder Inbox")).toHaveLength(2);
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
+    expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    expect(screen.getByRole("heading", { name: "Inbox / Archive" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Items" }));
+    expect(screen.getByRole("heading", { name: "Items" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse folder Inbox" }));
     expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();

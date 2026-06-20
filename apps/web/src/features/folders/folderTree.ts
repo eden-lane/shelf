@@ -76,3 +76,21 @@ export const folderPath = (folder: FolderItem, folders: FolderItem[]) => {
 
   return path.join(" / ");
 };
+
+export const folderPathSegments = (folder: FolderItem, folders: FolderItem[]) => {
+  const path = [folder];
+  let parentId = folder.parentId;
+
+  while (parentId) {
+    const parent = folders.find((candidate) => candidate.id === parentId);
+
+    if (!parent) {
+      break;
+    }
+
+    path.unshift(parent);
+    parentId = parent.parentId;
+  }
+
+  return path;
+};
