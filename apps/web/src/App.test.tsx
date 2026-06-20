@@ -95,11 +95,19 @@ describe("App", () => {
       expect(screen.getByRole("link", { name: item })).toBeTruthy();
     }
 
+    expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "Add bookmark" }));
 
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
       expect(screen.getByLabelText("Page URL")).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
     });
 
     await waitFor(() => {
