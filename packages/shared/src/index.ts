@@ -22,4 +22,12 @@ export interface CurrentUserResponse {
     slug: string;
     role: "owner";
   };
+  libraries: Array<{
+    id: string;
+    kind: "personal" | "organization";
+    name: string;
+    inboxFolderId: string;
+    organizationId?: string;
+    organizationSlug?: string;
+  }>;
 }

@@ -2,8 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { createApp } from "./app";
 import {
   DEV_ORGANIZATION_ID,
+  DEV_ORGANIZATION_INBOX_FOLDER_ID,
+  DEV_ORGANIZATION_LIBRARY_ID,
+  DEV_ORGANIZATION_LIBRARY_NAME,
   DEV_ORGANIZATION_NAME,
   DEV_ORGANIZATION_SLUG,
+  DEV_PERSONAL_INBOX_FOLDER_ID,
+  DEV_PERSONAL_LIBRARY_ID,
+  DEV_PERSONAL_LIBRARY_NAME,
   DEV_USER_EMAIL,
   DEV_USER_ID,
   DEV_USER_NAME
@@ -83,6 +89,12 @@ describe("current user endpoint", () => {
       currentUser: {
         userId: DEV_USER_ID,
         organizationId: DEV_ORGANIZATION_ID,
+        personalLibraryId: DEV_PERSONAL_LIBRARY_ID,
+        organizationLibraryId: DEV_ORGANIZATION_LIBRARY_ID,
+        personalInboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID,
+        organizationInboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+        personalLibraryName: DEV_PERSONAL_LIBRARY_NAME,
+        organizationLibraryName: DEV_ORGANIZATION_LIBRARY_NAME,
         email: DEV_USER_EMAIL,
         name: DEV_USER_NAME,
         organizationName: DEV_ORGANIZATION_NAME,
@@ -105,7 +117,23 @@ describe("current user endpoint", () => {
         name: DEV_ORGANIZATION_NAME,
         slug: DEV_ORGANIZATION_SLUG,
         role: "owner"
-      }
+      },
+      libraries: [
+        {
+          id: DEV_PERSONAL_LIBRARY_ID,
+          kind: "personal",
+          name: DEV_PERSONAL_LIBRARY_NAME,
+          inboxFolderId: DEV_PERSONAL_INBOX_FOLDER_ID
+        },
+        {
+          id: DEV_ORGANIZATION_LIBRARY_ID,
+          kind: "organization",
+          name: DEV_ORGANIZATION_LIBRARY_NAME,
+          inboxFolderId: DEV_ORGANIZATION_INBOX_FOLDER_ID,
+          organizationId: DEV_ORGANIZATION_ID,
+          organizationSlug: DEV_ORGANIZATION_SLUG
+        }
+      ]
     });
   });
 

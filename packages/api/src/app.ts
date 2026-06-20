@@ -40,7 +40,23 @@ export const createApp = (options: AppOptions) => {
         name: options.currentUser.organizationName,
         slug: options.currentUser.organizationSlug,
         role: "owner"
-      }
+      },
+      libraries: [
+        {
+          id: options.currentUser.personalLibraryId,
+          kind: "personal",
+          name: options.currentUser.personalLibraryName,
+          inboxFolderId: options.currentUser.personalInboxFolderId
+        },
+        {
+          id: options.currentUser.organizationLibraryId,
+          kind: "organization",
+          name: options.currentUser.organizationLibraryName,
+          inboxFolderId: options.currentUser.organizationInboxFolderId,
+          organizationId: options.currentUser.organizationId,
+          organizationSlug: options.currentUser.organizationSlug
+        }
+      ]
     };
 
     return context.json(response);

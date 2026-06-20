@@ -8,6 +8,20 @@
       "when": 1781888602133,
       "tag": "0000_zippy_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781925097219,
+      "tag": "0001_far_shotgun",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781925601744,
+      "tag": "0002_windy_puma",
+      "breakpoints": true
     }
   ]
 }
