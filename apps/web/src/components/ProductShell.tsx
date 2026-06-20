@@ -1,11 +1,16 @@
 import { type CSSProperties, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { CurrentUserResponse, FolderItem } from "@bookmarks/shared";
-import { IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
+import { IconBookmark, IconDatabase, IconLayoutSidebarLeftExpand } from "@tabler/icons-react";
 import { getCurrentUser, getFolders } from "../api";
 import { AddBookmarkDialog } from "../features/bookmarks/AddBookmarkDialog";
 import { BookmarksWorkspace } from "../features/bookmarks/BookmarksWorkspace";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
+import { folderPathSegments } from "../features/folders/folderTree";
+import {
+  DEFAULT_FOLDER_ICON_COLOR,
+  getFolderIconComponent
+} from "../features/folders/folderIcons";
 
 export const ProductShell = () => {
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
@@ -23,6 +28,7 @@ export const ProductShell = () => {
   });
   const username = displayUsername(currentUser.data);
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
+  const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
 
   const openBookmarkDialog = (folder: FolderItem | null) => {
     setBookmarkTargetFolder(folder);
@@ -81,9 +87,7 @@ export const ProductShell = () => {
           ) : null}
           <div className="col-span-3 min-w-0">
             <p className="mb-1 text-[13px] font-bold text-[#858b9a]">{username}</p>
-            <h1 className="m-0 text-[34px] leading-[1.1] font-bold">
-              {activeFolder?.name ?? "Items"}
-            </h1>
+            <FolderBreadcrumbs folders={activeFolderPath} />
           </div>
         </header>
 
@@ -101,3 +105,66 @@ export const ProductShell = () => {
 
 const displayUsername = (currentUser?: CurrentUserResponse) =>
   currentUser?.user.name || currentUser?.user.email || "User";
+
+const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
+  const label = folders.length > 0 ? folders.map((folder) => folder.name).join(" / ") : "Items";
+
+  return (
+    <h1
+      className="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[34px] leading-[1.1] font-bold"
+      aria-label={label}
+    >
+      <IconDatabase
+        className="shrink-0 text-gray-500"
+        size={31}
+        stroke={1.5}
+        aria-hidden="true"
+        focusable="false"
+      />
+      <BreadcrumbSeparator />
+      {folders.length > 0 ? (
+        folders.map((folder, index) => (
+          <BreadcrumbFolder folder={folder} key={folder.id} isLast={index === folders.length - 1} />
+        ))
+      ) : (
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <IconBookmark
+            className="shrink-0 text-[#3b8df5]"
+            size={31}
+            stroke={1.5}
+            aria-hidden="true"
+            focusable="false"
+          />
+          <span className="min-w-0 truncate">Items</span>
+        </span>
+      )}
+    </h1>
+  );
+};
+
+const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: boolean }) => {
+  const FolderIcon = getFolderIconComponent(folder.iconName);
+
+  return (
+    <>
+      <span className="inline-flex min-w-0 items-center gap-2">
+        <FolderIcon
+          className="shrink-0"
+          size={31}
+          stroke={1.5}
+          color={folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR}
+          aria-hidden="true"
+          focusable="false"
+        />
+        <span className="min-w-0 truncate">{folder.name}</span>
+      </span>
+      {isLast ? null : <BreadcrumbSeparator />}
+    </>
+  );
+};
+
+const BreadcrumbSeparator = () => (
+  <span className="shrink-0 text-[28px] leading-none font-medium text-gray-300" aria-hidden="true">
+    /
+  </span>
+);
