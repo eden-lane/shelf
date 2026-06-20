@@ -1,6 +1,10 @@
 import { defineConfig } from "wxt";
+import solid from "vite-plugin-solid";
 
 export default defineConfig({
+  vite: () => ({
+    plugins: [solid()]
+  }),
   manifest: {
     name: "Bookmarks",
     description: "Save the current page to Bookmarks.",

@@ -35,6 +35,12 @@ select {
   gap: 12px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: #64748b;
@@ -113,7 +119,6 @@ h1 {
   gap: 8px;
 }
 
-input[type="url"],
 select {
   width: 100%;
   min-height: 36px;
@@ -125,7 +130,6 @@ select {
   outline: none;
 }
 
-input[type="url"]:focus,
 select:focus {
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgb(37 99 235 / 14%);

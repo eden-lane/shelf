@@ -10,8 +10,12 @@
     "dev": "wxt",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "solid-js": "latest"
+  },
   "devDependencies": {
     "typescript": "latest",
+    "vite-plugin-solid": "latest",
     "wxt": "latest"
   }
 }
