@@ -62,6 +62,9 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async deleteFolder() {
     throw new Error("not used");
   },
+  async deleteTag() {
+    throw new Error("not used");
+  },
   async getFavicon() {
     return null;
   },
@@ -84,6 +87,9 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
     throw new Error("not used");
   },
   async updateFolder() {
+    throw new Error("not used");
+  },
+  async updateTag() {
     throw new Error("not used");
   },
   ...overrides
@@ -844,6 +850,94 @@ describe("tags RPC", () => {
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       color: "#3b82f6",
       name: "Research"
+    });
+  });
+
+  test("updates a tag with the current user's allowed libraries", async () => {
+    const calls: Parameters<BookmarksStore["updateTag"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async updateTag(input) {
+          calls.push(input);
+
+          return {
+            id: input.tagId,
+            libraryId: DEV_PERSONAL_LIBRARY_ID,
+            name: input.name,
+            color: input.color ?? null,
+            bookmarkCount: 2,
+            createdAt: "2026-06-20T12:00:00.000Z",
+            updatedAt: "2026-06-20T12:05:00.000Z"
+          };
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/tags/update", {
+      body: JSON.stringify({
+        json: {
+          tagId: "00000000-0000-4000-8000-000000000030",
+          color: "#F59E0B",
+          name: " Updated "
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json).toMatchObject({
+      id: "00000000-0000-4000-8000-000000000030",
+      name: "Updated",
+      color: "#f59e0b"
+    });
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      tagId: "00000000-0000-4000-8000-000000000030",
+      color: "#f59e0b",
+      name: "Updated"
+    });
+  });
+
+  test("deletes a tag with the current user's allowed libraries", async () => {
+    const calls: Parameters<BookmarksStore["deleteTag"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async deleteTag(input) {
+          calls.push(input);
+
+          return { deletedTagId: input.tagId };
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/tags/delete", {
+      body: JSON.stringify({
+        json: {
+          tagId: "00000000-0000-4000-8000-000000000030"
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json).toEqual({
+      deletedTagId: "00000000-0000-4000-8000-000000000030"
+    });
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      tagId: "00000000-0000-4000-8000-000000000030"
     });
   });
 });

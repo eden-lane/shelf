@@ -54,6 +54,18 @@ export interface CreateTagInput {
   color?: string | null;
 }
 
+export interface UpdateTagInput {
+  allowedLibraryIds: string[];
+  tagId: string;
+  name: string;
+  color?: string | null;
+}
+
+export interface DeleteTagInput {
+  allowedLibraryIds: string[];
+  tagId: string;
+}
+
 export interface CreateFolderInput {
   libraryId: string;
   allowedLibraryIds: string[];
@@ -98,6 +110,8 @@ export interface BookmarksStore {
   listFolders(input: ListFoldersInput): Promise<FolderItem[]>;
   listTags(input: ListTagsInput): Promise<TagItem[]>;
   createTag(input: CreateTagInput): Promise<TagItem>;
+  updateTag(input: UpdateTagInput): Promise<TagItem>;
+  deleteTag(input: DeleteTagInput): Promise<{ deletedTagId: string }>;
   createFolder(input: CreateFolderInput): Promise<FolderItem>;
   updateFolder(input: UpdateFolderInput): Promise<FolderItem>;
   moveFolder(input: MoveFolderInput): Promise<FolderItem[]>;

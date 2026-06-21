@@ -7,6 +7,7 @@ import {
   IconChevronDown,
   IconChevronRight,
   IconDatabase,
+  IconDotsVertical,
   IconFolderPlus,
   IconLayoutSidebarLeftCollapse,
   IconPlus,
@@ -14,10 +15,16 @@ import {
   IconTag,
   IconTagPlus
 } from "@tabler/icons-react";
-import { createFolder, createTag, updateFolder } from "../../api";
+import { createFolder, createTag, updateFolder, updateTag } from "../../api";
 import { usePersistedStringSet } from "../../hooks/usePersistedStringSet";
-import { FOLDER_CONTEXT_MENU_SIZE, clampContextMenuPosition } from "../../utils/contextMenu";
+import {
+  FOLDER_CONTEXT_MENU_SIZE,
+  TAG_CONTEXT_MENU_SIZE,
+  clampContextMenuPosition
+} from "../../utils/contextMenu";
+import { DeleteTagDialog } from "../tags/DeleteTagDialog";
 import { InlineTagForm } from "../tags/InlineTagForm";
+import { TagContextMenu } from "../tags/TagContextMenu";
 import { DeleteFolderDialog } from "./DeleteFolderDialog";
 import { FolderContextMenu } from "./FolderContextMenu";
 import { FolderDisclosurePlaceholder } from "./FolderDisclosureControls";
@@ -56,7 +63,7 @@ export const FolderSidebar = ({
   isTagsError: boolean;
   isTagsLoading: boolean;
   tags: TagItem[];
-  onAddBookmark: (folder: FolderItem | null) => void;
+  onAddBookmark: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
   onSelectFolder: (folderId: string | null) => void;
   onSelectTag: (tagId: string) => void;
@@ -68,8 +75,11 @@ export const FolderSidebar = ({
   } | null>(null);
   const [creatingTagLibraryId, setCreatingTagLibraryId] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
+  const [tagMenu, setTagMenu] = useState<{ tagId: string; x: number; y: number } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
+  const [tagToDelete, setTagToDelete] = useState<TagItem | null>(null);
   const [collapsedLibraryIds, toggleCollapsedLibrary, collapsedLibraries] = usePersistedStringSet(
     COLLAPSED_LIBRARIES_STORAGE_KEY
   );
@@ -126,23 +136,46 @@ export const FolderSidebar = ({
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
     }
   });
+  const updateTagMutation = useMutation({
+    mutationFn: updateTag,
+    onSuccess: (tag) => {
+      queryClient.setQueryData<TagItem[]>(["tags"], (currentTags = []) =>
+        currentTags.map((currentTag) => (currentTag.id === tag.id ? tag : currentTag))
+      );
+      setEditingTagId(null);
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
+    }
+  });
 
   useEffect(() => {
-    if (!menu) {
+    if (!menu && !tagMenu) {
       return;
     }
 
-    const closeMenu = () => setMenu(null);
+    const closeMenu = () => {
+      setMenu(null);
+      setTagMenu(null);
+    };
 
     window.addEventListener("click", closeMenu);
 
     return () => window.removeEventListener("click", closeMenu);
-  }, [menu]);
+  }, [menu, tagMenu]);
 
   const openFolderMenu = (folder: FolderItem, x: number, y: number) => {
+    setTagMenu(null);
     setMenu({
       folderId: folder.id,
       ...clampContextMenuPosition(x, y, FOLDER_CONTEXT_MENU_SIZE)
+    });
+  };
+
+  const openTagMenu = (tag: TagItem, x: number, y: number) => {
+    setMenu(null);
+    setTagMenu({
+      tagId: tag.id,
+      ...clampContextMenuPosition(x, y, TAG_CONTEXT_MENU_SIZE)
     });
   };
 
@@ -152,6 +185,8 @@ export const FolderSidebar = ({
       collapsedFolders.remove(parentId);
     }
     setCreatingTagLibraryId(null);
+    setEditingFolderId(null);
+    setEditingTagId(null);
     setCreatingTarget({ libraryId, parentId });
   };
 
@@ -159,10 +194,12 @@ export const FolderSidebar = ({
     collapsedLibraries.remove(libraryId);
     setCreatingTarget(null);
     setEditingFolderId(null);
+    setEditingTagId(null);
     setCreatingTagLibraryId(libraryId);
   };
 
   const menuFolder = menu ? folders.find((folder) => folder.id === menu.folderId) ?? null : null;
+  const menuTag = tagMenu ? tags.find((tag) => tag.id === tagMenu.tagId) ?? null : null;
 
   return (
     <nav className="flex min-h-full flex-col gap-4" aria-label="Folders">
@@ -183,7 +220,7 @@ export const FolderSidebar = ({
           aria-label="Add bookmark"
           title="Add bookmark"
           type="button"
-          onClick={() => onAddBookmark(null)}
+          onClick={() => onAddBookmark({ folder: null, tag: null })}
         >
           <IconPlus size={25} stroke={1.5} aria-hidden="true" focusable="false" />
         </button>
@@ -203,19 +240,6 @@ export const FolderSidebar = ({
         </button>
       </div>
       <div className="grid gap-3">
-        <div className="flex items-center justify-between px-2.5">
-          <span className="text-sm font-medium text-gray-500">Libraries</span>
-          {currentUser?.libraries[0] ? (
-            <button
-              className="grid h-8 w-8 place-items-center rounded-xl border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-              aria-label="Create folder"
-              type="button"
-              onClick={() => startCreatingFolder(currentUser.libraries[0].id, null)}
-            >
-              <IconFolderPlus size={16} stroke={1.5} aria-hidden="true" focusable="false" />
-            </button>
-          ) : null}
-        </div>
         {isLoading ? (
           <p className="m-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-bold text-gray-500">
             Loading folders
@@ -232,9 +256,9 @@ export const FolderSidebar = ({
 
           return (
             <section className="grid gap-2" key={library.id} aria-label={`${library.name} workspace`}>
-              <div className="relative grid min-h-9 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1">
+              <div className="relative grid min-h-9 items-center gap-1">
                 <button
-                  className="col-span-3 flex min-h-9 min-w-0 items-center gap-2 rounded-xl py-0 pr-10 pl-2.5 text-left outline-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="flex min-h-9 min-w-0 items-center gap-2 rounded-xl py-0 pr-2.5 pl-2.5 text-left outline-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-expanded={!isLibraryCollapsed}
                   aria-label={`${isLibraryCollapsed ? "Expand" : "Collapse"} workspace ${library.name}`}
                   type="button"
@@ -268,14 +292,6 @@ export const FolderSidebar = ({
                     {library.name}
                   </span>
                 </button>
-                <button
-                  className="absolute top-1/2 right-0 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                  aria-label={`Create folder in ${library.name}`}
-                  type="button"
-                  onClick={() => startCreatingFolder(library.id, null)}
-                >
-                  <IconPlus size={16} stroke={1.5} aria-hidden="true" focusable="false" />
-                </button>
               </div>
               <div
                 className={[
@@ -294,12 +310,15 @@ export const FolderSidebar = ({
                     ].join(" ")}
                   >
                     <section className="grid gap-1" aria-label={`${library.name} folders`}>
-                      <div className="flex min-h-8 items-center justify-between pl-[12px] pr-2.5">
+                      <div
+                        className="grid min-h-8 grid-cols-[minmax(0,1fr)_2rem] items-center"
+                        style={{ marginLeft: `${folderRowIndent(1)}px` }}
+                      >
                         <span className="text-xs font-bold tracking-[0.04em] text-gray-400 uppercase">
                           Folders
                         </span>
                         <button
-                          className="grid h-7 w-7 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                          className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                           aria-label={`Create folder in ${library.name}`}
                           type="button"
                           onClick={() => startCreatingFolder(library.id, null)}
@@ -386,15 +405,21 @@ export const FolderSidebar = ({
                       creatingTagLibraryId={creatingTagLibraryId}
                       createError={createTagMutation.isError}
                       createPending={createTagMutation.isPending}
+                      editError={updateTagMutation.isError}
+                      editPending={updateTagMutation.isPending}
+                      editingTagId={editingTagId}
                       isError={isTagsError}
                       isLoading={isTagsLoading}
                       libraryId={library.id}
                       libraryName={library.name}
                       tags={tags.filter((tag) => tag.libraryId === library.id)}
                       onCancelCreate={() => setCreatingTagLibraryId(null)}
+                      onCancelEdit={() => setEditingTagId(null)}
                       onCreateTag={(tag) =>
                         createTagMutation.mutate({ libraryId: library.id, ...tag })
                       }
+                      onEditTag={(tagId, tag) => updateTagMutation.mutate({ tagId, ...tag })}
+                      onOpenMenu={openTagMenu}
                       onSelectTag={onSelectTag}
                       onStartCreate={() => startCreatingTag(library.id)}
                     />
@@ -412,7 +437,7 @@ export const FolderSidebar = ({
           y={menu.y}
           onAddBookmark={() => {
             setMenu(null);
-            onAddBookmark(menuFolder);
+            onAddBookmark({ folder: menuFolder, tag: null });
           }}
           onCreateFolder={() => {
             setMenu(null);
@@ -427,6 +452,29 @@ export const FolderSidebar = ({
             setMenu(null);
             setCreatingTarget(null);
             setEditingFolderId(menuFolder.id);
+            setEditingTagId(null);
+          }}
+        />
+      ) : null}
+      {tagMenu && menuTag ? (
+        <TagContextMenu
+          tag={menuTag}
+          x={tagMenu.x}
+          y={tagMenu.y}
+          onAddBookmark={() => {
+            setTagMenu(null);
+            onAddBookmark({ folder: null, tag: menuTag });
+          }}
+          onDeleteTag={() => {
+            setTagMenu(null);
+            setTagToDelete(menuTag);
+          }}
+          onEditTag={() => {
+            setTagMenu(null);
+            setCreatingTagLibraryId(null);
+            setCreatingTarget(null);
+            setEditingFolderId(null);
+            setEditingTagId(menuTag.id);
           }}
         />
       ) : null}
@@ -436,6 +484,15 @@ export const FolderSidebar = ({
         onClose={() => setFolderToDelete(null)}
         onDeleted={(deletedFolderIds) => {
           if (activeFolderId && deletedFolderIds.includes(activeFolderId)) {
+            onSelectFolder(null);
+          }
+        }}
+      />
+      <DeleteTagDialog
+        tag={tagToDelete}
+        onClose={() => setTagToDelete(null)}
+        onDeleted={(deletedTagId) => {
+          if (activeTagId === deletedTagId) {
             onSelectFolder(null);
           }
         }}
@@ -494,13 +551,19 @@ const TagSection = ({
   creatingTagLibraryId,
   createError,
   createPending,
+  editError,
+  editPending,
+  editingTagId,
   isError,
   isLoading,
   libraryId,
   libraryName,
   tags,
   onCancelCreate,
+  onCancelEdit,
   onCreateTag,
+  onEditTag,
+  onOpenMenu,
   onSelectTag,
   onStartCreate
 }: {
@@ -508,21 +571,30 @@ const TagSection = ({
   creatingTagLibraryId: string | null;
   createError: boolean;
   createPending: boolean;
+  editError: boolean;
+  editPending: boolean;
+  editingTagId: string | null;
   isError: boolean;
   isLoading: boolean;
   libraryId: string;
   libraryName: string;
   tags: TagItem[];
   onCancelCreate: () => void;
+  onCancelEdit: () => void;
   onCreateTag: (tag: { name: string; color: string }) => void;
+  onEditTag: (tagId: string, tag: { name: string; color: string }) => void;
+  onOpenMenu: (tag: TagItem, x: number, y: number) => void;
   onSelectTag: (tagId: string) => void;
   onStartCreate: () => void;
 }) => (
   <section className="grid gap-1 pt-3" aria-label={`${libraryName} tags`}>
-    <div className="flex min-h-8 items-center justify-between pl-[12px] pr-2.5">
+    <div
+      className="grid min-h-8 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center"
+      style={{ marginLeft: `${folderRowIndent(1)}px` }}
+    >
       <span className="text-xs font-bold tracking-[0.04em] text-gray-400 uppercase">Tags</span>
       <button
-        className="grid h-7 w-7 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+        className="col-start-3 grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
         aria-label={`Create tag in ${libraryName}`}
         type="button"
         onClick={onStartCreate}
@@ -549,35 +621,69 @@ const TagSection = ({
       </div>
     ) : null}
     {tags.map((tag) => (
-      <button
+      <div
         className={[
-          "flex min-h-9 items-center gap-0.5 rounded-xl pr-8 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
-          activeTagId === tag.id ? "bg-gray-100 text-slate-950" : "text-gray-700"
+          "group grid min-h-9 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center rounded-xl text-sm font-medium",
+          activeTagId === tag.id ? "bg-gray-100 text-slate-950" : "text-gray-700 hover:bg-white"
         ].join(" ")}
-        aria-label={tag.name}
         key={tag.id}
         style={{ marginLeft: `${folderRowIndent(1)}px` }}
-        type="button"
-        onClick={() => onSelectTag(tag.id)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onOpenMenu(tag, event.clientX, event.clientY);
+        }}
       >
-        <span className="h-7 w-5 shrink-0" aria-hidden="true" />
-        <span className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5">
-          <IconTag
-            size={20}
-            stroke={1.5}
-            color={tag.color ?? "#697080"}
-            aria-hidden="true"
-            focusable="false"
-          />
-          <span className="truncate">{tag.name}</span>
-        </span>
-        <span
-          className="grid h-9 place-items-center text-xs font-extrabold text-gray-400"
-          aria-hidden="true"
-        >
-          {tag.bookmarkCount > 0 ? tag.bookmarkCount : null}
-        </span>
-      </button>
+        {editingTagId === tag.id ? (
+          <div className="col-span-3 min-w-0">
+            <InlineTagForm
+              defaultColor={tag.color}
+              defaultName={tag.name}
+              error={editError ? "Tag could not be updated." : null}
+              isPending={editPending}
+              submitLabel="Save tag"
+              onCancel={onCancelEdit}
+              onSubmit={(value) => onEditTag(tag.id, value)}
+            />
+          </div>
+        ) : (
+          <>
+            <button
+              className="flex min-h-9 min-w-0 items-center gap-2 rounded-xl pr-2.5 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              aria-label={tag.name}
+              type="button"
+              onClick={() => onSelectTag(tag.id)}
+            >
+              <span className="h-7 w-5 shrink-0" aria-hidden="true" />
+              <IconTag
+                size={20}
+                stroke={1.5}
+                color={tag.color ?? "#697080"}
+                aria-hidden="true"
+                focusable="false"
+              />
+              <span className="truncate">{tag.name}</span>
+            </button>
+            <span
+              className="grid h-9 place-items-center text-xs font-extrabold text-gray-400"
+              aria-hidden="true"
+            >
+              {tag.bookmarkCount > 0 ? tag.bookmarkCount : null}
+            </span>
+            <button
+              className="grid h-8 w-8 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              aria-label={`Tag actions for ${tag.name}`}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                const rect = event.currentTarget.getBoundingClientRect();
+                onOpenMenu(tag, rect.left, rect.bottom + 4);
+              }}
+            >
+              <IconDotsVertical size={16} stroke={1.5} aria-hidden="true" focusable="false" />
+            </button>
+          </>
+        )}
+      </div>
     ))}
     {!isLoading && tags.length === 0 ? (
       <p className="m-0 px-2.5 py-1 text-xs font-bold text-gray-400">No tags</p>

@@ -2,6 +2,7 @@ export const CONTEXT_MENU_MARGIN = 8;
 
 export const FOLDER_CONTEXT_MENU_SIZE = { height: 172, width: 190 };
 export const BOOKMARK_CONTEXT_MENU_SIZE = { height: 128, width: 160 };
+export const TAG_CONTEXT_MENU_SIZE = { height: 128, width: 190 };
 
 export const clampContextMenuPosition = (
   x: number,

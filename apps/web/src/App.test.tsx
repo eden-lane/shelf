@@ -296,6 +296,48 @@ describe("App", () => {
         });
       }
 
+      if (url.pathname === "/rpc/tags/update") {
+        const body = (await request.json()) as {
+          json?: {
+            color?: string | null;
+            name?: string;
+            tagId?: string;
+          };
+        };
+        const tagIndex = tags.findIndex((tag) => tag.id === body.json?.tagId);
+
+        if (tagIndex >= 0) {
+          tags[tagIndex] = {
+            ...tags[tagIndex],
+            color: body.json?.color ?? null,
+            name: body.json?.name || tags[tagIndex].name,
+            updatedAt: "2026-06-20T12:05:00.000Z"
+          };
+        }
+
+        return new Response(JSON.stringify({ json: tags[tagIndex] }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.pathname === "/rpc/tags/delete") {
+        const body = (await request.json()) as { json?: { tagId?: string } };
+        const deletedTagId = body.json?.tagId ?? "";
+        const tagIndex = tags.findIndex((tag) => tag.id === deletedTagId);
+
+        if (tagIndex >= 0) {
+          tags.splice(tagIndex, 1);
+        }
+
+        return new Response(JSON.stringify({ json: { deletedTagId } }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
       if (url.pathname === "/rpc/folders/create") {
         const body = (await request.json()) as {
           json?: {
@@ -365,7 +407,7 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/bookmarks/create") {
         const body = (await request.json()) as {
-          json?: { folderId?: string; tagIds?: string[]; url?: string };
+          json?: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string };
         };
         const targetFolder = body.json?.folderId
           ? (folders.find((folder) => folder.id === body.json?.folderId) ?? null)
@@ -374,7 +416,10 @@ describe("App", () => {
 
         const savedItem = {
           id: "00000000-0000-4000-8000-000000000011",
-          libraryId: targetFolder?.libraryId ?? "00000000-0000-4000-8000-000000000003",
+          libraryId:
+            targetFolder?.libraryId ??
+            body.json?.libraryId ??
+            "00000000-0000-4000-8000-000000000003",
           folderId: targetFolder?.id ?? null,
           folderName: targetFolder?.name ?? null,
           url: body.json?.url || "https://added.example/post",
@@ -646,15 +691,18 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
       expect(screen.getByLabelText("Personal tags")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Important" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Tag actions for Important" })).toBeTruthy();
       expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
+      expect(screen.queryByText("Libraries")).toBeNull();
     });
     const rootDropZone = screen.container.querySelector("[data-folder-root-drop-zone]");
     expect(rootDropZone).toBeTruthy();
     expect((rootDropZone as HTMLElement).className).toContain("absolute");
     expect((rootDropZone as HTMLElement).className).toContain("opacity-0");
     const workspaceButton = screen.getByRole("button", { name: "Collapse workspace Personal" });
-    expect(workspaceButton.className).toContain("col-span-3");
     expect(workspaceButton.className).toContain("min-h-9");
+    expect(screen.getAllByRole("button", { name: "Create folder in Personal" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Create tag in Personal" })).toHaveLength(1);
     const archiveTitle = screen.container.querySelector(
       '[data-folder-title="00000000-0000-4000-8000-000000000021"]'
     );
@@ -686,6 +734,47 @@ describe("App", () => {
       expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
       expect(screen.getByText("Plain Bookmark")).toBeTruthy();
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tag actions for Important" }));
+    expect(screen.getByRole("menu", { name: "Tag actions for Important" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a bookmark" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
+    });
+    await waitFor(() => {
+      const selectedTagInput = document.querySelector(
+        'input[name="tagIds"][value="00000000-0000-4000-8000-000000000030"]'
+      ) as HTMLInputElement | null;
+      expect(selectedTagInput?.checked).toBe(true);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tag actions for Important" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit tag" }));
+    const editTagInput = screen.getByLabelText("Tag name") as HTMLInputElement;
+    expect(editTagInput.value).toBe("Important");
+    fireEvent.change(editTagInput, { target: { value: "Updated tag" } });
+    fireEvent.input(editTagInput, { target: { value: "Updated tag" } });
+    fireEvent.click(screen.getByRole("button", { name: "Select tag color #f59e0b" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save tag" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Updated tag" })).toBeTruthy();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Tag actions for Updated tag" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete tag" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Delete Updated tag" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Delete tag" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Updated tag" })).toBeNull();
+    });
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 420 });
     window.dispatchEvent(new window.Event("resize"));

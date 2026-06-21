@@ -4,9 +4,11 @@ import type {
   CreateTagInput,
   DeleteBookmarkInput,
   DeleteFolderInput,
+  DeleteTagInput,
   MoveFolderInput,
   MoveBookmarksInput,
-  UpdateFolderInput
+  UpdateFolderInput,
+  UpdateTagInput
 } from "@bookmarks/shared";
 import { ORPCError, os } from "@orpc/server";
 import {
@@ -85,7 +87,11 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       }
 
       const targetFolderId = targetFolder?.id ?? null;
-      const targetLibraryId = targetFolder?.libraryId ?? personalLibrary?.id;
+      const requestedLibraryId =
+        !targetFolder && bookmark.libraryId && allowedLibraryIds.includes(bookmark.libraryId)
+          ? bookmark.libraryId
+          : null;
+      const targetLibraryId = targetFolder?.libraryId ?? requestedLibraryId ?? personalLibrary?.id;
       const selectedTagIds = bookmark.tagIds;
 
       if (!targetLibraryId) {
@@ -219,12 +225,46 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
+    delete: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const tag = parseDeleteTagInput(input);
+
+      if (!tag) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose a tag to delete"
+        });
+      }
+
+      return options.bookmarksStore.deleteTag({
+        ...tag,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
     list: os.handler(() => {
       assertCurrentUser(options.currentUser);
       assertBookmarksStore(options.bookmarksStore);
 
       return options.bookmarksStore.listTags({
         libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    update: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertBookmarksStore(options.bookmarksStore);
+
+      const tag = parseUpdateTagInput(input);
+
+      if (!tag) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a tag name"
+        });
+      }
+
+      return options.bookmarksStore.updateTag({
+        ...tag,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     })
   },
@@ -357,6 +397,7 @@ const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null =>
 
   return {
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
+    libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     tagIds: parseSelectedTagIds(input.tagIds),
     url
   };
@@ -478,6 +519,34 @@ const parseCreateTagInput = (input: unknown): CreateTagInput | null => {
     color: parseFolderIconColor(input.color),
     libraryId: input.libraryId,
     name
+  };
+};
+
+const parseUpdateTagInput = (input: unknown): UpdateTagInput | null => {
+  if (!isRecord(input) || typeof input.tagId !== "string" || !input.tagId) {
+    return null;
+  }
+
+  const name = parseFolderName(input.name);
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    color: parseFolderIconColor(input.color),
+    name,
+    tagId: input.tagId
+  };
+};
+
+const parseDeleteTagInput = (input: unknown): DeleteTagInput | null => {
+  if (!isRecord(input) || typeof input.tagId !== "string" || !input.tagId) {
+    return null;
+  }
+
+  return {
+    tagId: input.tagId
   };
 };
 

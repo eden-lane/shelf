@@ -9,13 +9,15 @@ import type {
   DeleteBookmarkInput,
   CurrentUserResponse,
   DeleteFolderInput,
+  DeleteTagInput,
   FolderItem,
   HealthResponse,
   ListBookmarksInput,
   MoveFolderInput,
   MoveBookmarksInput,
   TagItem,
-  UpdateFolderInput
+  UpdateFolderInput,
+  UpdateTagInput
 } from "@bookmarks/shared";
 import { createORPCClient, type Client, type NestedClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
@@ -62,7 +64,9 @@ interface FoldersRpcClient extends Record<string, NestedClient<Record<never, nev
 
 interface TagsRpcClient extends Record<string, NestedClient<Record<never, never>>> {
   create: RpcProcedure<CreateTagInput, TagItem>;
+  delete: RpcProcedure<DeleteTagInput, { deletedTagId: string }>;
   list: RpcProcedure<undefined, TagItem[]>;
+  update: RpcProcedure<UpdateTagInput, TagItem>;
 }
 
 export const getHealth = async (): Promise<HealthResponse> => rpc.health();
@@ -156,6 +160,12 @@ export const createFolder = async (input: CreateFolderInput): Promise<FolderItem
   rpc.folders.create(input);
 
 export const createTag = async (input: CreateTagInput): Promise<TagItem> => rpc.tags.create(input);
+
+export const updateTag = async (input: UpdateTagInput): Promise<TagItem> => rpc.tags.update(input);
+
+export const deleteTag = async (
+  input: DeleteTagInput
+): Promise<{ deletedTagId: string }> => rpc.tags.delete(input);
 
 export const moveFolder = async (input: MoveFolderInput): Promise<FolderItem[]> =>
   rpc.folders.move(input);

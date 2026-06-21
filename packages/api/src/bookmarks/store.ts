@@ -4,6 +4,7 @@ import { createFolder } from "./createFolder";
 import { createTag } from "./createTag";
 import { deleteBookmark } from "./deleteBookmark";
 import { deleteFolder } from "./deleteFolder";
+import { deleteTag } from "./deleteTag";
 import { getFavicon } from "./getFavicon";
 import { listBookmarkLocations } from "./listBookmarkLocations";
 import { listBookmarks } from "./listBookmarks";
@@ -13,6 +14,7 @@ import { moveFolder } from "./moveFolder";
 import { moveBookmarks } from "./moveBookmarks";
 import type { BookmarksStore } from "./types";
 import { updateFolder } from "./updateFolder";
+import { updateTag } from "./updateTag";
 
 export const createDatabaseBookmarksStore = (db: Database): BookmarksStore => ({
   createBookmark: (input) => createBookmark(db, input),
@@ -20,6 +22,7 @@ export const createDatabaseBookmarksStore = (db: Database): BookmarksStore => ({
   createTag: (input) => createTag(db, input),
   deleteBookmark: (input) => deleteBookmark(db, input),
   deleteFolder: (input) => deleteFolder(db, input),
+  deleteTag: (input) => deleteTag(db, input),
   getFavicon: (id) => getFavicon(db, id),
   listBookmarkLocations: (input) => listBookmarkLocations(db, input),
   listBookmarks: (input) => listBookmarks(db, input),
@@ -27,5 +30,6 @@ export const createDatabaseBookmarksStore = (db: Database): BookmarksStore => ({
   listTags: (input) => listTags(db, input),
   moveFolder: (input) => moveFolder(db, input),
   moveBookmarks: (input) => moveBookmarks(db, input),
-  updateFolder: (input) => updateFolder(db, input)
+  updateFolder: (input) => updateFolder(db, input),
+  updateTag: (input) => updateTag(db, input)
 });

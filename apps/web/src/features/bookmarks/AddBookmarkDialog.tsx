@@ -16,6 +16,7 @@ import {
 export const AddBookmarkDialog = ({
   isOpen,
   targetFolder,
+  targetLibraryId,
   targetTagId,
   tags,
   visibleFolderId,
@@ -24,6 +25,7 @@ export const AddBookmarkDialog = ({
 }: {
   isOpen: boolean;
   targetFolder: FolderItem | null;
+  targetLibraryId: string | null;
   targetTagId: string | null;
   tags: TagItem[];
   visibleFolderId: string | null;
@@ -205,6 +207,7 @@ export const AddBookmarkDialog = ({
 
     addBookmark.mutate({
       folderId: targetFolder?.id,
+      libraryId: targetFolder ? undefined : (targetLibraryId ?? undefined),
       optimisticFolder: targetFolder,
       tagIds,
       url
@@ -213,7 +216,9 @@ export const AddBookmarkDialog = ({
 
   const visibleTags = targetFolder
     ? tags.filter((tag) => tag.libraryId === targetFolder.libraryId)
-    : tags;
+    : targetLibraryId
+      ? tags.filter((tag) => tag.libraryId === targetLibraryId)
+      : tags;
 
   return (
     <Dialog.Root
@@ -338,6 +343,7 @@ export const AddBookmarkDialog = ({
 
 type AddBookmarkMutationInput = {
   folderId?: string;
+  libraryId?: string;
   optimisticFolder: FolderItem | null;
   tagIds: string[];
   url: string;

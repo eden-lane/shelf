@@ -19,19 +19,25 @@ const TAG_COLORS = [
 ];
 
 export const InlineTagForm = ({
+  defaultColor,
+  defaultName,
   error,
   isPending,
+  submitLabel = "Create tag",
   onCancel,
   onSubmit
 }: {
+  defaultColor?: string | null;
+  defaultName?: string;
   error: string | null;
   isPending: boolean;
+  submitLabel?: string;
   onCancel: () => void;
   onSubmit: (value: TagFormValue) => void;
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [name, setName] = useState("");
-  const [color, setColor] = useState(DEFAULT_TAG_COLOR);
+  const [name, setName] = useState(defaultName ?? "");
+  const [color, setColor] = useState(defaultColor ?? DEFAULT_TAG_COLOR);
   const [isNameInvalid, setIsNameInvalid] = useState(false);
   const [isNameShaking, setIsNameShaking] = useState(false);
 
@@ -107,15 +113,15 @@ export const InlineTagForm = ({
         </button>
         <button
           className="grid h-8 w-8 place-items-center rounded-lg border border-transparent bg-transparent text-[#3b8df5] outline-none hover:bg-[#eef6ff] disabled:cursor-not-allowed disabled:text-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          aria-label={isPending ? "Saving" : "Create tag"}
+          aria-label={isPending ? "Saving" : submitLabel}
           disabled={isPending}
-        title={isPending ? "Saving" : "Create tag"}
-        type="submit"
-        onClick={(event) => {
-          event.preventDefault();
-          submitTag();
-        }}
-      >
+          title={isPending ? "Saving" : submitLabel}
+          type="submit"
+          onClick={(event) => {
+            event.preventDefault();
+            submitTag();
+          }}
+        >
           <IconCheck size={17} stroke={1.8} aria-hidden="true" focusable="false" />
         </button>
       </div>

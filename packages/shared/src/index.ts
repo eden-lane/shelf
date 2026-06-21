@@ -112,6 +112,7 @@ export interface BookmarksPageResponse {
 export interface CreateBookmarkInput {
   url: string;
   folderId?: string;
+  libraryId?: string;
   tagIds?: string[];
 }
 
@@ -163,4 +164,14 @@ export interface CreateTagInput {
   libraryId: string;
   name: string;
   color?: string | null;
+}
+
+export interface UpdateTagInput {
+  tagId: string;
+  name: string;
+  color?: string | null;
+}
+
+export interface DeleteTagInput {
+  tagId: string;
 }

@@ -72,6 +72,7 @@ export const ProductShell = () => {
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
+  const [bookmarkTargetTag, setBookmarkTargetTag] = useState<TagItem | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(() => !isStackedSidebarViewport());
   const [isStackedSidebar, setIsStackedSidebar] = useState(isStackedSidebarViewport);
   const [activeBookmarkDragItem, setActiveBookmarkDragItem] = useState<BookmarkItem | null>(null);
@@ -107,6 +108,8 @@ export const ProductShell = () => {
   });
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
   const activeTag = tags.data?.find((tag) => tag.id === activeTagId) ?? null;
+  const bookmarkTargetLibraryId =
+    bookmarkTargetFolder?.libraryId ?? bookmarkTargetTag?.libraryId ?? activeTag?.libraryId ?? null;
   const activeFolderDragItem =
     folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
@@ -379,9 +382,25 @@ export const ProductShell = () => {
     return () => window.clearTimeout(timeout);
   }, [moveNotification]);
 
-  const openBookmarkDialog = (folder: FolderItem | null) => {
+  const openBookmarkDialog = ({
+    folder,
+    tag
+  }: {
+    folder: FolderItem | null;
+    tag: TagItem | null;
+  }) => {
     setBookmarkTargetFolder(folder);
+    setBookmarkTargetTag(tag);
     setBookmarkDialogOpen(true);
+  };
+
+  const updateBookmarkDialogOpen = (open: boolean) => {
+    setBookmarkDialogOpen(open);
+
+    if (!open) {
+      setBookmarkTargetFolder(null);
+      setBookmarkTargetTag(null);
+    }
   };
 
   const selectFolder = (folderId: string | null) => {
@@ -634,11 +653,12 @@ export const ProductShell = () => {
       <AddBookmarkDialog
         isOpen={bookmarkDialogOpen}
         targetFolder={bookmarkTargetFolder}
-        targetTagId={activeTagId}
+        targetLibraryId={bookmarkTargetLibraryId}
+        targetTagId={bookmarkTargetTag?.id ?? activeTagId}
         tags={tags.data ?? []}
         visibleFolderId={activeFolderId}
         visibleTagId={activeTagId}
-        onOpenChange={setBookmarkDialogOpen}
+        onOpenChange={updateBookmarkDialogOpen}
       />
       {moveNotification ? (
         <div
