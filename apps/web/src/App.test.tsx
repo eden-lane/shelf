@@ -119,6 +119,7 @@ describe("App", () => {
         updatedAt: "2026-06-19T12:00:00.000Z"
       }
     ];
+    const bookmarkCreateRequests: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string }[] = [];
     let finishCreate = () => {};
     const copiedLinks: string[] = [];
     const openedLinks: string[] = [];
@@ -278,8 +279,9 @@ describe("App", () => {
             name?: string;
           };
         };
+        const tagIndex = tags.length + 30;
         const tag = {
-          id: "00000000-0000-4000-8000-000000000031",
+          id: `00000000-0000-4000-8000-${String(tagIndex).padStart(12, "0")}`,
           libraryId: body.json?.libraryId || "00000000-0000-4000-8000-000000000003",
           name: body.json?.name || "Important",
           color: body.json?.color ?? null,
@@ -409,6 +411,7 @@ describe("App", () => {
         const body = (await request.json()) as {
           json?: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string };
         };
+        bookmarkCreateRequests.push(body.json ?? {});
         const targetFolder = body.json?.folderId
           ? (folders.find((folder) => folder.id === body.json?.folderId) ?? null)
           : null;
@@ -742,10 +745,8 @@ describe("App", () => {
       expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
     });
     await waitFor(() => {
-      const selectedTagInput = document.querySelector(
-        'input[name="tagIds"][value="00000000-0000-4000-8000-000000000030"]'
-      ) as HTMLInputElement | null;
-      expect(selectedTagInput?.checked).toBe(true);
+      const dialog = screen.getByRole("dialog", { name: "Add bookmark" });
+      expect(dialog.querySelector('[aria-label="Important"]')).toBeTruthy();
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
@@ -1005,6 +1006,14 @@ describe("App", () => {
     pageUrlInput.value = "https://added.example/post";
     pageUrlInput.setAttribute("value", "https://added.example/post");
     fireEvent.input(pageUrlInput);
+    const tagInput = screen.getByLabelText("Tags") as HTMLInputElement;
+    fireEvent.change(tagInput, { target: { value: "Project" } });
+    fireEvent.input(tagInput, { target: { value: "Project" } });
+    fireEvent.keyDown(tagInput, { code: "Enter", key: "Enter" });
+    await waitFor(() => {
+      const dialog = screen.getByRole("dialog", { name: "Add to Read later" });
+      expect(dialog.querySelector('[aria-label="Project"]')).toBeTruthy();
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -1017,5 +1026,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(document.body.textContent).toContain("https://added.example/post");
     });
+    expect(bookmarkCreateRequests.at(-1)?.tagIds).toContain("00000000-0000-4000-8000-000000000031");
   }, 15000);
 });

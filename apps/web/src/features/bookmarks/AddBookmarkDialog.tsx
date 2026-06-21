@@ -1,10 +1,11 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Combobox } from "@base-ui/react/combobox";
 import { Dialog } from "@base-ui/react/dialog";
 import type { InfiniteData } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { BookmarkItem, BookmarksPageResponse, FolderItem, TagItem } from "@bookmarks/shared";
-import { IconX } from "@tabler/icons-react";
-import { createBookmark } from "../../api";
+import { IconCheck, IconPlus, IconX } from "@tabler/icons-react";
+import { createBookmark, createTag } from "../../api";
 import {
   bookmarkQueryKey,
   bookmarkQueryKeysForFolder,
@@ -34,12 +35,64 @@ export const AddBookmarkDialog = ({
 }) => {
   const formRef = useRef<HTMLFormElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const tagInputRef = useRef<HTMLInputElement | null>(null);
   const [isUrlInvalid, setIsUrlInvalid] = useState(false);
   const [isUrlShaking, setIsUrlShaking] = useState(false);
+  const [tagInputValue, setTagInputValue] = useState("");
+  const [selectedTagOptions, setSelectedTagOptions] = useState<TagComboboxOption[]>([]);
   const queryClient = useQueryClient();
+  const visibleTags = useMemo(
+    () =>
+      targetFolder
+        ? tags.filter((tag) => tag.libraryId === targetFolder.libraryId)
+        : targetLibraryId
+          ? tags.filter((tag) => tag.libraryId === targetLibraryId)
+          : tags,
+    [tags, targetFolder, targetLibraryId]
+  );
+  const selectedExistingTagIds = new Set(
+    selectedTagOptions.flatMap((option) => (option.kind === "existing" ? [option.tag.id] : []))
+  );
+  const selectedNewTagNames = new Set(
+    selectedTagOptions.flatMap((option) => (option.kind === "new" ? [normalizeTagName(option.name)] : []))
+  );
+  const normalizedTagInput = normalizeTagName(tagInputValue);
+  const findMatchingVisibleTag = (tagName: string) =>
+    visibleTags.find((tag) => normalizeTagName(tag.name).toLowerCase() === tagName.toLowerCase());
+  const matchingExistingTag = findMatchingVisibleTag(normalizedTagInput);
+  const canCreateTag =
+    normalizedTagInput.length > 0 &&
+    !matchingExistingTag &&
+    !selectedNewTagNames.has(normalizedTagInput);
+  const tagOptions = [
+    ...visibleTags
+      .filter((tag) => !selectedExistingTagIds.has(tag.id))
+      .map((tag): TagComboboxOption => ({ kind: "existing", tag })),
+    ...(canCreateTag ? [{ kind: "create", name: normalizedTagInput } satisfies TagComboboxOption] : [])
+  ];
   const addBookmark = useMutation({
-    mutationFn: ({ optimisticFolder: _optimisticFolder, ...input }: AddBookmarkMutationInput) =>
-      createBookmark(input),
+    mutationFn: async ({
+      existingTagIds,
+      newTagNames,
+      optimisticFolder: _optimisticFolder,
+      ...input
+    }: AddBookmarkMutationInput) => {
+      if (newTagNames.length > 0 && !input.libraryId) {
+        throw new Error("A library is required to create tags");
+      }
+
+      const createdTags = await Promise.all(
+        newTagNames.map((name) => createTag({ libraryId: input.libraryId as string, name }))
+      );
+      const tagIds = [...existingTagIds, ...createdTags.map((tag) => tag.id)];
+
+      return createBookmark({
+        folderId: input.folderId,
+        libraryId: input.folderId ? undefined : input.libraryId,
+        tagIds,
+        url: input.url
+      });
+    },
     onMutate: async (input) => {
       const optimisticFolder = input.optimisticFolder;
 
@@ -94,8 +147,8 @@ export const AddBookmarkDialog = ({
         )
       );
 
-      if (input.tagIds.length > 0) {
-        const selectedTagIds = new Set(input.tagIds);
+      if (input.existingTagIds.length > 0) {
+        const selectedTagIds = new Set(input.existingTagIds);
 
         queryClient.setQueryData<TagItem[]>(["tags"], (currentTags = []) =>
           currentTags.map((tag) =>
@@ -139,7 +192,7 @@ export const AddBookmarkDialog = ({
         );
       }
 
-      if (visibleTagId && _input.tagIds.includes(visibleTagId)) {
+      if (visibleTagId && _input.existingTagIds.includes(visibleTagId)) {
         queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
           bookmarkQueryKey({ folderId: null, tagId: visibleTagId }),
           (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
@@ -147,6 +200,8 @@ export const AddBookmarkDialog = ({
       }
 
       formRef.current?.reset();
+      setSelectedTagOptions([]);
+      setTagInputValue("");
       setIsUrlInvalid(false);
       setIsUrlShaking(false);
       onOpenChange(false);
@@ -176,7 +231,7 @@ export const AddBookmarkDialog = ({
         });
       }
 
-      for (const tagId of input.tagIds) {
+      for (const tagId of input.existingTagIds) {
         for (const queryKey of bookmarkQueryKeysForTag(tagId)) {
           void queryClient.invalidateQueries({ exact: true, queryKey });
         }
@@ -186,6 +241,54 @@ export const AddBookmarkDialog = ({
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   });
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const targetTag = targetTagId ? visibleTags.find((tag) => tag.id === targetTagId) : null;
+    setSelectedTagOptions(targetTag ? [{ kind: "existing", tag: targetTag }] : []);
+    setTagInputValue("");
+  }, [isOpen, targetTagId, visibleTags]);
+
+  const selectTypedTag = (rawTagName = tagInputRef.current?.value ?? tagInputValue) => {
+    const tagName = normalizeTagName(rawTagName);
+    const existingTag = findMatchingVisibleTag(tagName);
+
+    if (!tagName) {
+      return false;
+    }
+
+    if (existingTag) {
+      if (!selectedExistingTagIds.has(existingTag.id)) {
+        setSelectedTagOptions((current) => [
+          ...current,
+          { kind: "existing", tag: existingTag }
+        ]);
+      }
+      setTagInputValue("");
+      return true;
+    }
+
+    if (!selectedNewTagNames.has(tagName)) {
+      setSelectedTagOptions((current) => [...current, { kind: "new", name: tagName }]);
+    }
+    setTagInputValue("");
+    return true;
+  };
+
+  const handleTagInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    const tagName = normalizeTagName(event.currentTarget.value);
+
+    if (event.key !== "Enter" || !tagName) {
+      return;
+    }
+
+    if (selectTypedTag(tagName)) {
+      event.preventDefault();
+    }
+  };
 
   const submitBookmark = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,25 +303,35 @@ export const AddBookmarkDialog = ({
       return;
     }
 
-    const tagIds = formData
-      .getAll("tagIds")
-      .map((tagId) => String(tagId))
-      .filter(Boolean);
+    const pendingTagName = normalizeTagName(tagInputRef.current?.value ?? tagInputValue);
+    const pendingExistingTag = pendingTagName ? findMatchingVisibleTag(pendingTagName) : undefined;
+
+    selectTypedTag(pendingTagName);
+
+    const currentSelectedTags = pendingTagName
+      ? mergeTagOptionsForSubmit(
+          selectedTagOptions,
+          pendingExistingTag
+            ? { kind: "existing", tag: pendingExistingTag }
+            : { kind: "new", name: pendingTagName }
+        )
+      : selectedTagOptions;
+    const existingTagIds = currentSelectedTags.flatMap((option) =>
+      option.kind === "existing" ? [option.tag.id] : []
+    );
+    const newTagNames = currentSelectedTags.flatMap((option) =>
+      option.kind === "new" ? [option.name] : []
+    );
 
     addBookmark.mutate({
+      existingTagIds,
       folderId: targetFolder?.id,
-      libraryId: targetFolder ? undefined : (targetLibraryId ?? undefined),
+      libraryId: targetFolder?.libraryId ?? targetLibraryId ?? undefined,
+      newTagNames,
       optimisticFolder: targetFolder,
-      tagIds,
       url
     });
   };
-
-  const visibleTags = targetFolder
-    ? tags.filter((tag) => tag.libraryId === targetFolder.libraryId)
-    : targetLibraryId
-      ? tags.filter((tag) => tag.libraryId === targetLibraryId)
-      : tags;
 
   return (
     <Dialog.Root
@@ -227,6 +340,7 @@ export const AddBookmarkDialog = ({
         onOpenChange(open);
         if (open) {
           addBookmark.reset();
+          setTagInputValue("");
           setIsUrlInvalid(false);
           setIsUrlShaking(false);
         }
@@ -285,33 +399,113 @@ export const AddBookmarkDialog = ({
                   }}
                 />
               </label>
-              {visibleTags.length > 0 ? (
-                <fieldset className="grid gap-2 rounded-lg border border-[#dfe4ef] p-3">
-                  <legend className="px-1 text-sm font-bold text-[#242833]">Tags</legend>
-                  <div className="flex flex-wrap gap-2">
-                    {visibleTags.map((tag) => (
-                      <label
-                        className="flex min-h-8 items-center gap-2 rounded-lg border border-[#dfe4ef] bg-white px-2 text-sm font-bold text-[#4b5262]"
-                        key={tag.id}
-                      >
-                        <input
-                          className="h-4 w-4 accent-[#3b8df5]"
-                          defaultChecked={tag.id === targetTagId}
-                          name="tagIds"
-                          type="checkbox"
-                          value={tag.id}
-                        />
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: tag.color ?? "#697080" }}
-                          aria-hidden="true"
-                        />
-                        <span>{tag.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ) : null}
+              <div className="grid gap-2 text-sm font-bold">
+                <label htmlFor="bookmark-tags">Tags</label>
+                <Combobox.Root<TagComboboxOption, true>
+                  items={tagOptions}
+                  multiple
+                  value={selectedTagOptions}
+                  autoHighlight
+                  itemToStringLabel={getTagOptionLabel}
+                  itemToStringValue={getTagOptionValue}
+                  isItemEqualToValue={isTagOptionEqual}
+                  onInputValueChange={setTagInputValue}
+                  onValueChange={(nextValue) => {
+                    setSelectedTagOptions(normalizeSelectedTagOptions(nextValue));
+                    setTagInputValue("");
+                  }}
+                >
+                  <Combobox.InputGroup className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-1 rounded-lg border border-[#dfe4ef] bg-white px-2 py-1.5 text-[#242833] outline-none focus-within:border-[#3b8df5] focus-within:ring-3 focus-within:ring-[#d9eaff] has-[button]:px-1">
+                    <Combobox.Chips className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+                      <Combobox.Value>
+                        {(value: TagComboboxOption[]) => (
+                          <>
+                            {value.map((option) => (
+                              <Combobox.Chip
+                                className="group flex min-h-7 max-w-full cursor-default items-center gap-1.5 overflow-hidden rounded-md border border-[#dfe4ef] bg-[#f7f8fc] py-0 pr-1 pl-2 text-sm font-bold text-[#4b5262] outline-none focus-within:border-[#3b8df5] focus-within:ring-2 focus-within:ring-[#d9eaff] data-highlighted:border-[#3b8df5]"
+                                aria-label={getTagOptionLabel(option)}
+                                key={getTagOptionValue(option)}
+                              >
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      option.kind === "existing" ? (option.tag.color ?? "#697080") : "#9aa1ad"
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                <span className="min-w-0 truncate">{getTagOptionLabel(option)}</span>
+                                <Combobox.ChipRemove
+                                  className="grid h-5 w-5 shrink-0 place-items-center rounded border-0 bg-transparent p-0 text-[#697080] outline-none hover:bg-[#e9edf5] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3b8df5]"
+                                  aria-label={`Remove ${getTagOptionLabel(option)}`}
+                                  type="button"
+                                >
+                                  <IconX size={13} stroke={1.8} aria-hidden="true" focusable="false" />
+                                </Combobox.ChipRemove>
+                              </Combobox.Chip>
+                            ))}
+                            <Combobox.Input
+                              className="h-7 min-w-24 flex-1 border-0 bg-transparent p-0 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] md:text-sm"
+                              autoComplete="off"
+                              id="bookmark-tags"
+                              placeholder={value.length > 0 ? "" : "Type a tag"}
+                              ref={tagInputRef}
+                              value={tagInputValue}
+                              onChange={(event) => setTagInputValue(event.currentTarget.value)}
+                              onKeyDown={handleTagInputKeyDown}
+                            />
+                          </>
+                        )}
+                      </Combobox.Value>
+                    </Combobox.Chips>
+                  </Combobox.InputGroup>
+                  <Combobox.Portal>
+                    <Combobox.Positioner className="z-[80] outline-none" sideOffset={4}>
+                      <Combobox.Popup className="max-h-[min(260px,var(--available-height))] w-[var(--anchor-width)] max-w-[var(--available-width)] overflow-y-auto overscroll-contain rounded-lg border border-[#dfe4ef] bg-white py-1 text-[#242833] shadow-[0_16px_48px_rgb(22_28_43_/_0.18)] outline-none">
+                        <Combobox.Empty>
+                          <div className="px-3 py-2 text-sm font-bold text-[#697080]">
+                            Type a tag name to create it.
+                          </div>
+                        </Combobox.Empty>
+                        <Combobox.List>
+                          {(option: TagComboboxOption, index: number) => (
+                            <Combobox.Item
+                              className="grid min-h-10 cursor-default grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 px-3 py-2 text-sm font-bold text-[#4b5262] outline-none select-none data-highlighted:bg-[#f0f6ff] data-highlighted:text-[#242833] data-selected:text-[#242833]"
+                              index={index}
+                              key={getTagOptionValue(option)}
+                              value={option}
+                            >
+                              <Combobox.ItemIndicator className="col-start-1 text-[#3b8df5]">
+                                <IconCheck size={15} stroke={1.8} aria-hidden="true" focusable="false" />
+                              </Combobox.ItemIndicator>
+                              <span className="col-start-2 flex min-w-0 items-center gap-2">
+                                {option.kind === "existing" ? (
+                                  <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: option.tag.color ?? "#697080" }}
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <IconPlus
+                                    className="shrink-0 text-[#3b8df5]"
+                                    size={15}
+                                    stroke={1.8}
+                                    aria-hidden="true"
+                                    focusable="false"
+                                  />
+                                )}
+                                <span className="min-w-0 truncate">
+                                  {option.kind === "existing" ? option.tag.name : `Create "${option.name}"`}
+                                </span>
+                              </span>
+                            </Combobox.Item>
+                          )}
+                        </Combobox.List>
+                      </Combobox.Popup>
+                    </Combobox.Positioner>
+                  </Combobox.Portal>
+                </Combobox.Root>
+              </div>
               {addBookmark.isError ? (
                 <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">
                   Bookmark could not be saved.
@@ -342,9 +536,61 @@ export const AddBookmarkDialog = ({
 };
 
 type AddBookmarkMutationInput = {
+  existingTagIds: string[];
   folderId?: string;
   libraryId?: string;
+  newTagNames: string[];
   optimisticFolder: FolderItem | null;
-  tagIds: string[];
   url: string;
 };
+
+type ExistingTagOption = {
+  kind: "existing";
+  tag: TagItem;
+};
+
+type NewTagOption = {
+  kind: "new";
+  name: string;
+};
+
+type CreateTagOption = {
+  kind: "create";
+  name: string;
+};
+
+type TagComboboxOption = ExistingTagOption | NewTagOption | CreateTagOption;
+
+const normalizeTagName = (name: string) => name.trim().replace(/\s+/g, " ");
+
+const getTagOptionLabel = (option: TagComboboxOption) =>
+  option.kind === "existing" ? option.tag.name : option.name;
+
+const getTagOptionValue = (option: TagComboboxOption) =>
+  option.kind === "existing" ? `existing:${option.tag.id}` : `${option.kind}:${option.name.toLowerCase()}`;
+
+const isTagOptionEqual = (itemValue: TagComboboxOption, value: TagComboboxOption) =>
+  getTagOptionValue(itemValue) === getTagOptionValue(value);
+
+const normalizeSelectedTagOptions = (options: TagComboboxOption[]) => {
+  const selectedOptions: TagComboboxOption[] = [];
+  const selectedKeys = new Set<string>();
+
+  for (const option of options) {
+    const selectedOption: TagComboboxOption =
+      option.kind === "create" ? { kind: "new", name: option.name } : option;
+    const key = getTagOptionValue(selectedOption);
+
+    if (!selectedKeys.has(key)) {
+      selectedKeys.add(key);
+      selectedOptions.push(selectedOption);
+    }
+  }
+
+  return selectedOptions;
+};
+
+const mergeTagOptionsForSubmit = (
+  options: TagComboboxOption[],
+  option: ExistingTagOption | NewTagOption
+) => normalizeSelectedTagOptions([...options, option]);
