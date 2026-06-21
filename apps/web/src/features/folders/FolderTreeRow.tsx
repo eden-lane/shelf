@@ -64,6 +64,7 @@ export const FolderTreeRow = ({
   const isCollapsed = hasChildren && collapsedFolderIds.has(folder.id) && !isFiltering;
   const FolderIcon = getFolderIconComponent(folder.iconName);
   const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
+  const hasBookmarkCount = folder.bookmarkCount > 0;
   const indent = folderRowIndent(level);
   const { isOver, setNodeRef } = useDroppable({
     id: `folder:${folder.id}`,
@@ -105,7 +106,8 @@ export const FolderTreeRow = ({
       <div
         ref={setRowRefs}
         className={[
-          "relative grid grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl transition-[background-color,box-shadow,opacity]",
+          "folder-tree-row group relative flex min-h-9 items-center rounded-xl transition-[background-color,box-shadow,opacity]",
+          hasBookmarkCount ? "pr-16" : "pr-8",
           isActive ? "bg-gray-100 text-slate-950" : "text-slate-950 hover:bg-white",
           isOver ? "bg-blue-50 ring-2 ring-blue-500 ring-inset" : "",
           isDragging ? "z-20 opacity-80 shadow-[0_12px_34px_rgb(15_23_42_/_0.14)]" : ""
@@ -127,8 +129,20 @@ export const FolderTreeRow = ({
           folder={folder}
           position="after"
         />
+        {!isEditing ? (
+          <button
+            className="folder-drag-handle absolute top-1/2 -left-5 z-10 grid h-7 w-5 -translate-y-1/2 cursor-grab place-items-center rounded-lg text-gray-400 opacity-0 outline-none transition-opacity hover:bg-gray-100 hover:text-slate-950 hover:opacity-100 active:cursor-grabbing active:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-label={`Drag folder ${folder.name}`}
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+          >
+            <IconGripVertical size={15} stroke={1.5} aria-hidden="true" focusable="false" />
+          </button>
+        ) : null}
         {isEditing ? (
-          <div className="col-span-3 min-w-0">
+          <div className="min-w-0 flex-1">
             <InlineFolderForm
               defaultValue={folder.name}
               defaultIconColor={folder.iconColor}
@@ -150,10 +164,10 @@ export const FolderTreeRow = ({
           </div>
         ) : (
           <>
-            <div className="flex min-h-9 min-w-0 items-center gap-1">
+            <div className="flex min-h-9 min-w-0 flex-1 items-center gap-0.5">
               {hasChildren ? (
                 <button
-                  className="grid h-7 w-6 shrink-0 place-items-center rounded-lg text-gray-500 outline-none hover:bg-gray-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="grid h-7 w-5 shrink-0 place-items-center rounded-lg text-gray-500 outline-none hover:bg-gray-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-expanded={!isCollapsed}
                   aria-label={`${isCollapsed ? "Expand" : "Collapse"} folder ${folder.name}`}
                   type="button"
@@ -171,18 +185,8 @@ export const FolderTreeRow = ({
                   )}
                 </button>
               ) : (
-                <span className="h-7 w-6 shrink-0" aria-hidden="true" />
+                <span className="h-7 w-5 shrink-0" aria-hidden="true" />
               )}
-              <button
-                className="grid h-7 w-6 shrink-0 cursor-grab place-items-center rounded-lg text-gray-400 outline-none hover:bg-gray-100 hover:text-slate-950 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                aria-label={`Drag folder ${folder.name}`}
-                type="button"
-                ref={setActivatorNodeRef}
-                {...attributes}
-                {...listeners}
-              >
-                <IconGripVertical size={15} stroke={1.5} aria-hidden="true" focusable="false" />
-              </button>
               <button
                 className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5 text-left text-sm font-medium outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                 type="button"
@@ -195,14 +199,18 @@ export const FolderTreeRow = ({
                   aria-hidden="true"
                   focusable="false"
                 />
-                <span className="truncate">{folder.name}</span>
+                <span className="truncate" data-folder-title={folder.id}>
+                  {folder.name}
+                </span>
               </button>
             </div>
-            <span className="grid h-9 place-items-center text-xs font-extrabold text-gray-400">
-              {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
-            </span>
+            {hasBookmarkCount ? (
+              <span className="absolute top-0 right-8 grid h-9 w-7 place-items-center text-xs font-extrabold text-gray-400">
+                {folder.bookmarkCount}
+              </span>
+            ) : null}
             <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="absolute top-1/2 right-0 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label={`Folder actions for ${folder.name}`}
               type="button"
               onClick={(event) => {

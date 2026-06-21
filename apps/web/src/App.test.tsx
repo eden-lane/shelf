@@ -493,7 +493,21 @@ describe("App", () => {
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
     expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Inbox" })).toBeTruthy();
+    const personalSection = screen.getByLabelText("Personal folders");
+    const inboxButton = screen.getByRole("button", { name: "Inbox" });
+    expect(inboxButton).toBeTruthy();
+    expect(personalSection.contains(inboxButton)).toBe(true);
+    expect(inboxButton.getAttribute("data-workspace-inbox")).toBe(
+      "00000000-0000-4000-8000-000000000003"
+    );
+    expect((inboxButton as HTMLElement).style.marginLeft).toBe("12px");
+    expect(inboxButton.className).toContain("gap-0.5");
+    expect(inboxButton.className).toContain("pr-8");
+    expect(
+      screen.container.querySelector(
+        '[data-workspace-inbox-title="00000000-0000-4000-8000-000000000003"]'
+      )
+    ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close sidebar" })).toBeNull();
     const sidebar = screen.container.querySelector('aside[aria-label="Primary"]');
     expect(sidebar).toBeTruthy();
@@ -563,6 +577,25 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
       expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
     });
+    const rootDropZone = screen.container.querySelector("[data-folder-root-drop-zone]");
+    expect(rootDropZone).toBeTruthy();
+    expect((rootDropZone as HTMLElement).className).toContain("absolute");
+    expect((rootDropZone as HTMLElement).className).toContain("opacity-0");
+    const workspaceButton = screen.getByRole("button", { name: "Collapse workspace Personal" });
+    expect(workspaceButton.className).toContain("col-span-3");
+    expect(workspaceButton.className).toContain("min-h-9");
+    const archiveTitle = screen.container.querySelector(
+      '[data-folder-title="00000000-0000-4000-8000-000000000021"]'
+    );
+    expect(archiveTitle?.closest("[data-folder-drop-target]")?.className).toContain("pr-8");
+    const researchRow = screen.getByRole("button", { name: "Research" }).closest("[data-folder-drop-target]");
+    expect((researchRow as HTMLElement).style.marginLeft).toBe("12px");
+    expect(researchRow?.className).toContain("folder-tree-row");
+    const dragResearchButton = screen.getByRole("button", { name: "Drag folder Research" });
+    expect(dragResearchButton.className).toContain("folder-drag-handle");
+    expect(dragResearchButton.className).toContain("-left-5");
+    expect(dragResearchButton.className).toContain("opacity-0");
+    expect(dragResearchButton.className).toContain("group-hover:opacity-100");
 
     fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
@@ -620,6 +653,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse workspace Personal" }));
+    expect(screen.queryByRole("button", { name: "Inbox" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
     expect(window.localStorage.getItem("bookmarks.collapsedLibraries")).toBe(
       '["00000000-0000-4000-8000-000000000003"]'

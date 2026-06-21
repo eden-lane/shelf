@@ -46,3 +46,10 @@ body {
 .field-shake {
   animation: field-shake 180ms ease-in-out;
 }
+
+.folder-tree-row:hover > .folder-drag-handle,
+.folder-drag-handle:hover,
+.folder-drag-handle:focus-visible,
+.folder-drag-handle:active {
+  opacity: 1;
+}

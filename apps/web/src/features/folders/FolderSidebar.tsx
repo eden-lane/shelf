@@ -56,13 +56,6 @@ export const FolderSidebar = ({
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ folderId: string; x: number; y: number } | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<FolderItem | null>(null);
-  const { isOver: isInboxDropTarget, setNodeRef: setInboxDropTargetRef } = useDroppable({
-    id: "folder:inbox",
-    data: {
-      folder: null,
-      type: "folder"
-    }
-  });
   const [collapsedLibraryIds, toggleCollapsedLibrary, collapsedLibraries] = usePersistedStringSet(
     COLLAPSED_LIBRARIES_STORAGE_KEY
   );
@@ -190,19 +183,6 @@ export const FolderSidebar = ({
             </button>
           ) : null}
         </div>
-        <button
-          ref={setInboxDropTargetRef}
-          className={[
-            "flex min-h-10 items-center gap-2 rounded-xl px-2.5 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
-            activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700",
-            isInboxDropTarget ? "bg-blue-50 text-slate-950 ring-2 ring-blue-500 ring-inset" : ""
-          ].join(" ")}
-          type="button"
-          onClick={() => onSelectFolder(null)}
-        >
-          <IconBookmark size={21} stroke={1.5} aria-hidden="true" focusable="false" />
-          <span>Inbox</span>
-        </button>
         {isLoading ? (
           <p className="m-0 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-sm font-bold text-gray-500">
             Loading folders
@@ -219,9 +199,9 @@ export const FolderSidebar = ({
 
           return (
             <section className="grid gap-1" key={library.id} aria-label={`${library.name} folders`}>
-              <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1">
+              <div className="relative grid min-h-9 grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1">
                 <button
-                  className="flex min-w-0 items-center gap-2 rounded-lg py-1 pl-2.5 text-left outline-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="col-span-3 flex min-h-9 min-w-0 items-center gap-2 rounded-xl py-0 pr-10 pl-2.5 text-left outline-none hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-expanded={!isLibraryCollapsed}
                   aria-label={`${isLibraryCollapsed ? "Expand" : "Collapse"} workspace ${library.name}`}
                   type="button"
@@ -255,9 +235,8 @@ export const FolderSidebar = ({
                     {library.name}
                   </span>
                 </button>
-                <span aria-hidden="true" />
                 <button
-                  className="grid h-8 w-8 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                  className="absolute top-1/2 right-0 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                   aria-label={`Create folder in ${library.name}`}
                   type="button"
                   onClick={() => startCreatingFolder(library.id, null)}
@@ -274,13 +253,18 @@ export const FolderSidebar = ({
                 ].join(" ")}
                 aria-hidden={isLibraryCollapsed}
               >
-                <div className="overflow-hidden">
+                <div className="-ml-3 overflow-hidden pl-3">
                   <div
                     className={[
-                      "grid gap-1 pt-1",
+                      "relative grid gap-1 pt-1",
                       isLibraryCollapsed ? "pointer-events-none" : ""
                     ].join(" ")}
                   >
+                    <WorkspaceInboxRow
+                      activeFolderId={activeFolderId}
+                      libraryId={library.id}
+                      onSelectFolder={onSelectFolder}
+                    />
                     {creatingTarget?.libraryId === library.id &&
                     creatingTarget.parentId === null ? (
                       <div style={{ marginLeft: `${folderRowIndent(1)}px` }}>
@@ -302,7 +286,10 @@ export const FolderSidebar = ({
                         />
                       </div>
                     ) : null}
-                    <LibraryRootDropZone libraryId={library.id} />
+                    <LibraryRootDropZone
+                      isActive={activeFolderDragId !== null}
+                      libraryId={library.id}
+                    />
                     {roots.map((folder) => (
                       <FolderTreeRow
                         activeFolderId={activeFolderId}
@@ -384,7 +371,54 @@ export const FolderSidebar = ({
   );
 };
 
-const LibraryRootDropZone = ({ libraryId }: { libraryId: string }) => {
+const WorkspaceInboxRow = ({
+  activeFolderId,
+  libraryId,
+  onSelectFolder
+}: {
+  activeFolderId: string | null;
+  libraryId: string;
+  onSelectFolder: (folderId: string | null) => void;
+}) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `folder:inbox:${libraryId}`,
+    data: {
+      folder: null,
+      type: "folder"
+    }
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      className={[
+        "flex min-h-9 items-center gap-0.5 rounded-xl pr-8 text-left text-sm font-medium outline-none hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500",
+        activeFolderId === null ? "bg-gray-100 text-slate-950" : "text-gray-700",
+        isOver ? "bg-blue-50 text-slate-950 ring-2 ring-blue-500 ring-inset" : ""
+      ].join(" ")}
+      data-workspace-inbox={libraryId}
+      style={{ marginLeft: `${folderRowIndent(1)}px` }}
+      type="button"
+      onClick={() => onSelectFolder(null)}
+    >
+      <span className="h-7 w-5 shrink-0" aria-hidden="true" />
+      <span className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5">
+        <IconBookmark size={21} stroke={1.5} aria-hidden="true" focusable="false" />
+        <span className="truncate" data-workspace-inbox-title={libraryId}>
+          Inbox
+        </span>
+      </span>
+    </button>
+  );
+};
+
+const LibraryRootDropZone = ({
+  isActive,
+  libraryId
+}: {
+  isActive: boolean;
+  libraryId: string;
+}) => {
   const { isOver, setNodeRef } = useDroppable({
     id: `folder-root:${libraryId}`,
     data: {
@@ -396,10 +430,12 @@ const LibraryRootDropZone = ({ libraryId }: { libraryId: string }) => {
   return (
     <div
       className={[
-        "mx-2.5 h-2 rounded-lg border border-transparent transition-[background-color,box-shadow] duration-150",
+        "pointer-events-none absolute top-1 right-2.5 left-2.5 z-10 h-2 rounded-lg border border-transparent transition-[opacity,background-color,box-shadow] duration-150",
+        isActive ? "" : "opacity-0",
         isOver ? "border-blue-500 bg-blue-50 shadow-[inset_0_0_0_1px_#3b82f6]" : ""
       ].join(" ")}
       ref={setNodeRef}
+      data-folder-root-drop-zone={libraryId}
       aria-hidden="true"
     />
   );

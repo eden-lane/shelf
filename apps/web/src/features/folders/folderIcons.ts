@@ -114,4 +114,4 @@ export const normalizeFolderIconName = (iconName: string | null | undefined) =>
 export const getFolderIconComponent = (iconName: string | null | undefined) =>
   TABLER_ICON_COMPONENTS[normalizeFolderIconName(iconName)] ?? IconFolder;
 
-export const folderRowIndent = (level: number) => 8 + level * 18;
+export const folderRowIndent = (level: number) => level * 12;
