@@ -21,6 +21,7 @@ export const AddBookmarkDialog = ({
   targetTagId,
   tags,
   visibleFolderId,
+  visibleLibraryId,
   visibleTagId,
   onOpenChange
 }: {
@@ -30,6 +31,7 @@ export const AddBookmarkDialog = ({
   targetTagId: string | null;
   tags: TagItem[];
   visibleFolderId: string | null;
+  visibleLibraryId: string | null;
   visibleTagId: string | null;
   onOpenChange: (open: boolean) => void;
 }) => {
@@ -106,7 +108,10 @@ export const AddBookmarkDialog = ({
         queryClient.cancelQueries({ queryKey: ["tags"] })
       ]);
 
-      const bookmarkQueryKeys = bookmarkQueryKeysForFolder(optimisticFolder.id);
+      const bookmarkQueryKeys = bookmarkQueryKeysForFolder(
+        optimisticFolder.id,
+        optimisticFolder.libraryId
+      );
       const previousBookmarks = bookmarkQueryKeys.map((queryKey) => ({
         data: queryClient.getQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey),
         hadData: Boolean(queryClient.getQueryState(queryKey)),
@@ -185,16 +190,24 @@ export const AddBookmarkDialog = ({
       }
     },
     onSuccess: (bookmark, _input, context) => {
-      if (!visibleTagId && (!visibleFolderId || bookmark.folderId === visibleFolderId)) {
+      if (
+        !visibleTagId &&
+        bookmark.folderId === visibleFolderId &&
+        (!visibleLibraryId || bookmark.libraryId === visibleLibraryId)
+      ) {
         queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
-          bookmarkQueryKey({ folderId: visibleFolderId, tagId: null }),
+          bookmarkQueryKey({ folderId: visibleFolderId, libraryId: visibleLibraryId, tagId: null }),
           (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
         );
       }
 
-      if (visibleTagId && _input.existingTagIds.includes(visibleTagId)) {
+      if (
+        visibleTagId &&
+        _input.existingTagIds.includes(visibleTagId) &&
+        (!visibleLibraryId || bookmark.libraryId === visibleLibraryId)
+      ) {
         queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
-          bookmarkQueryKey({ folderId: null, tagId: visibleTagId }),
+          bookmarkQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: visibleTagId }),
           (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
         );
       }
@@ -209,9 +222,10 @@ export const AddBookmarkDialog = ({
     onSettled: (bookmark, _error, input, context) => {
       const targetFolderId =
         bookmark?.folderId ?? context?.targetFolderId ?? input.optimisticFolder?.id ?? null;
+      const targetLibraryId = bookmark?.libraryId ?? input.optimisticFolder?.libraryId ?? visibleLibraryId;
 
       if (bookmark && context?.optimisticBookmarkId) {
-        for (const queryKey of bookmarkQueryKeysForFolder(bookmark.folderId)) {
+        for (const queryKey of bookmarkQueryKeysForFolder(bookmark.folderId, bookmark.libraryId)) {
           queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
             queryKey,
             (data) => insertBookmarkIntoPages(data, bookmark, context.optimisticBookmarkId)
@@ -221,18 +235,22 @@ export const AddBookmarkDialog = ({
 
       void queryClient.invalidateQueries({
         exact: true,
-        queryKey: bookmarkQueryKey({ folderId: null, tagId: null })
+        queryKey: bookmarkQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: null })
       });
 
       if (targetFolderId) {
         void queryClient.invalidateQueries({
           exact: true,
-          queryKey: bookmarkQueryKey({ folderId: targetFolderId, tagId: null })
+          queryKey: bookmarkQueryKey({
+            folderId: targetFolderId,
+            libraryId: targetLibraryId,
+            tagId: null
+          })
         });
       }
 
       for (const tagId of input.existingTagIds) {
-        for (const queryKey of bookmarkQueryKeysForTag(tagId)) {
+        for (const queryKey of bookmarkQueryKeysForTag(tagId, visibleLibraryId)) {
           void queryClient.invalidateQueries({ exact: true, queryKey });
         }
       }

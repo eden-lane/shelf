@@ -3,7 +3,7 @@ import type { BookmarkItem, FolderItem, TagItem } from "@bookmarks/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
 
-const window = new Window();
+const window = new Window({ url: "http://localhost:5173/" });
 
 const setGlobal = (name: string, value: unknown) => {
   Object.defineProperty(globalThis, name, {
@@ -216,7 +216,12 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/bookmarks/list") {
         const body = (await request.json()) as {
-          json?: { folderId?: string | null; inbox?: boolean; tagId?: string | null };
+          json?: {
+            folderId?: string | null;
+            inbox?: boolean;
+            libraryId?: string | null;
+            tagId?: string | null;
+          };
         };
         const tagBookmarks =
           body.json?.tagId === "00000000-0000-4000-8000-000000000030"
@@ -228,7 +233,9 @@ describe("App", () => {
             : body.json?.folderId
               ? savedItems.filter((item) => item.folderId === body.json?.folderId)
               : savedItems
-        ).filter((item) => (tagBookmarks ? tagBookmarks.has(item.id) : true));
+        )
+          .filter((item) => (body.json?.libraryId ? item.libraryId === body.json.libraryId : true))
+          .filter((item) => (tagBookmarks ? tagBookmarks.has(item.id) : true));
 
         return new Response(
           JSON.stringify({
@@ -602,6 +609,9 @@ describe("App", () => {
     );
     expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/me/");
+    });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[minmax(0,1fr)_2.5rem]"
@@ -721,10 +731,16 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/me/folder/00000000-0000-4000-8000-000000000005");
     fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(screen.getByRole("heading", { name: "Research / Archive" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/me/folder/00000000-0000-4000-8000-000000000021");
+    fireEvent.click(screen.getByRole("link", { name: "Research" }));
+    expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/me/folder/00000000-0000-4000-8000-000000000005");
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/me/");
 
     fireEvent.click(screen.getByRole("button", { name: "Important" }));
     await waitFor(() => {
@@ -732,11 +748,13 @@ describe("App", () => {
       expect(screen.getByText("Example Article")).toBeTruthy();
       expect(screen.queryByText("Plain Bookmark")).toBeNull();
     });
+    expect(window.location.pathname).toBe("/me/tag/00000000-0000-4000-8000-000000000030");
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
       expect(screen.getByText("Plain Bookmark")).toBeTruthy();
     });
+    expect(window.location.pathname).toBe("/me/");
 
     fireEvent.click(screen.getByRole("button", { name: "Tag actions for Important" }));
     expect(screen.getByRole("menu", { name: "Tag actions for Important" })).toBeTruthy();

@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type TouchEvent as ReactTouchEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type TouchEvent as ReactTouchEvent
+} from "react";
 import {
   DndContext,
   DragOverlay,
@@ -13,6 +21,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   BookmarkItem,
   BookmarksPageResponse,
+  CurrentUserResponse,
   FolderItem,
   MoveFolderInput,
   TagItem
@@ -54,6 +63,24 @@ import {
 const STACKED_SIDEBAR_BREAKPOINT = 768;
 const SIDEBAR_CLOSE_DRAG_THRESHOLD = 64;
 
+type ActiveRoute =
+  | {
+      id: string;
+      type: "folder";
+      workspaceSlug: string | null;
+    }
+  | {
+      type: "inbox";
+      workspaceSlug: string | null;
+    }
+  | {
+      id: string;
+      type: "tag";
+      workspaceSlug: string | null;
+    };
+
+type WorkspaceLibrary = CurrentUserResponse["libraries"][number];
+
 type SidebarTouchState = {
   mode: "pending" | "horizontal" | "vertical";
   width: number;
@@ -64,12 +91,122 @@ type SidebarTouchState = {
 const isStackedSidebarViewport = () =>
   typeof window !== "undefined" && window.innerWidth < STACKED_SIDEBAR_BREAKPOINT;
 
+const routeFromLocation = (): ActiveRoute => {
+  if (typeof window === "undefined") {
+    return { type: "inbox", workspaceSlug: null };
+  }
+
+  const segments = window.location.pathname
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => safeDecodePathSegment(segment));
+  const [firstSegment, secondSegment, thirdSegment] = segments;
+
+  if (firstSegment === "folder" && secondSegment) {
+    return { id: secondSegment, type: "folder", workspaceSlug: null };
+  }
+
+  if (firstSegment === "tag" && secondSegment) {
+    return { id: secondSegment, type: "tag", workspaceSlug: null };
+  }
+
+  if (!firstSegment) {
+    return { type: "inbox", workspaceSlug: null };
+  }
+
+  if (secondSegment === "folder" && thirdSegment) {
+    return { id: thirdSegment, type: "folder", workspaceSlug: firstSegment };
+  }
+
+  if (secondSegment === "tag" && thirdSegment) {
+    return { id: thirdSegment, type: "tag", workspaceSlug: firstSegment };
+  }
+
+  return { type: "inbox", workspaceSlug: firstSegment };
+};
+
+const writeRouteToHistory = (route: ActiveRoute, mode: "push" | "replace") => {
+  if (typeof window === "undefined" || !["http:", "https:"].includes(window.location.protocol)) {
+    return;
+  }
+
+  const path = pathForRoute(route);
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+
+  if (currentPath === path) {
+    return;
+  }
+
+  if (mode === "replace") {
+    window.history.replaceState(null, "", path);
+    return;
+  }
+
+  window.history.pushState(null, "", path);
+};
+
+const pathForRoute = (route: ActiveRoute) => {
+  const workspaceSlug = encodeURIComponent(route.workspaceSlug ?? "me");
+
+  if (route.type === "folder") {
+    return `/${workspaceSlug}/folder/${encodeURIComponent(route.id)}`;
+  }
+
+  if (route.type === "tag") {
+    return `/${workspaceSlug}/tag/${encodeURIComponent(route.id)}`;
+  }
+
+  return `/${workspaceSlug}/`;
+};
+
+const safeDecodePathSegment = (segment: string) => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+};
+
+const workspaceSlugForLibrary = (library: WorkspaceLibrary) =>
+  library.kind === "personal" ? "me" : (library.organizationSlug ?? slugifyWorkspaceName(library.name));
+
+const workspaceSlugForLibraryId = (libraries: WorkspaceLibrary[], libraryId: string | null) => {
+  const library = findWorkspaceById(libraries, libraryId);
+
+  return library ? workspaceSlugForLibrary(library) : null;
+};
+
+const findWorkspaceById = (libraries: WorkspaceLibrary[], libraryId: string | null) =>
+  libraryId ? (libraries.find((library) => library.id === libraryId) ?? null) : null;
+
+const findWorkspaceBySlug = (libraries: WorkspaceLibrary[], workspaceSlug: string | null) =>
+  workspaceSlug
+    ? (libraries.find((library) => workspaceSlugForLibrary(library) === workspaceSlug) ?? null)
+    : null;
+
+const slugifyWorkspaceName = (name: string) => {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "workspace";
+};
+
+const shouldHandleBreadcrumbClick = (event: ReactMouseEvent<HTMLAnchorElement>) =>
+  !event.defaultPrevented &&
+  event.button === 0 &&
+  !event.metaKey &&
+  !event.altKey &&
+  !event.ctrlKey &&
+  !event.shiftKey;
+
 export const ProductShell = () => {
   const queryClient = useQueryClient();
   const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const sidebarTouchStartRef = useRef<SidebarTouchState | null>(null);
-  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
-  const [activeTagId, setActiveTagId] = useState<string | null>(null);
+  const [activeRoute, setActiveRoute] = useState<ActiveRoute>(() => routeFromLocation());
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
   const [bookmarkTargetTag, setBookmarkTargetTag] = useState<TagItem | null>(null);
@@ -100,6 +237,8 @@ export const ProductShell = () => {
     queryKey: ["tags"],
     queryFn: getTags
   });
+  const activeFolderId = activeRoute.type === "folder" ? activeRoute.id : null;
+  const activeTagId = activeRoute.type === "tag" ? activeRoute.id : null;
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: async () => {
@@ -108,8 +247,29 @@ export const ProductShell = () => {
   });
   const activeFolder = folders.data?.find((folder) => folder.id === activeFolderId) ?? null;
   const activeTag = tags.data?.find((tag) => tag.id === activeTagId) ?? null;
+  const workspaceFromRoute = findWorkspaceBySlug(
+    currentUser.data?.libraries ?? [],
+    activeRoute.workspaceSlug
+  );
+  const workspaceFromEntity = findWorkspaceById(
+    currentUser.data?.libraries ?? [],
+    activeFolder?.libraryId ?? activeTag?.libraryId ?? null
+  );
+  const defaultWorkspace =
+    currentUser.data?.libraries.find((library) => library.kind === "personal") ??
+    currentUser.data?.libraries[0] ??
+    null;
+  const activeWorkspace = workspaceFromEntity ?? workspaceFromRoute ?? defaultWorkspace;
+  const activeWorkspaceSlug = activeWorkspace
+    ? workspaceSlugForLibrary(activeWorkspace)
+    : (activeRoute.workspaceSlug ?? "me");
+  const activeLibraryId =
+    activeWorkspace?.id ?? activeFolder?.libraryId ?? activeTag?.libraryId ?? null;
   const bookmarkTargetLibraryId =
-    bookmarkTargetFolder?.libraryId ?? bookmarkTargetTag?.libraryId ?? activeTag?.libraryId ?? null;
+    bookmarkTargetFolder?.libraryId ??
+    bookmarkTargetTag?.libraryId ??
+    activeTag?.libraryId ??
+    activeLibraryId;
   const activeFolderDragItem =
     folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
@@ -152,7 +312,11 @@ export const ProductShell = () => {
       }
 
       const destinationFolderId = input.destinationFolder?.id ?? null;
-      const destinationQueryKey = bookmarkQueryKeysForFolder(destinationFolderId)[0];
+      const destinationLibraryId = input.destinationFolder?.libraryId ?? null;
+      const destinationQueryKey = bookmarkQueryKeysForFolder(
+        destinationFolderId,
+        destinationLibraryId
+      )[0];
       const movedItems = [...movedBookmarks.values()]
         .filter((item) => item.folderId !== destinationFolderId)
         .map((item) => ({
@@ -231,9 +395,14 @@ export const ProductShell = () => {
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
 
       const destinationFolderId = input.destinationFolder?.id ?? null;
+      const destinationLibraryId = input.destinationFolder?.libraryId ?? null;
       void queryClient.invalidateQueries({
         exact: true,
-        queryKey: bookmarkQueryKey({ folderId: destinationFolderId, tagId: null })
+        queryKey: bookmarkQueryKey({
+          folderId: destinationFolderId,
+          libraryId: destinationLibraryId,
+          tagId: null
+        })
       });
     }
   });
@@ -275,6 +444,39 @@ export const ProductShell = () => {
 
     return () => window.removeEventListener("resize", syncSidebarViewport);
   }, []);
+
+  useEffect(() => {
+    const syncRouteFromLocation = () => setActiveRoute(routeFromLocation());
+
+    window.addEventListener("popstate", syncRouteFromLocation);
+
+    return () => window.removeEventListener("popstate", syncRouteFromLocation);
+  }, []);
+
+  const navigateToRoute = useCallback((route: ActiveRoute, mode: "push" | "replace" = "push") => {
+    setActiveRoute(route);
+    writeRouteToHistory(route, mode);
+  }, []);
+
+  useEffect(() => {
+    if (activeRoute.type === "folder" && folders.isSuccess && !activeFolder) {
+      navigateToRoute({ type: "inbox", workspaceSlug: activeWorkspaceSlug }, "replace");
+    }
+  }, [activeFolder, activeRoute, activeWorkspaceSlug, folders.isSuccess, navigateToRoute]);
+
+  useEffect(() => {
+    if (activeRoute.type === "tag" && tags.isSuccess && !activeTag) {
+      navigateToRoute({ type: "inbox", workspaceSlug: activeWorkspaceSlug }, "replace");
+    }
+  }, [activeRoute, activeTag, activeWorkspaceSlug, navigateToRoute, tags.isSuccess]);
+
+  useEffect(() => {
+    if (!currentUser.data || !activeWorkspace || activeRoute.workspaceSlug === activeWorkspaceSlug) {
+      return;
+    }
+
+    navigateToRoute({ ...activeRoute, workspaceSlug: activeWorkspaceSlug }, "replace");
+  }, [activeRoute, activeWorkspace, activeWorkspaceSlug, currentUser.data, navigateToRoute]);
 
   useEffect(() => {
     if (!isSidebarVisible || !isStackedSidebar) {
@@ -403,9 +605,25 @@ export const ProductShell = () => {
     }
   };
 
-  const selectFolder = (folderId: string | null) => {
-    setActiveFolderId(folderId);
-    setActiveTagId(null);
+  const selectFolder = (folderId: string | null, libraryId?: string | null) => {
+    const folderWorkspaceSlug =
+      folderId && folders.data
+        ? workspaceSlugForLibraryId(
+            currentUser.data?.libraries ?? [],
+            folders.data.find((folder) => folder.id === folderId)?.libraryId ?? null
+          )
+        : null;
+    const inboxWorkspaceSlug = workspaceSlugForLibraryId(
+      currentUser.data?.libraries ?? [],
+      libraryId ?? activeLibraryId
+    );
+    const workspaceSlug = folderWorkspaceSlug ?? inboxWorkspaceSlug ?? activeWorkspaceSlug;
+
+    navigateToRoute(
+      folderId
+        ? { id: folderId, type: "folder", workspaceSlug }
+        : { type: "inbox", workspaceSlug }
+    );
 
     if (isStackedSidebar) {
       setIsSidebarVisible(false);
@@ -413,8 +631,13 @@ export const ProductShell = () => {
   };
 
   const selectTag = (tagId: string) => {
-    setActiveTagId(tagId);
-    setActiveFolderId(null);
+    const workspaceSlug =
+      workspaceSlugForLibraryId(
+        currentUser.data?.libraries ?? [],
+        tags.data?.find((tag) => tag.id === tagId)?.libraryId ?? null
+      ) ?? activeWorkspaceSlug;
+
+    navigateToRoute({ id: tagId, type: "tag", workspaceSlug });
 
     if (isStackedSidebar) {
       setIsSidebarVisible(false);
@@ -626,9 +849,17 @@ export const ProductShell = () => {
           ) : null}
           <div className="min-w-0">
             {activeTag ? (
-              <TagBreadcrumb tag={activeTag} />
+              <TagBreadcrumb
+                tag={activeTag}
+                workspaceSlug={activeWorkspaceSlug}
+                onNavigate={navigateToRoute}
+              />
             ) : (
-              <FolderBreadcrumbs folders={activeFolderPath} />
+              <FolderBreadcrumbs
+                folders={activeFolderPath}
+                workspaceSlug={activeWorkspaceSlug}
+                onNavigate={navigateToRoute}
+              />
             )}
           </div>
           <button
@@ -646,6 +877,7 @@ export const ProductShell = () => {
         <BookmarksWorkspace
           folderId={activeFolderId}
           folderName={activeFolder?.name ?? null}
+          libraryId={activeLibraryId}
           tagId={activeTagId}
           tagName={activeTag?.name ?? null}
         />
@@ -657,6 +889,7 @@ export const ProductShell = () => {
         targetTagId={bookmarkTargetTag?.id ?? activeTagId}
         tags={tags.data ?? []}
         visibleFolderId={activeFolderId}
+        visibleLibraryId={activeLibraryId}
         visibleTagId={activeTagId}
         onOpenChange={updateBookmarkDialogOpen}
       />
@@ -1000,28 +1233,45 @@ const FolderDragPreview = ({ folder }: { folder: FolderItem }) => {
   );
 };
 
-const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
+const FolderBreadcrumbs = ({
+  folders,
+  workspaceSlug,
+  onNavigate
+}: {
+  folders: FolderItem[];
+  workspaceSlug: string;
+  onNavigate: (route: ActiveRoute) => void;
+}) => {
   const label = folders.length > 0 ? folders.map((folder) => folder.name).join(" / ") : "Inbox";
+  const inboxRoute = { type: "inbox", workspaceSlug } satisfies ActiveRoute;
 
   return (
     <h1
       className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[15px] leading-5 font-semibold"
       aria-label={label}
     >
-      <IconDatabase
-        className="shrink-0 text-gray-500"
-        size={16}
-        stroke={1.5}
-        aria-hidden="true"
-        focusable="false"
-      />
+      <BreadcrumbLink route={inboxRoute} title="Inbox" onNavigate={onNavigate}>
+        <IconDatabase
+          className="shrink-0 text-gray-500"
+          size={16}
+          stroke={1.5}
+          aria-hidden="true"
+          focusable="false"
+        />
+      </BreadcrumbLink>
       <BreadcrumbSeparator />
       {folders.length > 0 ? (
         folders.map((folder, index) => (
-          <BreadcrumbFolder folder={folder} key={folder.id} isLast={index === folders.length - 1} />
+          <BreadcrumbFolder
+            folder={folder}
+            key={folder.id}
+            isLast={index === folders.length - 1}
+            workspaceSlug={workspaceSlug}
+            onNavigate={onNavigate}
+          />
         ))
       ) : (
-        <span className="inline-flex min-w-0 items-center gap-1">
+        <BreadcrumbLink route={inboxRoute} isCurrent onNavigate={onNavigate}>
           <IconBookmark
             className="shrink-0 text-[#3b8df5]"
             size={16}
@@ -1030,26 +1280,40 @@ const FolderBreadcrumbs = ({ folders }: { folders: FolderItem[] }) => {
             focusable="false"
           />
           <span className="min-w-0 truncate">Inbox</span>
-        </span>
+        </BreadcrumbLink>
       )}
     </h1>
   );
 };
 
-const TagBreadcrumb = ({ tag }: { tag: TagItem }) => (
+const TagBreadcrumb = ({
+  tag,
+  workspaceSlug,
+  onNavigate
+}: {
+  tag: TagItem;
+  workspaceSlug: string;
+  onNavigate: (route: ActiveRoute) => void;
+}) => (
   <h1
     className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[15px] leading-5 font-semibold"
     aria-label={tag.name}
   >
-    <IconDatabase
-      className="shrink-0 text-gray-500"
-      size={16}
-      stroke={1.5}
-      aria-hidden="true"
-      focusable="false"
-    />
+    <BreadcrumbLink
+      route={{ type: "inbox", workspaceSlug }}
+      title="Inbox"
+      onNavigate={onNavigate}
+    >
+      <IconDatabase
+        className="shrink-0 text-gray-500"
+        size={16}
+        stroke={1.5}
+        aria-hidden="true"
+        focusable="false"
+      />
+    </BreadcrumbLink>
     <BreadcrumbSeparator />
-    <span className="inline-flex min-w-0 items-center gap-1">
+    <BreadcrumbLink route={{ id: tag.id, type: "tag", workspaceSlug }} isCurrent onNavigate={onNavigate}>
       <IconTag
         className="shrink-0"
         size={16}
@@ -1059,16 +1323,27 @@ const TagBreadcrumb = ({ tag }: { tag: TagItem }) => (
         focusable="false"
       />
       <span className="min-w-0 truncate">{tag.name}</span>
-    </span>
+    </BreadcrumbLink>
   </h1>
 );
 
-const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: boolean }) => {
+const BreadcrumbFolder = ({
+  folder,
+  isLast,
+  workspaceSlug,
+  onNavigate
+}: {
+  folder: FolderItem;
+  isLast: boolean;
+  workspaceSlug: string;
+  onNavigate: (route: ActiveRoute) => void;
+}) => {
   const FolderIcon = getFolderIconComponent(folder.iconName);
+  const route = { id: folder.id, type: "folder", workspaceSlug } satisfies ActiveRoute;
 
   return (
     <>
-      <span className="inline-flex min-w-0 items-center gap-1">
+      <BreadcrumbLink route={route} isCurrent={isLast} onNavigate={onNavigate}>
         <FolderIcon
           className="shrink-0"
           size={16}
@@ -1078,11 +1353,40 @@ const BreadcrumbFolder = ({ folder, isLast }: { folder: FolderItem; isLast: bool
           focusable="false"
         />
         <span className="min-w-0 truncate">{folder.name}</span>
-      </span>
+      </BreadcrumbLink>
       {isLast ? null : <BreadcrumbSeparator />}
     </>
   );
 };
+
+const BreadcrumbLink = ({
+  children,
+  isCurrent = false,
+  route,
+  title,
+  onNavigate
+}: {
+  children: ReactNode;
+  isCurrent?: boolean;
+  route: ActiveRoute;
+  title?: string;
+  onNavigate: (route: ActiveRoute) => void;
+}) => (
+  <a
+    className="inline-flex min-w-0 items-center gap-1 rounded-md text-inherit no-underline outline-none hover:text-[#2f80ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+    aria-current={isCurrent ? "page" : undefined}
+    href={pathForRoute(route)}
+    title={title}
+    onClick={(event) => {
+      if (shouldHandleBreadcrumbClick(event)) {
+        event.preventDefault();
+        onNavigate(route);
+      }
+    }}
+  >
+    {children}
+  </a>
+);
 
 const BreadcrumbSeparator = () => (
   <span className="shrink-0 text-sm leading-none font-medium text-gray-300" aria-hidden="true">

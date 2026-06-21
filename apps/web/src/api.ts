@@ -122,12 +122,14 @@ export const getBookmarks = async ({
   cursor,
   folderId,
   inbox,
+  libraryId,
   limit = 20,
   tagId
 }: {
   cursor?: string | null;
   folderId?: string | null;
   inbox?: boolean;
+  libraryId?: string | null;
   limit?: number;
   tagId?: string | null;
 } = {}): Promise<BookmarksPageResponse> => {
@@ -135,6 +137,7 @@ export const getBookmarks = async ({
     cursor,
     folderId,
     inbox,
+    libraryId,
     limit,
     tagId
   });

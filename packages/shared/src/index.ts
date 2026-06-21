@@ -129,6 +129,7 @@ export interface ListBookmarksInput {
   cursor?: string | null;
   folderId?: string | null;
   inbox?: boolean;
+  libraryId?: string | null;
   limit?: number;
   tagId?: string | null;
 }

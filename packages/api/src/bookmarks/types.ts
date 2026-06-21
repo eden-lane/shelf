@@ -11,6 +11,7 @@ export interface ListBookmarksInput {
   limit: number;
   folderId?: string;
   inbox?: boolean;
+  libraryId?: string;
   tagId?: string;
   cursor?: BookmarkCursor;
 }

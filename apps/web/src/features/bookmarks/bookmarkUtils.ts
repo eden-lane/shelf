@@ -3,6 +3,7 @@ import type { BookmarkItem, BookmarksPageResponse } from "@bookmarks/shared";
 
 export type BookmarkFilter = {
   folderId: string | null;
+  libraryId: string | null;
   tagId: string | null;
 };
 
@@ -104,12 +105,16 @@ export const bookmarkQueryKey = (filter: BookmarkFilter): ["bookmarks", Bookmark
 ];
 
 export const bookmarkQueryKeysForFolder = (
-  folderId: string | null
+  folderId: string | null,
+  libraryId: string | null = null
 ): Array<["bookmarks", BookmarkFilter]> =>
   folderId
-    ? [bookmarkQueryKey({ folderId, tagId: null })]
-    : [bookmarkQueryKey({ folderId: null, tagId: null })];
+    ? [bookmarkQueryKey({ folderId, libraryId, tagId: null })]
+    : [bookmarkQueryKey({ folderId: null, libraryId, tagId: null })];
 
-export const bookmarkQueryKeysForTag = (tagId: string): Array<["bookmarks", BookmarkFilter]> => [
-  bookmarkQueryKey({ folderId: null, tagId })
+export const bookmarkQueryKeysForTag = (
+  tagId: string,
+  libraryId: string | null = null
+): Array<["bookmarks", BookmarkFilter]> => [
+  bookmarkQueryKey({ folderId: null, libraryId, tagId })
 ];

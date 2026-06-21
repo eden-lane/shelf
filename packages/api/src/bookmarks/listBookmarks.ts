@@ -16,6 +16,10 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
 
   const filters: SQL[] = [inArray(schema.savedItems.libraryId, input.libraryIds)];
 
+  if (input.libraryId) {
+    filters.push(eq(schema.savedItems.libraryId, input.libraryId));
+  }
+
   if (input.folderId) {
     filters.push(eq(schema.savedItems.folderId, input.folderId));
   } else if (input.inbox) {

@@ -65,7 +65,7 @@ export const FolderSidebar = ({
   tags: TagItem[];
   onAddBookmark: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
-  onSelectFolder: (folderId: string | null) => void;
+  onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
   onSelectTag: (tagId: string) => void;
 }) => {
   const queryClient = useQueryClient();
@@ -510,7 +510,7 @@ const WorkspaceInboxRow = ({
   activeFolderId: string | null;
   activeTagId: string | null;
   libraryId: string;
-  onSelectFolder: (folderId: string | null) => void;
+  onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
 }) => {
   const { isOver, setNodeRef } = useDroppable({
     id: `folder:inbox:${libraryId}`,
@@ -533,7 +533,7 @@ const WorkspaceInboxRow = ({
       data-workspace-inbox={libraryId}
       style={{ marginLeft: `${folderRowIndent(1)}px` }}
       type="button"
-      onClick={() => onSelectFolder(null)}
+      onClick={() => onSelectFolder(null, libraryId)}
     >
       <span className="h-6 w-4 shrink-0" aria-hidden="true" />
       <span className="flex min-h-8 min-w-0 flex-1 items-center gap-2 pr-2">

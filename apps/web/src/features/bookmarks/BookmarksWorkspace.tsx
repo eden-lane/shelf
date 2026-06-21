@@ -10,18 +10,20 @@ import { BookmarkRow } from "./BookmarkRow";
 export const BookmarksWorkspace = ({
   folderId,
   folderName,
+  libraryId,
   tagId,
   tagName
 }: {
   folderId: string | null;
   folderName: string | null;
+  libraryId: string | null;
   tagId: string | null;
   tagName: string | null;
 }) => {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
   const [notification, setNotification] = useState<string | null>(null);
-  const currentQueryKey = bookmarkQueryKey({ folderId, tagId });
+  const currentQueryKey = bookmarkQueryKey({ folderId, libraryId, tagId });
   const bookmarks = useInfiniteQuery({
     queryKey: currentQueryKey,
     queryFn: ({ pageParam }) =>
@@ -29,6 +31,7 @@ export const BookmarksWorkspace = ({
         cursor: pageParam,
         folderId,
         inbox: folderId === null && tagId === null,
+        libraryId,
         limit: 20,
         tagId
       }),

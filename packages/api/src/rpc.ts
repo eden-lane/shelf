@@ -167,9 +167,17 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
+      const allowedLibraryIds = currentUserLibraryIds(options.currentUser);
+
+      if (pagination.libraryId && !allowedLibraryIds.includes(pagination.libraryId)) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an available workspace"
+        });
+      }
+
       return listBookmarksPage(options.bookmarksStore, {
         ...pagination,
-        libraryIds: currentUserLibraryIds(options.currentUser)
+        libraryIds: allowedLibraryIds
       });
     }),
     locations: os.handler(async ({ input }) => {
@@ -357,6 +365,7 @@ const parseBookmarksInput = (
   cursor?: BookmarkCursor;
   folderId?: string;
   inbox?: boolean;
+  libraryId?: string;
   tagId?: string;
 } | null => {
   if (!isRecord(input)) {
@@ -376,6 +385,7 @@ const parseBookmarksInput = (
     cursor: cursor ?? undefined,
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
     inbox: input.inbox === true,
+    libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null),
     tagId: typeof input.tagId === "string" && input.tagId ? input.tagId : undefined
   };
