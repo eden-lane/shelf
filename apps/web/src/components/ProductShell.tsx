@@ -903,7 +903,7 @@ export const ProductShell = () => {
         onTouchEnd={handleSidebarTouchEnd}
       >
         <div
-          className="h-full w-[min(360px,calc(100vw-48px))] min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 md:w-[340px] md:px-6 md:py-5"
+          className="stable-scrollbar-gutter h-full w-[min(360px,calc(100vw-48px))] min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 md:w-[340px] md:px-6 md:py-5"
           ref={sidebarScrollRef}
         >
           <FolderSidebar
