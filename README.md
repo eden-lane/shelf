@@ -1,6 +1,6 @@
 # Shelf
 
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/biCX3T?utm_medium=integration&utm_source=template&utm_campaign=shelf)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/shelf-template?utm_medium=integration&utm_source=template&utm_campaign=shelf)
 
 A self-hosted saved-link app, currently bootstrapped as a runnable product shell with API health checks and local services.
 
@@ -41,7 +41,7 @@ The production service is ready for Railway one-click templates:
 - `railway.json` runs migrations before deploy, starts the server, and health-checks `/health`.
 - The server serves the React app and API from the same origin.
 
-Template setup notes live in [`docs/railway-template.md`](docs/railway-template.md). The Railway template draft is `biCX3T`.
+Template setup notes live in [`docs/railway-template.md`](docs/railway-template.md). The Railway template is `shelf-template`.
 
 ## Authentication
 

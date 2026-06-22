@@ -55,8 +55,8 @@ In the Railway template composer:
 5. Add descriptions for every variable before publishing.
 6. Use a 1:1 transparent icon for the template and each service.
 
-The current Railway template draft is `biCX3T`. The deploy button is:
+The current Railway template is `shelf-template`. The deploy button is:
 
 ```md
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/biCX3T?utm_medium=integration&utm_source=template&utm_campaign=shelf)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/shelf-template?utm_medium=integration&utm_source=template&utm_campaign=shelf)
 ```
