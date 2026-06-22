@@ -17,7 +17,8 @@ const db = createDatabase(pool);
 const savedItemSearchIndex = new ServerMeilisearchSavedItemSearchIndex(
   hostReachableComposeUrl(config.meilisearchUrl, {
     meilisearch: "127.0.0.1"
-  })
+  }),
+  config.meilisearchMasterKey
 );
 
 try {

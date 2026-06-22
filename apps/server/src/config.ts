@@ -7,6 +7,7 @@ export interface ServerConfig {
   databaseUrl: string;
   redisUrl: string;
   meilisearchUrl: string;
+  meilisearchMasterKey: string | null;
   authMode: AuthMode;
   registrationMode: RegistrationMode;
   allowedOrigins: string[];
@@ -109,6 +110,12 @@ const staticDirFromEnv = () => {
   return null;
 };
 
+const optionalStringFromEnv = (name: string) => {
+  const value = Bun.env[name]?.trim();
+
+  return value ? value : null;
+};
+
 export const getConfig = (): ServerConfig => {
   const port = numberFromEnv("PORT", 3000);
   const authMode = authModeFromEnv();
@@ -119,6 +126,7 @@ export const getConfig = (): ServerConfig => {
       Bun.env.DATABASE_URL ?? "postgres://shelf:shelf@localhost:5432/shelf",
     redisUrl: Bun.env.REDIS_URL ?? "redis://localhost:6379",
     meilisearchUrl: Bun.env.MEILISEARCH_URL ?? "http://localhost:7700",
+    meilisearchMasterKey: optionalStringFromEnv("MEILI_MASTER_KEY"),
     authMode,
     registrationMode: registrationModeFromEnv(),
     allowedOrigins: allowedOriginsFromEnv(port),

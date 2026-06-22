@@ -7,7 +7,8 @@ const config = getConfig();
 const clients = createRuntimeClients({
   databaseUrl: config.databaseUrl,
   redisUrl: config.redisUrl,
-  meilisearchUrl: config.meilisearchUrl
+  meilisearchUrl: config.meilisearchUrl,
+  meilisearchMasterKey: config.meilisearchMasterKey
 });
 
 const app = createApp({

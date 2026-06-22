@@ -29,6 +29,7 @@ REGISTRATION_MODE=first-user-only
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
 MEILISEARCH_URL=http://${{Meilisearch.RAILWAY_PRIVATE_DOMAIN}}:7700
+MEILI_MASTER_KEY=${{Meilisearch.MEILI_MASTER_KEY}}
 NODE_ENV=production
 ```
 
@@ -42,7 +43,16 @@ APP_ORIGINS=https://your-domain.example
 
 Attach a volume to the `Meilisearch` service at `/meili_data` so search indexes survive restarts.
 
-Leave Meilisearch unauthenticated until the app supports passing `MEILI_MASTER_KEY` to its Meilisearch client. If the template later exposes a Meilisearch admin key, also set `MEILI_MASTER_KEY` and update the app to send that key.
+Set these variables on the `Meilisearch` service:
+
+```sh
+MEILI_ENV=production
+MEILI_MASTER_KEY=<generate a long random secret>
+MEILI_MAX_INDEXING_MEMORY=512Mb
+MEILI_MAX_INDEXING_THREADS=1
+```
+
+Use the same `MEILI_MASTER_KEY` value on the `Shelf` service so it can authenticate search and indexing requests.
 
 ## Template settings
 

@@ -21,7 +21,10 @@ const SORTABLE_ATTRIBUTES = ["createdAt"];
 export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
   private ensureIndexPromise: Promise<void> | null = null;
 
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string | null = null
+  ) {}
 
   async search(input: SearchSavedItemsInput) {
     await this.ensureIndex();
@@ -121,21 +124,20 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
   }
 
   private async createOrUpdateIndex(): Promise<void> {
-    const indexResponse = await fetch(new URL(`/indexes/${SAVED_ITEMS_INDEX_UID}`, this.baseUrl));
+    const indexResponse = await this.fetch(`/indexes/${SAVED_ITEMS_INDEX_UID}`, {
+      method: "GET"
+    });
 
     if (!indexResponse.ok && indexResponse.status !== 404) {
       throw new Error(`Meilisearch index lookup failed with ${indexResponse.status}`);
     }
 
     if (indexResponse.status === 404) {
-      const createResponse = await fetch(new URL("/indexes", this.baseUrl), {
+      const createResponse = await this.fetch("/indexes", {
         body: JSON.stringify({
           primaryKey: "id",
           uid: SAVED_ITEMS_INDEX_UID
         }),
-        headers: {
-          "content-type": "application/json"
-        },
         method: "POST"
       });
 
@@ -194,14 +196,8 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
       method: "DELETE" | "GET" | "PATCH" | "POST";
     }
   ): Promise<T> {
-    const response = await fetch(new URL(path, this.baseUrl), {
+    const response = await this.fetch(path, {
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      headers:
-        options.body === undefined
-          ? undefined
-          : {
-              "content-type": "application/json"
-            },
       method: options.method
     });
 
@@ -215,7 +211,35 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
 
     return (await response.json()) as T;
   }
+
+  private async fetch(
+    path: string,
+    options: {
+      body?: BodyInit;
+      method: "DELETE" | "GET" | "PATCH" | "POST";
+    }
+  ) {
+    return fetch(new URL(path, this.baseUrl), {
+      body: options.body,
+      headers: meilisearchHeaders(this.apiKey, options.body !== undefined),
+      method: options.method
+    });
+  }
 }
+
+const meilisearchHeaders = (apiKey: string | null, hasBody: boolean) => {
+  const headers: Record<string, string> = {};
+
+  if (hasBody) {
+    headers["content-type"] = "application/json";
+  }
+
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  return Object.keys(headers).length > 0 ? headers : undefined;
+};
 
 const readTaskUid = async (response: Response): Promise<number | undefined> => {
   const body = (await response.json().catch(() => null)) as { taskUid?: unknown } | null;

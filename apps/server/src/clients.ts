@@ -30,10 +30,15 @@ export class RedisQueueHealthClient implements QueueHealthClient {
 }
 
 export class MeilisearchHealthClient implements SearchHealthClient {
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string | null
+  ) {}
 
   async check(): Promise<void> {
-    const response = await fetch(new URL("/health", this.baseUrl));
+    const response = await fetch(new URL("/health", this.baseUrl), {
+      headers: meilisearchHeaders(this.apiKey)
+    });
     if (!response.ok) {
       throw new Error(`Meilisearch health returned ${response.status}`);
     }
@@ -60,6 +65,7 @@ export const createRuntimeClients = (options: {
   databaseUrl: string;
   redisUrl: string;
   meilisearchUrl: string;
+  meilisearchMasterKey: string | null;
 }): RuntimeClients => {
   const pool = new Pool({ connectionString: options.databaseUrl });
   const db = createDatabase(pool);
@@ -71,10 +77,20 @@ export const createRuntimeClients = (options: {
     redis,
     database: new PostgresDatabaseHealthClient(pool),
     queue: new RedisQueueHealthClient(redis),
-    search: new MeilisearchHealthClient(options.meilisearchUrl),
-    savedItemSearchIndex: new MeilisearchSavedItemSearchIndex(options.meilisearchUrl),
+    search: new MeilisearchHealthClient(options.meilisearchUrl, options.meilisearchMasterKey),
+    savedItemSearchIndex: new MeilisearchSavedItemSearchIndex(
+      options.meilisearchUrl,
+      options.meilisearchMasterKey
+    ),
     async close() {
       await Promise.allSettled([pool.end(), redis.quit()]);
     }
   };
 };
+
+const meilisearchHeaders = (apiKey: string | null) =>
+  apiKey
+    ? {
+        Authorization: `Bearer ${apiKey}`
+      }
+    : undefined;
