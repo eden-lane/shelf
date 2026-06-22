@@ -56,12 +56,12 @@ export const FolderIconPickerDropdown = ({
   return (
     <Popover.Root open={isOpen} onOpenChange={onOpenChange}>
       <Popover.Trigger
-        className="grid h-8 w-[21px] shrink-0 place-items-center rounded-lg border border-transparent bg-transparent outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+        className="grid h-8 w-[17px] shrink-0 place-items-center rounded-lg bg-transparent outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
         aria-label="Choose folder icon"
         type="button"
       >
         <TriggerIcon
-          size={19}
+          size={17}
           stroke={1.5}
           color={iconColor}
           aria-hidden="true"

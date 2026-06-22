@@ -73,7 +73,7 @@ export const InlineFolderForm = ({
         });
       }}
     >
-      <div className="flex min-w-0 items-center gap-1">
+      <div className="flex min-w-0 items-center gap-0.5">
         {leadingSlot}
         <FolderIconPickerDropdown
           iconColor={iconColor}
@@ -87,24 +87,26 @@ export const InlineFolderForm = ({
           }}
           onOpenChange={setIsIconPickerOpen}
         />
-        <input
-          className={[
-            "min-h-7 min-w-0 flex-1 rounded-md border bg-transparent px-1.5 text-[13px] font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]",
-            isNameInvalid
-              ? "border-[#ef4444] ring-3 ring-[#fee2e2]"
-              : "border-transparent",
-            isNameShaking ? "field-shake" : ""
-          ].join(" ")}
-          aria-label="Folder title"
-          aria-invalid={isNameInvalid}
-          name="name"
-          placeholder="Folder title"
-          ref={inputRef}
-          value={name}
-          onAnimationEnd={() => setIsNameShaking(false)}
-          onChange={(event) => updateName(event.target.value)}
-          onInput={(event) => updateName(event.currentTarget.value)}
-        />
+        <div className="ml-1.5 min-w-0 flex-1">
+          <input
+            className={[
+              "min-h-7 w-full min-w-0 rounded-md border bg-transparent px-1.5 text-[13px] font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad]",
+              isNameInvalid
+                ? "border-[#ef4444] ring-3 ring-[#fee2e2]"
+                : "border-transparent",
+              isNameShaking ? "field-shake" : ""
+            ].join(" ")}
+            aria-label="Folder title"
+            aria-invalid={isNameInvalid}
+            name="name"
+            placeholder="Folder title"
+            ref={inputRef}
+            value={name}
+            onAnimationEnd={() => setIsNameShaking(false)}
+            onChange={(event) => updateName(event.target.value)}
+            onInput={(event) => updateName(event.currentTarget.value)}
+          />
+        </div>
       </div>
       <button
         className="grid h-7 w-6 place-items-center rounded-lg border border-transparent bg-transparent text-[#697080] outline-none hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"

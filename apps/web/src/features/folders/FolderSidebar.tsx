@@ -9,6 +9,7 @@ import {
   IconDatabase,
   IconDotsVertical,
   IconFolderPlus,
+  IconInbox,
   IconLayoutSidebarLeftCollapse,
   IconPlus,
   IconSearch,
@@ -535,7 +536,7 @@ const WorkspaceInboxRow = ({
     >
       <span className="h-6 w-4 shrink-0" aria-hidden="true" />
       <span className="flex min-h-8 min-w-0 flex-1 items-center gap-2 pr-2">
-        <IconLink size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+        <IconInbox size={17} stroke={1.5} aria-hidden="true" focusable="false" />
         <span className="truncate" data-workspace-inbox-title={libraryId}>
           Inbox
         </span>
