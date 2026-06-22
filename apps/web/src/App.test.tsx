@@ -772,6 +772,8 @@ describe("App", () => {
     }) as HTMLInputElement;
     expect(screen.getAllByRole("searchbox", { name: "Search saved items" })).toHaveLength(1);
     expect(savedItemSearchInput.getAttribute("autocomplete")).toBe("off");
+    expect(savedItemSearchInput.dataset["1pIgnore"]).toBe("true");
+    expect(savedItemSearchInput.dataset["opIgnore"]).toBe("true");
     savedItemSearchInput.value = "plain";
     fireEvent.input(savedItemSearchInput);
     expect(savedItemSearchRequests.some((request) => request.query === "plain")).toBe(false);
@@ -1033,6 +1035,8 @@ describe("App", () => {
 
     const folderTitleInput = screen.getByLabelText("Folder title");
     expect(folderTitleInput.getAttribute("autocomplete")).toBe("off");
+    expect(folderTitleInput.dataset["1pIgnore"]).toBe("true");
+    expect(folderTitleInput.dataset["opIgnore"]).toBe("true");
     expect(folderTitleInput.hasAttribute("required")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
     await waitFor(() => {
@@ -1049,6 +1053,8 @@ describe("App", () => {
     });
     const iconSearchInput = screen.getByLabelText("Search icons") as HTMLInputElement;
     expect(iconSearchInput.getAttribute("autocomplete")).toBe("off");
+    expect(iconSearchInput.dataset["1pIgnore"]).toBe("true");
+    expect(iconSearchInput.dataset["opIgnore"]).toBe("true");
     fireEvent.change(iconSearchInput, { target: { value: "book" } });
     fireEvent.click(screen.getByRole("button", { name: "Book" }));
     fireEvent.click(screen.getByRole("button", { name: "Select color #3b82f6" }));
@@ -1065,6 +1071,8 @@ describe("App", () => {
     });
     const tagNameInput = screen.getByLabelText("Tag name");
     expect(tagNameInput.getAttribute("autocomplete")).toBe("off");
+    expect(tagNameInput.dataset["1pIgnore"]).toBe("true");
+    expect(tagNameInput.dataset["opIgnore"]).toBe("true");
     expect(tagNameInput.hasAttribute("required")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Create tag" }));
     await waitFor(() => {
@@ -1126,11 +1134,15 @@ describe("App", () => {
 
     const pageUrlInput = screen.getByLabelText("Page URL") as HTMLInputElement;
     expect(pageUrlInput.getAttribute("autocomplete")).toBe("url");
+    expect(pageUrlInput.dataset["1pIgnore"]).toBe("true");
+    expect(pageUrlInput.dataset["opIgnore"]).toBe("true");
     pageUrlInput.value = "https://added.example/post";
     pageUrlInput.setAttribute("value", "https://added.example/post");
     fireEvent.input(pageUrlInput);
     const tagInput = screen.getByLabelText("Tags") as HTMLInputElement;
     expect(tagInput.getAttribute("autocomplete")).toBe("off");
+    expect(tagInput.dataset["1pIgnore"]).toBe("true");
+    expect(tagInput.dataset["opIgnore"]).toBe("true");
     fireEvent.change(tagInput, { target: { value: "Project" } });
     fireEvent.input(tagInput, { target: { value: "Project" } });
     fireEvent.keyDown(tagInput, { code: "Enter", key: "Enter" });

@@ -399,6 +399,8 @@ export const AddSavedItemDialog = ({
                   ].join(" ")}
                   aria-invalid={isUrlInvalid}
                   autoComplete="url"
+                  data-1p-ignore="true"
+                  data-op-ignore="true"
                   id="savedItem-url"
                   inputMode="url"
                   name="url"
@@ -466,6 +468,8 @@ export const AddSavedItemDialog = ({
                             <Combobox.Input
                               className="h-7 min-w-24 flex-1 border-0 bg-transparent p-0 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] md:text-sm"
                               autoComplete="off"
+                              data-1p-ignore="true"
+                              data-op-ignore="true"
                               id="savedItem-tags"
                               placeholder={value.length > 0 ? "" : "Type a tag"}
                               ref={tagInputRef}
