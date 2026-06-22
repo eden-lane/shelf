@@ -36,24 +36,6 @@ const sortFolderNodes = (nodes: FolderNode[]): FolderNode[] =>
       children: sortFolderNodes(node.children)
     }));
 
-export const filterFolderTree = (nodes: FolderNode[], search: string): FolderNode[] => {
-  const query = search.trim().toLocaleLowerCase();
-
-  if (!query) {
-    return nodes;
-  }
-
-  return nodes.flatMap((node) => {
-    const children = filterFolderTree(node.children, query);
-
-    if (node.name.toLocaleLowerCase().includes(query) || children.length > 0) {
-      return [{ ...node, children }];
-    }
-
-    return [];
-  });
-};
-
 export const collectFolderSubtreeIds = (folders: FolderItem[], folderId: string): string[] => {
   const ids = [folderId];
 

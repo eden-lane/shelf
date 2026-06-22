@@ -33,6 +33,7 @@ import {
   IconLayoutSidebarLeftExpand,
   IconLogout2,
   IconPhoto,
+  IconSearch,
   IconTag
 } from "@tabler/icons-react";
 import {
@@ -54,9 +55,9 @@ import {
   removeBookmarksFromPages
 } from "../features/bookmarks/bookmarkUtils";
 import {
-  SearchToolbar,
+  SearchScopeControl,
   type BookmarkSearchScope
-} from "../features/bookmarks/SearchToolbar";
+} from "../features/bookmarks/SearchScopeControl";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
 import { folderPathSegments } from "../features/folders/folderTree";
 import {
@@ -75,6 +76,10 @@ type ActiveRoute =
     }
   | {
       type: "inbox";
+      workspaceSlug: string | null;
+    }
+  | {
+      type: "search";
       workspaceSlug: string | null;
     }
   | {
@@ -119,6 +124,10 @@ const routeFromLocation = (): ActiveRoute => {
     return { id: secondSegment, type: "tag", workspaceSlug: null };
   }
 
+  if (firstSegment === "search") {
+    return { type: "search", workspaceSlug: null };
+  }
+
   if (!firstSegment) {
     return { type: "inbox", workspaceSlug: null };
   }
@@ -129,6 +138,10 @@ const routeFromLocation = (): ActiveRoute => {
 
   if (secondSegment === "tag" && thirdSegment) {
     return { id: thirdSegment, type: "tag", workspaceSlug: firstSegment };
+  }
+
+  if (secondSegment === "search") {
+    return { type: "search", workspaceSlug: firstSegment };
   }
 
   return { type: "inbox", workspaceSlug: firstSegment };
@@ -177,14 +190,18 @@ const pathForRoute = (route: ActiveRoute, search: BookmarkSearchState = emptySea
   const searchSuffix = searchParamsForState(search);
 
   if (route.type === "folder") {
-    return `/${workspaceSlug}/folder/${encodeURIComponent(route.id)}${searchSuffix}`;
+    return `/${workspaceSlug}/folder/${encodeURIComponent(route.id)}`;
   }
 
   if (route.type === "tag") {
-    return `/${workspaceSlug}/tag/${encodeURIComponent(route.id)}${searchSuffix}`;
+    return `/${workspaceSlug}/tag/${encodeURIComponent(route.id)}`;
   }
 
-  return `/${workspaceSlug}/${searchSuffix}`;
+  if (route.type === "search") {
+    return `/${workspaceSlug}/search${searchSuffix}`;
+  }
+
+  return `/${workspaceSlug}/`;
 };
 
 const emptySearchState: BookmarkSearchState = {
@@ -294,6 +311,7 @@ export const ProductShell = () => {
   });
   const activeFolderId = activeRoute.type === "folder" ? activeRoute.id : null;
   const activeTagId = activeRoute.type === "tag" ? activeRoute.id : null;
+  const isSearchRoute = activeRoute.type === "search";
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: async () => {
@@ -519,11 +537,26 @@ export const ProductShell = () => {
 
   const updateSearchState = useCallback(
     (nextSearchState: BookmarkSearchState, mode: "push" | "replace" = "replace") => {
-      setSearchState(nextSearchState);
-      writeLocationToHistory(activeRoute, nextSearchState, mode);
+      const query = nextSearchState.query.trim();
+      const nextRoute: ActiveRoute = query
+        ? { type: "search", workspaceSlug: activeWorkspaceSlug }
+        : isSearchRoute
+          ? { type: "inbox", workspaceSlug: activeWorkspaceSlug }
+          : activeRoute;
+      const nextState = query ? nextSearchState : emptySearchState;
+
+      setActiveRoute(nextRoute);
+      setSearchState(nextState);
+      writeLocationToHistory(nextRoute, nextState, mode);
     },
-    [activeRoute]
+    [activeRoute, activeWorkspaceSlug, isSearchRoute]
   );
+
+  useEffect(() => {
+    if (activeRoute.type === "search" && searchState.query.trim().length === 0) {
+      navigateToRoute({ type: "inbox", workspaceSlug: activeWorkspaceSlug }, "replace");
+    }
+  }, [activeRoute, activeWorkspaceSlug, navigateToRoute, searchState.query]);
 
   useEffect(() => {
     if (activeRoute.type === "folder" && folders.isSuccess && !activeFolder) {
@@ -542,8 +575,13 @@ export const ProductShell = () => {
       return;
     }
 
-    navigateToRoute({ ...activeRoute, workspaceSlug: activeWorkspaceSlug }, "replace");
-  }, [activeRoute, activeWorkspace, activeWorkspaceSlug, currentUser.data, navigateToRoute]);
+    const nextRoute = { ...activeRoute, workspaceSlug: activeWorkspaceSlug } satisfies ActiveRoute;
+    const nextSearchState = activeRoute.type === "search" ? searchState : emptySearchState;
+
+    setActiveRoute(nextRoute);
+    setSearchState(nextSearchState);
+    writeLocationToHistory(nextRoute, nextSearchState, "replace");
+  }, [activeRoute, activeWorkspace, activeWorkspaceSlug, currentUser.data, searchState]);
 
   useEffect(() => {
     if (!isSidebarVisible || !isStackedSidebar) {
@@ -836,6 +874,8 @@ export const ProductShell = () => {
     setSidebarDragOffset(0);
   };
 
+  const activeSearchQuery = isSearchRoute ? searchState.query : "";
+
   return (
     <DndContext
       sensors={sensors}
@@ -876,10 +916,17 @@ export const ProductShell = () => {
             isLoading={folders.isLoading}
             isTagsError={tags.isError}
             isTagsLoading={tags.isLoading}
+            searchQuery={activeSearchQuery}
             tags={tags.data ?? []}
             activeFolderDragId={activeFolderDragId}
             onAddBookmark={openBookmarkDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
+            onSearchQueryChange={(query) =>
+              updateSearchState({
+                query,
+                scope: searchState.scope
+              })
+            }
             onSelectFolder={selectFolder}
             onSelectTag={selectTag}
           />
@@ -915,7 +962,9 @@ export const ProductShell = () => {
             </button>
           ) : null}
           <div className="min-w-0">
-            {activeTag ? (
+            {isSearchRoute ? (
+              <SearchBreadcrumb workspaceSlug={activeWorkspaceSlug} onNavigate={navigateToRoute} />
+            ) : activeTag ? (
               <TagBreadcrumb
                 tag={activeTag}
                 workspaceSlug={activeWorkspaceSlug}
@@ -941,32 +990,27 @@ export const ProductShell = () => {
           </button>
         </header>
 
-        <SearchToolbar
-          query={searchState.query}
-          scope={searchState.scope}
-          workspaceName={activeWorkspace?.name ?? "Current workspace"}
-          onQueryChange={(query) =>
-            updateSearchState({
-              query,
-              scope: searchState.scope
-            })
-          }
-          onScopeChange={(scope) =>
-            updateSearchState(
-              {
-                query: searchState.query,
-                scope
-              },
-              "push"
-            )
-          }
-        />
+        {isSearchRoute && searchState.query.trim().length > 0 ? (
+          <SearchScopeControl
+            scope={searchState.scope}
+            workspaceName={activeWorkspace?.name ?? "Current workspace"}
+            onScopeChange={(scope) =>
+              updateSearchState(
+                {
+                  query: searchState.query,
+                  scope
+                },
+                "push"
+              )
+            }
+          />
+        ) : null}
 
         <BookmarksWorkspace
           folderId={activeFolderId}
           folderName={activeFolder?.name ?? null}
           libraryId={activeLibraryId}
-          searchQuery={searchState.query}
+          searchQuery={activeSearchQuery}
           searchScope={searchState.scope}
           tagId={activeTagId}
           tagName={activeTag?.name ?? null}
@@ -1413,6 +1457,44 @@ const TagBreadcrumb = ({
         focusable="false"
       />
       <span className="min-w-0 truncate">{tag.name}</span>
+    </BreadcrumbLink>
+  </h1>
+);
+
+const SearchBreadcrumb = ({
+  workspaceSlug,
+  onNavigate
+}: {
+  workspaceSlug: string;
+  onNavigate: (route: ActiveRoute) => void;
+}) => (
+  <h1
+    className="m-0 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-[15px] leading-5 font-semibold"
+    aria-label="Search"
+  >
+    <BreadcrumbLink
+      route={{ type: "inbox", workspaceSlug }}
+      title="Inbox"
+      onNavigate={onNavigate}
+    >
+      <IconDatabase
+        className="shrink-0 text-gray-500"
+        size={16}
+        stroke={1.5}
+        aria-hidden="true"
+        focusable="false"
+      />
+    </BreadcrumbLink>
+    <BreadcrumbSeparator />
+    <BreadcrumbLink route={{ type: "search", workspaceSlug }} isCurrent onNavigate={onNavigate}>
+      <IconSearch
+        className="shrink-0 text-[#3b8df5]"
+        size={16}
+        stroke={1.5}
+        aria-hidden="true"
+        focusable="false"
+      />
+      <span className="min-w-0 truncate">Search</span>
     </BreadcrumbLink>
   </h1>
 );

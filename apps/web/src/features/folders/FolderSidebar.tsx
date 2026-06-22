@@ -30,7 +30,7 @@ import { FolderContextMenu } from "./FolderContextMenu";
 import { FolderDisclosurePlaceholder } from "./FolderDisclosureControls";
 import { InlineFolderForm } from "./InlineFolderForm";
 import { FolderTreeRow } from "./FolderTreeRow";
-import { buildFolderTree, filterFolderTree } from "./folderTree";
+import { buildFolderTree } from "./folderTree";
 import { folderRowIndent } from "./folderIcons";
 import type { FolderFormValue } from "./types";
 
@@ -47,9 +47,11 @@ export const FolderSidebar = ({
   isLoading,
   isTagsError,
   isTagsLoading,
+  searchQuery,
   tags,
   onAddBookmark,
   onHideSidebar,
+  onSearchQueryChange,
   onSelectFolder,
   onSelectTag
 }: {
@@ -62,9 +64,11 @@ export const FolderSidebar = ({
   isLoading: boolean;
   isTagsError: boolean;
   isTagsLoading: boolean;
+  searchQuery: string;
   tags: TagItem[];
   onAddBookmark: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
+  onSearchQueryChange: (query: string) => void;
   onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
   onSelectTag: (tagId: string) => void;
 }) => {
@@ -87,12 +91,6 @@ export const FolderSidebar = ({
     COLLAPSED_FOLDERS_STORAGE_KEY
   );
   const folderTree = useMemo(() => buildFolderTree(folders), [folders]);
-  const [folderSearch, setFolderSearch] = useState("");
-  const isFilteringFolders = folderSearch.trim().length > 0;
-  const visibleFolderTree = useMemo(
-    () => filterFolderTree(folderTree, folderSearch),
-    [folderSearch, folderTree]
-  );
 
   const createFolderMutation = useMutation({
     mutationFn: createFolder,
@@ -208,11 +206,11 @@ export const FolderSidebar = ({
           <IconSearch size={18} stroke={1.5} aria-hidden="true" focusable="false" />
           <input
             className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-950 outline-none placeholder:text-gray-500"
-            aria-label="Search folders"
-            placeholder="Search..."
+            aria-label="Search bookmarks"
+            placeholder="Search saved links"
             type="search"
-            value={folderSearch}
-            onChange={(event) => setFolderSearch(event.target.value)}
+            value={searchQuery}
+            onInput={(event) => onSearchQueryChange(event.currentTarget.value)}
           />
         </label>
         <button
@@ -251,8 +249,8 @@ export const FolderSidebar = ({
           </p>
         ) : null}
         {currentUser?.libraries.map((library) => {
-          const roots = visibleFolderTree.filter((folder) => folder.libraryId === library.id);
-          const isLibraryCollapsed = collapsedLibraryIds.has(library.id) && !isFilteringFolders;
+          const roots = folderTree.filter((folder) => folder.libraryId === library.id);
+          const isLibraryCollapsed = collapsedLibraryIds.has(library.id);
 
           return (
             <section className="grid gap-2" key={library.id} aria-label={`${library.name} workspace`}>
@@ -380,7 +378,7 @@ export const FolderSidebar = ({
                             updateFolderMutation.isError ? "Folder could not be updated." : null
                           }
                           editPending={updateFolderMutation.isPending}
-                          isFiltering={isFilteringFolders}
+                          isFiltering={false}
                           onCancelCreate={() => setCreatingTarget(null)}
                           onCancelEdit={() => setEditingFolderId(null)}
                           onCreateFolder={(libraryId, parentId, folder) =>

@@ -5,7 +5,7 @@ import type { BookmarksPageResponse } from "@bookmarks/shared";
 import { IconAlertTriangle, IconBookmark, IconRefresh } from "@tabler/icons-react";
 import { deleteBookmark, getBookmarks, searchBookmarks } from "../../api";
 import { bookmarkQueryKey } from "./bookmarkUtils";
-import type { BookmarkSearchScope } from "./SearchToolbar";
+import type { BookmarkSearchScope } from "./SearchScopeControl";
 import { BookmarkRow } from "./BookmarkRow";
 
 export const BookmarksWorkspace = ({
@@ -29,20 +29,25 @@ export const BookmarksWorkspace = ({
   const queryClient = useQueryClient();
   const [notification, setNotification] = useState<string | null>(null);
   const trimmedSearchQuery = searchQuery.trim();
+  const debouncedSearchQuery = useDebouncedValue(trimmedSearchQuery, 350);
   const isSearching = trimmedSearchQuery.length > 0;
+  const hasDebouncedSearchQuery = debouncedSearchQuery.length > 0;
+  const isWaitingForSearchDebounce = isSearching && trimmedSearchQuery !== debouncedSearchQuery;
   const currentQueryKey = isSearching
     ? [
         "bookmarks",
         "search",
         {
           libraryId: searchScope === "current" ? libraryId : null,
-          query: trimmedSearchQuery,
+          query: debouncedSearchQuery || "__pending__",
           scope: searchScope
         }
       ]
     : bookmarkQueryKey({ folderId, libraryId, tagId });
   const bookmarks = useInfiniteQuery({
-    enabled: !isSearching || searchScope === "all" || Boolean(libraryId),
+    enabled:
+      (!isSearching || (hasDebouncedSearchQuery && !isWaitingForSearchDebounce)) &&
+      (!isSearching || searchScope === "all" || Boolean(libraryId)),
     queryKey: currentQueryKey,
     queryFn: ({ pageParam }) =>
       isSearching
@@ -50,7 +55,7 @@ export const BookmarksWorkspace = ({
             cursor: pageParam,
             libraryId: searchScope === "current" ? libraryId : undefined,
             limit: 20,
-            query: trimmedSearchQuery,
+            query: debouncedSearchQuery,
             scope: searchScope
           })
         : getBookmarks({
@@ -152,7 +157,7 @@ export const BookmarksWorkspace = ({
     return () => window.clearTimeout(timeout);
   }, [notification]);
 
-  if (bookmarks.isLoading) {
+  if (bookmarks.isLoading || isWaitingForSearchDebounce) {
     return (
       <section
         className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
@@ -273,4 +278,16 @@ export const BookmarksWorkspace = ({
       ) : null}
     </>
   );
+};
+
+const useDebouncedValue = <Value,>(value: Value, delayMs: number) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 };

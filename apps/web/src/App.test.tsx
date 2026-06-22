@@ -666,7 +666,7 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
     await waitFor(() => {
       expect(window.location.pathname).toBe("/me/");
@@ -678,7 +678,7 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).not.toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
     const personalSection = screen.getByLabelText("Personal folders");
     const inboxButton = screen.getByRole("button", { name: "Inbox" });
     expect(inboxButton).toBeTruthy();
@@ -724,24 +724,24 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
     window.dispatchEvent(new window.Event("resize"));
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
-    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
     expect((sidebar as HTMLElement).className).toContain(
       "transition-[transform,opacity,width,border-color]"
     );
     expect((sidebar as HTMLElement).className).toContain("md:w-0");
     expect((sidebar as HTMLElement).className).not.toContain("md:hidden");
-    expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((sidebar as HTMLElement).className).toContain("md:w-[340px]");
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Tags" })).toBeNull();
@@ -770,13 +770,17 @@ describe("App", () => {
     const bookmarkSearchInput = screen.getByRole("searchbox", {
       name: "Search bookmarks"
     }) as HTMLInputElement;
+    expect(screen.getAllByRole("searchbox", { name: "Search bookmarks" })).toHaveLength(1);
     bookmarkSearchInput.value = "plain";
     fireEvent.input(bookmarkSearchInput);
+    expect(bookmarkSearchRequests.some((request) => request.query === "plain")).toBe(false);
     await waitFor(() => {
       expect(bookmarkSearchRequests.at(-1)?.query).toBe("plain");
       expect(screen.getByText("Plain Bookmark")).toBeTruthy();
       expect(screen.getByLabelText("Bookmark location Personal / Inbox")).toBeTruthy();
     });
+    expect(screen.getByRole("heading", { name: "Search" })).toBeTruthy();
+    expect(window.location.pathname).toBe("/me/search");
     expect(window.location.search).toBe("?q=plain");
     expect(bookmarkSearchRequests.at(-1)).toEqual({
       cursor: null,
@@ -787,6 +791,7 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "All workspaces" }));
     await waitFor(() => {
+      expect(window.location.pathname).toBe("/me/search");
       expect(window.location.search).toBe("?q=plain&scope=all");
     });
     expect(bookmarkSearchRequests.at(-1)).toEqual({
@@ -796,8 +801,10 @@ describe("App", () => {
       query: "plain",
       scope: "all"
     });
-    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    bookmarkSearchInput.value = "";
+    fireEvent.input(bookmarkSearchInput);
     await waitFor(() => {
+      expect(window.location.pathname).toBe("/me/");
       expect(window.location.search).toBe("");
       expect(screen.getByText("Example Article")).toBeTruthy();
     });
@@ -897,14 +904,14 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
-    expect(screen.queryByRole("searchbox", { name: "Search folders" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
     await waitFor(() => {
       expect(document.body.style.position).toBe("");
       expect(document.body.style.overflow).toBe("");
       expect(document.documentElement.style.overflow).toBe("");
     });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
-    expect(screen.getByRole("searchbox", { name: "Search folders" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
     await waitFor(() => {
       expect(document.body.style.position).toBe("fixed");
       expect(document.body.style.overflow).toBe("hidden");
