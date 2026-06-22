@@ -13,6 +13,7 @@ const clients = createRuntimeClients({
 const app = createApp({
   bookmarkEnrichmentQueue: new RedisBookmarkEnrichmentQueue(clients.redis),
   dependencies: clients,
+  savedItemSearchIndex: clients.savedItemSearchIndex,
   authMode: config.authMode,
   registrationMode: config.registrationMode,
   allowedOrigins: config.allowedOrigins,
@@ -20,7 +21,8 @@ const app = createApp({
 });
 const bookmarkEnrichmentWorker = new BookmarkEnrichmentWorker({
   db: clients.db,
-  redis: clients.redis
+  redis: clients.redis,
+  savedItemSearchIndex: clients.savedItemSearchIndex
 });
 
 bookmarkEnrichmentWorker.start();

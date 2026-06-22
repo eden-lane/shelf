@@ -53,6 +53,10 @@ import {
   insertBookmarkIntoPages,
   removeBookmarksFromPages
 } from "../features/bookmarks/bookmarkUtils";
+import {
+  SearchToolbar,
+  type BookmarkSearchScope
+} from "../features/bookmarks/SearchToolbar";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
 import { folderPathSegments } from "../features/folders/folderTree";
 import {
@@ -80,6 +84,11 @@ type ActiveRoute =
     };
 
 type WorkspaceLibrary = CurrentUserResponse["libraries"][number];
+
+type BookmarkSearchState = {
+  query: string;
+  scope: BookmarkSearchScope;
+};
 
 type SidebarTouchState = {
   mode: "pending" | "horizontal" | "vertical";
@@ -125,12 +134,30 @@ const routeFromLocation = (): ActiveRoute => {
   return { type: "inbox", workspaceSlug: firstSegment };
 };
 
-const writeRouteToHistory = (route: ActiveRoute, mode: "push" | "replace") => {
+const searchStateFromLocation = (): BookmarkSearchState => {
+  if (typeof window === "undefined") {
+    return { query: "", scope: "current" };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const scope = params.get("scope") === "all" ? "all" : "current";
+
+  return {
+    query: params.get("q") ?? "",
+    scope
+  };
+};
+
+const writeLocationToHistory = (
+  route: ActiveRoute,
+  search: BookmarkSearchState,
+  mode: "push" | "replace"
+) => {
   if (typeof window === "undefined" || !["http:", "https:"].includes(window.location.protocol)) {
     return;
   }
 
-  const path = pathForRoute(route);
+  const path = pathForRoute(route, search);
   const currentPath = `${window.location.pathname}${window.location.search}`;
 
   if (currentPath === path) {
@@ -145,18 +172,43 @@ const writeRouteToHistory = (route: ActiveRoute, mode: "push" | "replace") => {
   window.history.pushState(null, "", path);
 };
 
-const pathForRoute = (route: ActiveRoute) => {
+const pathForRoute = (route: ActiveRoute, search: BookmarkSearchState = emptySearchState) => {
   const workspaceSlug = encodeURIComponent(route.workspaceSlug ?? "me");
+  const searchSuffix = searchParamsForState(search);
 
   if (route.type === "folder") {
-    return `/${workspaceSlug}/folder/${encodeURIComponent(route.id)}`;
+    return `/${workspaceSlug}/folder/${encodeURIComponent(route.id)}${searchSuffix}`;
   }
 
   if (route.type === "tag") {
-    return `/${workspaceSlug}/tag/${encodeURIComponent(route.id)}`;
+    return `/${workspaceSlug}/tag/${encodeURIComponent(route.id)}${searchSuffix}`;
   }
 
-  return `/${workspaceSlug}/`;
+  return `/${workspaceSlug}/${searchSuffix}`;
+};
+
+const emptySearchState: BookmarkSearchState = {
+  query: "",
+  scope: "current"
+};
+
+const searchParamsForState = (search: BookmarkSearchState) => {
+  const query = search.query.trim();
+
+  if (!query) {
+    return "";
+  }
+
+  const params = new URLSearchParams();
+  params.set("q", query);
+
+  if (search.scope === "all") {
+    params.set("scope", "all");
+  }
+
+  const value = params.toString();
+
+  return value ? `?${value}` : "";
 };
 
 const safeDecodePathSegment = (segment: string) => {
@@ -207,6 +259,9 @@ export const ProductShell = () => {
   const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const sidebarTouchStartRef = useRef<SidebarTouchState | null>(null);
   const [activeRoute, setActiveRoute] = useState<ActiveRoute>(() => routeFromLocation());
+  const [searchState, setSearchState] = useState<BookmarkSearchState>(() =>
+    searchStateFromLocation()
+  );
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
   const [bookmarkTargetTag, setBookmarkTargetTag] = useState<TagItem | null>(null);
@@ -446,7 +501,10 @@ export const ProductShell = () => {
   }, []);
 
   useEffect(() => {
-    const syncRouteFromLocation = () => setActiveRoute(routeFromLocation());
+    const syncRouteFromLocation = () => {
+      setActiveRoute(routeFromLocation());
+      setSearchState(searchStateFromLocation());
+    };
 
     window.addEventListener("popstate", syncRouteFromLocation);
 
@@ -455,8 +513,17 @@ export const ProductShell = () => {
 
   const navigateToRoute = useCallback((route: ActiveRoute, mode: "push" | "replace" = "push") => {
     setActiveRoute(route);
-    writeRouteToHistory(route, mode);
+    setSearchState(emptySearchState);
+    writeLocationToHistory(route, emptySearchState, mode);
   }, []);
+
+  const updateSearchState = useCallback(
+    (nextSearchState: BookmarkSearchState, mode: "push" | "replace" = "replace") => {
+      setSearchState(nextSearchState);
+      writeLocationToHistory(activeRoute, nextSearchState, mode);
+    },
+    [activeRoute]
+  );
 
   useEffect(() => {
     if (activeRoute.type === "folder" && folders.isSuccess && !activeFolder) {
@@ -874,10 +941,33 @@ export const ProductShell = () => {
           </button>
         </header>
 
+        <SearchToolbar
+          query={searchState.query}
+          scope={searchState.scope}
+          workspaceName={activeWorkspace?.name ?? "Current workspace"}
+          onQueryChange={(query) =>
+            updateSearchState({
+              query,
+              scope: searchState.scope
+            })
+          }
+          onScopeChange={(scope) =>
+            updateSearchState(
+              {
+                query: searchState.query,
+                scope
+              },
+              "push"
+            )
+          }
+        />
+
         <BookmarksWorkspace
           folderId={activeFolderId}
           folderName={activeFolder?.name ?? null}
           libraryId={activeLibraryId}
+          searchQuery={searchState.query}
+          searchScope={searchState.scope}
           tagId={activeTagId}
           tagName={activeTag?.name ?? null}
         />

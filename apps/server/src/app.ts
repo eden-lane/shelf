@@ -9,7 +9,8 @@ import {
 import {
   createDatabaseBookmarksStore,
   type BookmarkEnrichmentQueue,
-  type BookmarksStore
+  type BookmarksStore,
+  type SavedItemSearchIndex
 } from "@bookmarks/api/bookmarks";
 import { getCurrentUserResponse } from "@bookmarks/api/currentUser";
 import type { CurrentIdentity } from "@bookmarks/api/currentUser";
@@ -27,6 +28,7 @@ export interface AppOptions {
   currentUser?: CurrentIdentity;
   bookmarksStore?: BookmarksStore;
   bookmarkEnrichmentQueue?: BookmarkEnrichmentQueue;
+  savedItemSearchIndex?: SavedItemSearchIndex;
   authMode?: "session" | "none";
   registrationMode?: RegistrationMode;
   allowedOrigins?: string[];
@@ -207,7 +209,8 @@ export const createApp = (options: AppOptions) => {
         bookmarksStore,
         bookmarkEnrichmentQueue: options.bookmarkEnrichmentQueue,
         currentUser: currentUser ?? undefined,
-        dependencies: options.dependencies
+        dependencies: options.dependencies,
+        savedItemSearchIndex: options.savedItemSearchIndex
       })
     );
     const { matched, response } = await rpcHandler.handle(context.req.raw, {

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
-import type { BookmarksStore } from "@bookmarks/api/bookmarks";
+import { describe, expect, spyOn, test } from "bun:test";
+import type { BookmarksStore, SavedItemSearchIndex } from "@bookmarks/api/bookmarks";
 import type { HealthDependencies } from "@bookmarks/api/health";
 import { Buffer } from "node:buffer";
 import { createApp } from "./app";
@@ -9,6 +9,8 @@ const DEV_PERSONAL_LIBRARY_ID = "00000000-0000-4000-8000-000000000003";
 const DEV_USER_EMAIL = "dev@localhost";
 const DEV_USER_NAME = "Dev User";
 const DEV_PERSONAL_LIBRARY_NAME = "Personal";
+const DEV_ORGANIZATION_LIBRARY_ID = "00000000-0000-4000-8000-000000000004";
+const DEV_ORGANIZATION_LIBRARY_NAME = "Team";
 const TEST_FOLDER_ID = "00000000-0000-4000-8000-000000000005";
 const TEST_CHILD_FOLDER_ID = "00000000-0000-4000-8000-000000000020";
 
@@ -72,6 +74,9 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
     return [];
   },
   async listBookmarkLocations() {
+    return [];
+  },
+  async listSavedItemSearchDocuments() {
     return [];
   },
   async listFolders() {
@@ -351,6 +356,89 @@ describe("bookmarks RPC", () => {
     expect(queuedIds).toEqual(["00000000-0000-4000-8000-000000000010"]);
   });
 
+  test("indexes a created bookmark without blocking creation on search failures", async () => {
+    const consoleError = spyOn(console, "error").mockImplementation(() => {});
+    const indexedDocuments: unknown[] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async createBookmark(input) {
+          return {
+            id: "00000000-0000-4000-8000-000000000010",
+            libraryId: input.libraryId,
+            libraryName: DEV_PERSONAL_LIBRARY_NAME,
+            folderId: input.folderId,
+            folderName: null,
+            url: input.url,
+            title: "Searchable bookmark",
+            description: null,
+            siteName: "Example",
+            imageUrl: null,
+            metadataStatus: "fetched",
+            metadataFetchedAt: "2026-06-20T12:00:00.000Z",
+            faviconId: null,
+            faviconUrl: null,
+            createdAt: "2026-06-20T12:00:00.000Z",
+            updatedAt: "2026-06-20T12:00:00.000Z"
+          };
+        },
+        async listSavedItemSearchDocuments(input) {
+          expect(input).toEqual({
+            libraryIds: [DEV_PERSONAL_LIBRARY_ID],
+            savedItemIds: ["00000000-0000-4000-8000-000000000010"]
+          });
+
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000010",
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              libraryName: DEV_PERSONAL_LIBRARY_NAME,
+              folderId: null,
+              folderName: null,
+              url: "https://example.com/article",
+              title: "Searchable bookmark",
+              description: null,
+              siteName: "Example",
+              imageUrl: null,
+              metadataStatus: "fetched",
+              metadataFetchedAt: "2026-06-20T12:00:00.000Z",
+              faviconId: null,
+              faviconUrl: null,
+              tagNames: ["Research"],
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:00:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies(),
+      savedItemSearchIndex: {
+        async delete() {},
+        async search() {
+          return { items: [], nextCursor: null };
+        },
+        async upsert(documents) {
+          indexedDocuments.push(...documents);
+          throw new Error("search offline");
+        }
+      }
+    });
+
+    const response = await app.request("/rpc/bookmarks/create", {
+      body: JSON.stringify({ json: { url: "https://example.com/article" } }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.title).toBe("Searchable bookmark");
+    expect(indexedDocuments).toHaveLength(1);
+    consoleError.mockRestore();
+  });
+
   test("creates a bookmark with selected tags from the target folder library", async () => {
     const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
     const app = createApp({
@@ -486,6 +574,41 @@ describe("bookmarks RPC", () => {
     });
   });
 
+  test("removes deleted bookmarks from the search index", async () => {
+    const deletedIds: string[][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async deleteBookmark(input) {
+          return { deletedBookmarkId: input.bookmarkId };
+        }
+      }),
+      currentUser,
+      dependencies: dependencies(),
+      savedItemSearchIndex: {
+        async delete(savedItemIds) {
+          deletedIds.push(savedItemIds);
+        },
+        async search() {
+          return { items: [], nextCursor: null };
+        },
+        async upsert() {}
+      }
+    });
+
+    const response = await app.request("/rpc/bookmarks/delete", {
+      body: JSON.stringify({
+        json: { bookmarkId: "00000000-0000-4000-8000-000000000010" }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+
+    expect(response.status).toBe(200);
+    expect(deletedIds).toEqual([["00000000-0000-4000-8000-000000000010"]]);
+  });
+
   test("moves multiple bookmarks through oRPC for the current user's libraries", async () => {
     const calls: Parameters<BookmarksStore["moveBookmarks"]>[0][] = [];
     const bookmarksStore = createBookmarksStore({
@@ -537,6 +660,211 @@ describe("bookmarks RPC", () => {
         "00000000-0000-4000-8000-000000000011"
       ],
       destinationFolderId: TEST_FOLDER_ID
+    });
+  });
+
+  test("reindexes moved bookmarks with their updated folder context", async () => {
+    const indexedDocuments: unknown[] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({
+        async moveBookmarks(input) {
+          return {
+            destinationFolderId: input.destinationFolderId ?? null,
+            movedBookmarkIds: input.bookmarkIds
+          };
+        },
+        async listSavedItemSearchDocuments(input) {
+          expect(input).toEqual({
+            libraryIds: [DEV_PERSONAL_LIBRARY_ID],
+            savedItemIds: ["00000000-0000-4000-8000-000000000010"]
+          });
+
+          return [
+            {
+              id: "00000000-0000-4000-8000-000000000010",
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              libraryName: DEV_PERSONAL_LIBRARY_NAME,
+              folderId: TEST_FOLDER_ID,
+              folderName: "Research",
+              url: "https://example.com/article",
+              title: "Moved bookmark",
+              description: null,
+              siteName: "Example",
+              imageUrl: null,
+              metadataStatus: "fetched",
+              metadataFetchedAt: "2026-06-20T12:00:00.000Z",
+              faviconId: null,
+              faviconUrl: null,
+              tagNames: [],
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:05:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies(),
+      savedItemSearchIndex: {
+        async delete() {},
+        async search() {
+          return { items: [], nextCursor: null };
+        },
+        async upsert(documents) {
+          indexedDocuments.push(...documents);
+        }
+      }
+    });
+
+    const response = await app.request("/rpc/bookmarks/move", {
+      body: JSON.stringify({
+        json: {
+          bookmarkIds: ["00000000-0000-4000-8000-000000000010"],
+          destinationFolderId: TEST_FOLDER_ID
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+
+    expect(response.status).toBe(200);
+    expect(indexedDocuments).toHaveLength(1);
+    expect(indexedDocuments[0]).toMatchObject({
+      folderName: "Research",
+      title: "Moved bookmark"
+    });
+  });
+
+  test("searches bookmarks in the current workspace through oRPC", async () => {
+    const calls: Parameters<SavedItemSearchIndex["search"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({}),
+      currentUser: {
+        ...currentUser,
+        libraries: [
+          ...currentUser.libraries,
+          {
+            id: DEV_ORGANIZATION_LIBRARY_ID,
+            kind: "organization" as const,
+            name: DEV_ORGANIZATION_LIBRARY_NAME,
+            organizationId: "00000000-0000-4000-8000-000000000100",
+            organizationSlug: "team"
+          }
+        ]
+      },
+      dependencies: dependencies(),
+      savedItemSearchIndex: {
+        async delete() {},
+        async search(input) {
+          calls.push(input);
+
+          return {
+            items: [
+              {
+                id: "00000000-0000-4000-8000-000000000010",
+                libraryId: DEV_PERSONAL_LIBRARY_ID,
+                libraryName: DEV_PERSONAL_LIBRARY_NAME,
+                folderId: TEST_FOLDER_ID,
+                folderName: "Research",
+                url: "https://example.com/search",
+                title: "Search result",
+                description: null,
+                siteName: "Example",
+                imageUrl: null,
+                metadataStatus: "fetched",
+                metadataFetchedAt: "2026-06-20T12:00:00.000Z",
+                faviconId: null,
+                faviconUrl: null,
+                createdAt: "2026-06-20T12:00:00.000Z",
+                updatedAt: "2026-06-20T12:00:00.000Z"
+              }
+            ],
+            nextCursor: null
+          };
+        },
+        async upsert() {}
+      }
+    });
+
+    const response = await app.request("/rpc/bookmarks/search", {
+      body: JSON.stringify({
+        json: {
+          libraryId: DEV_PERSONAL_LIBRARY_ID,
+          limit: 10,
+          query: " search ",
+          scope: "current"
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json.items[0].title).toBe("Search result");
+    expect(calls[0]).toEqual({
+      cursor: undefined,
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      limit: 10,
+      query: "search"
+    });
+  });
+
+  test("searches all current user workspaces through oRPC", async () => {
+    const calls: Parameters<SavedItemSearchIndex["search"]>[0][] = [];
+    const app = createApp({
+      bookmarksStore: createBookmarksStore({}),
+      currentUser: {
+        ...currentUser,
+        libraries: [
+          ...currentUser.libraries,
+          {
+            id: DEV_ORGANIZATION_LIBRARY_ID,
+            kind: "organization" as const,
+            name: DEV_ORGANIZATION_LIBRARY_NAME,
+            organizationId: "00000000-0000-4000-8000-000000000100",
+            organizationSlug: "team"
+          }
+        ]
+      },
+      dependencies: dependencies(),
+      savedItemSearchIndex: {
+        async delete() {},
+        async search(input) {
+          calls.push(input);
+
+          return {
+            items: [],
+            nextCursor: null
+          };
+        },
+        async upsert() {}
+      }
+    });
+
+    const response = await app.request("/rpc/bookmarks/search", {
+      body: JSON.stringify({
+        json: {
+          libraryId: DEV_PERSONAL_LIBRARY_ID,
+          query: "postgres",
+          scope: "all"
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toEqual({
+      cursor: undefined,
+      libraryIds: [DEV_PERSONAL_LIBRARY_ID, DEV_ORGANIZATION_LIBRARY_ID],
+      limit: 20,
+      query: "postgres"
     });
   });
 });

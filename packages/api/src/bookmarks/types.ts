@@ -16,6 +16,22 @@ export interface ListBookmarksInput {
   cursor?: BookmarkCursor;
 }
 
+export interface SavedItemSearchCursor {
+  offset: number;
+}
+
+export interface SavedItemSearchDocument extends BookmarkItem {
+  libraryName: string;
+  tagNames: string[];
+}
+
+export interface SearchBookmarksInput {
+  cursor?: SavedItemSearchCursor;
+  libraryIds: string[];
+  limit: number;
+  query: string;
+}
+
 export interface ListBookmarkLocationsInput {
   libraryIds: string[];
   url: string;
@@ -32,6 +48,11 @@ export interface CreateBookmarkInput {
 export interface DeleteBookmarkInput {
   allowedLibraryIds: string[];
   bookmarkId: string;
+}
+
+export interface ListSavedItemSearchDocumentsInput {
+  libraryIds?: string[];
+  savedItemIds?: string[];
 }
 
 export interface MoveBookmarksInput {
@@ -101,6 +122,9 @@ export interface DeleteFolderInput {
 export interface BookmarksStore {
   listBookmarks(input: ListBookmarksInput): Promise<BookmarkItem[]>;
   listBookmarkLocations(input: ListBookmarkLocationsInput): Promise<BookmarkLocationItem[]>;
+  listSavedItemSearchDocuments(
+    input: ListSavedItemSearchDocumentsInput
+  ): Promise<SavedItemSearchDocument[]>;
   createBookmark(input: CreateBookmarkInput): Promise<BookmarkItem>;
   deleteBookmark(input: DeleteBookmarkInput): Promise<{ deletedBookmarkId: string }>;
   moveBookmarks(input: MoveBookmarksInput): Promise<{

@@ -1,4 +1,9 @@
-import { enrichSavedItem, type BookmarkEnrichmentQueue } from "@bookmarks/api/bookmarks";
+import {
+  createDatabaseBookmarksStore,
+  enrichSavedItem,
+  type BookmarkEnrichmentQueue,
+  type SavedItemSearchIndex
+} from "@bookmarks/api/bookmarks";
 import type { Database } from "@bookmarks/api/db";
 import type Redis from "ioredis";
 
@@ -28,6 +33,7 @@ export class BookmarkEnrichmentWorker {
     private readonly options: {
       db: Database;
       redis: Redis;
+      savedItemSearchIndex?: SavedItemSearchIndex;
     }
   ) {}
 
@@ -62,6 +68,7 @@ export class BookmarkEnrichmentWorker {
 
         if (job) {
           await enrichSavedItem(this.options.db, job.savedItemId);
+          await this.syncSearchIndex(job.savedItemId);
         }
       } catch (error) {
         if (!this.stopping) {
@@ -71,6 +78,25 @@ export class BookmarkEnrichmentWorker {
     }
 
     redis.disconnect();
+  }
+
+  private async syncSearchIndex(savedItemId: string): Promise<void> {
+    if (!this.options.savedItemSearchIndex) {
+      return;
+    }
+
+    const store = createDatabaseBookmarksStore(this.options.db);
+    const documents = await store.listSavedItemSearchDocuments({
+      savedItemIds: [savedItemId]
+    });
+
+    if (documents.length === 0) {
+      return;
+    }
+
+    await this.options.savedItemSearchIndex.upsert(documents).catch((error: unknown) => {
+      console.error("Unable to sync enriched bookmark to search index", error);
+    });
   }
 }
 

@@ -7,6 +7,7 @@ import type {
   DeleteTagInput,
   MoveFolderInput,
   MoveBookmarksInput,
+  SearchBookmarksInput,
   UpdateFolderInput,
   UpdateTagInput
 } from "@bookmarks/shared";
@@ -16,8 +17,10 @@ import {
   type BookmarkEnrichmentQueue,
   listBookmarksPage,
   parseBookmarksLimit,
+  searchSavedItemsPage,
   type BookmarkCursor,
-  type BookmarksStore
+  type BookmarksStore,
+  type SavedItemSearchIndex
 } from "./bookmarks";
 import { getCurrentUserResponse, type CurrentIdentity } from "./currentUser";
 import type { HealthDependencies } from "./health";
@@ -28,6 +31,7 @@ export interface RpcRouterOptions {
   currentUser?: CurrentIdentity;
   bookmarksStore?: BookmarksStore;
   bookmarkEnrichmentQueue?: BookmarkEnrichmentQueue;
+  savedItemSearchIndex?: SavedItemSearchIndex;
 }
 
 export const createRpcRouter = (options: RpcRouterOptions) => ({
@@ -119,6 +123,11 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         url: bookmark.url
       });
 
+      await upsertSavedItemSearchDocuments(options.bookmarksStore, options.savedItemSearchIndex, {
+        libraryIds: allowedLibraryIds,
+        savedItemIds: [createdBookmark.id]
+      });
+
       if (createdBookmark.metadataStatus !== "fetched") {
         await options.bookmarkEnrichmentQueue
           ?.enqueueSavedItem(createdBookmark.id)
@@ -141,10 +150,16 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.deleteBookmark({
+      const result = await options.bookmarksStore.deleteBookmark({
         ...bookmark,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
+
+      await options.savedItemSearchIndex?.delete([result.deletedBookmarkId]).catch((error: unknown) => {
+        console.error("Unable to delete bookmark from search index", error);
+      });
+
+      return result;
     }),
     list: os.handler(async ({ input }) => {
       if (!options.currentUser) {
@@ -209,10 +224,58 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.moveBookmarks({
+      const result = await options.bookmarksStore.moveBookmarks({
         ...move,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
+
+      await upsertSavedItemSearchDocuments(options.bookmarksStore, options.savedItemSearchIndex, {
+        libraryIds: currentUserLibraryIds(options.currentUser),
+        savedItemIds: result.movedBookmarkIds
+      });
+
+      return result;
+    }),
+    search: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertSavedItemSearchIndex(options.savedItemSearchIndex);
+
+      const search = parseSearchBookmarksInput(input);
+
+      if (!search) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a search query"
+        });
+      }
+
+      const allowedLibraryIds = currentUserLibraryIds(options.currentUser);
+      const libraryIds =
+        search.scope === "all"
+          ? allowedLibraryIds
+          : search.libraryId && allowedLibraryIds.includes(search.libraryId)
+            ? [search.libraryId]
+            : null;
+
+      if (!libraryIds) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an available workspace"
+        });
+      }
+
+      const result = await searchSavedItemsPage(options.savedItemSearchIndex, {
+        cursor: search.cursor,
+        libraryIds,
+        limit: search.limit,
+        query: search.query
+      });
+
+      if (!result) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Invalid search cursor"
+        });
+      }
+
+      return result;
     })
   },
   tags: {
@@ -388,6 +451,38 @@ const parseBookmarksInput = (
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null),
     tagId: typeof input.tagId === "string" && input.tagId ? input.tagId : undefined
+  };
+};
+
+const parseSearchBookmarksInput = (
+  input: unknown
+): {
+  cursor?: string;
+  libraryId?: string;
+  limit: number;
+  query: string;
+  scope: SearchBookmarksInput["scope"];
+} | null => {
+  if (!isRecord(input) || typeof input.query !== "string") {
+    return null;
+  }
+
+  const query = input.query.trim();
+
+  if (!query) {
+    return null;
+  }
+
+  if (input.scope !== "current" && input.scope !== "all") {
+    return null;
+  }
+
+  return {
+    cursor: typeof input.cursor === "string" && input.cursor ? input.cursor : undefined,
+    libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
+    limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null),
+    query,
+    scope: input.scope
   };
 };
 
@@ -678,4 +773,34 @@ function assertBookmarksStore(
       message: "Bookmarks storage is not configured"
     });
   }
+}
+
+function assertSavedItemSearchIndex(
+  savedItemSearchIndex: SavedItemSearchIndex | undefined
+): asserts savedItemSearchIndex is SavedItemSearchIndex {
+  if (!savedItemSearchIndex) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "Search index is not configured"
+    });
+  }
+}
+
+async function upsertSavedItemSearchDocuments(
+  bookmarksStore: BookmarksStore,
+  savedItemSearchIndex: SavedItemSearchIndex | undefined,
+  input: Parameters<BookmarksStore["listSavedItemSearchDocuments"]>[0]
+) {
+  if (!savedItemSearchIndex) {
+    return;
+  }
+
+  const documents = await bookmarksStore.listSavedItemSearchDocuments(input);
+
+  if (documents.length === 0) {
+    return;
+  }
+
+  await savedItemSearchIndex.upsert(documents).catch((error: unknown) => {
+    console.error("Unable to upsert bookmarks into search index", error);
+  });
 }

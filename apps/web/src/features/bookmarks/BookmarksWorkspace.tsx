@@ -3,38 +3,64 @@ import type { InfiniteData } from "@tanstack/react-query";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { BookmarksPageResponse } from "@bookmarks/shared";
 import { IconAlertTriangle, IconBookmark, IconRefresh } from "@tabler/icons-react";
-import { deleteBookmark, getBookmarks } from "../../api";
+import { deleteBookmark, getBookmarks, searchBookmarks } from "../../api";
 import { bookmarkQueryKey } from "./bookmarkUtils";
+import type { BookmarkSearchScope } from "./SearchToolbar";
 import { BookmarkRow } from "./BookmarkRow";
 
 export const BookmarksWorkspace = ({
   folderId,
   folderName,
   libraryId,
+  searchQuery,
+  searchScope,
   tagId,
   tagName
 }: {
   folderId: string | null;
   folderName: string | null;
   libraryId: string | null;
+  searchQuery: string;
+  searchScope: BookmarkSearchScope;
   tagId: string | null;
   tagName: string | null;
 }) => {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
   const [notification, setNotification] = useState<string | null>(null);
-  const currentQueryKey = bookmarkQueryKey({ folderId, libraryId, tagId });
+  const trimmedSearchQuery = searchQuery.trim();
+  const isSearching = trimmedSearchQuery.length > 0;
+  const currentQueryKey = isSearching
+    ? [
+        "bookmarks",
+        "search",
+        {
+          libraryId: searchScope === "current" ? libraryId : null,
+          query: trimmedSearchQuery,
+          scope: searchScope
+        }
+      ]
+    : bookmarkQueryKey({ folderId, libraryId, tagId });
   const bookmarks = useInfiniteQuery({
+    enabled: !isSearching || searchScope === "all" || Boolean(libraryId),
     queryKey: currentQueryKey,
     queryFn: ({ pageParam }) =>
-      getBookmarks({
-        cursor: pageParam,
-        folderId,
-        inbox: folderId === null && tagId === null,
-        libraryId,
-        limit: 20,
-        tagId
-      }),
+      isSearching
+        ? searchBookmarks({
+            cursor: pageParam,
+            libraryId: searchScope === "current" ? libraryId : undefined,
+            limit: 20,
+            query: trimmedSearchQuery,
+            scope: searchScope
+          })
+        : getBookmarks({
+            cursor: pageParam,
+            folderId,
+            inbox: folderId === null && tagId === null,
+            libraryId,
+            limit: 20,
+            tagId
+          }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor
   });
@@ -195,7 +221,9 @@ export const BookmarksWorkspace = ({
             No items yet
           </h2>
           <p className="mb-0 max-w-full text-[#697080] sm:max-w-[56ch]">
-            {tagName
+            {isSearching
+              ? "No saved links match this search."
+              : tagName
               ? "Bookmarks with this tag will appear here."
               : folderName
                 ? "Bookmarks added to this folder will appear here."
@@ -219,7 +247,7 @@ export const BookmarksWorkspace = ({
           <BookmarkRow
             item={item}
             key={item.id}
-            showFolderName={false}
+            showFolderName={isSearching}
             onDeleteBookmark={(bookmarkId) => deleteBookmarkMutation.mutate({ bookmarkId })}
             onLinkCopied={() => setNotification("Link copied")}
           />

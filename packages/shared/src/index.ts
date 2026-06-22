@@ -57,6 +57,7 @@ export interface AuthCredentials {
 export interface BookmarkItem {
   id: string;
   libraryId: string;
+  libraryName?: string | null;
   folderId: string | null;
   folderName: string | null;
   url: string;
@@ -132,6 +133,14 @@ export interface ListBookmarksInput {
   libraryId?: string | null;
   limit?: number;
   tagId?: string | null;
+}
+
+export interface SearchBookmarksInput {
+  cursor?: string | null;
+  libraryId?: string | null;
+  limit?: number;
+  query: string;
+  scope: "current" | "all";
 }
 
 export interface CreateFolderInput {

@@ -15,6 +15,7 @@ import type {
   ListBookmarksInput,
   MoveFolderInput,
   MoveBookmarksInput,
+  SearchBookmarksInput,
   TagItem,
   UpdateFolderInput,
   UpdateTagInput
@@ -52,6 +53,7 @@ interface BookmarksRpcClient extends Record<string, NestedClient<Record<never, n
     MoveBookmarksInput,
     { destinationFolderId: string | null; movedBookmarkIds: string[] }
   >;
+  search: RpcProcedure<SearchBookmarksInput, BookmarksPageResponse>;
 }
 
 interface FoldersRpcClient extends Record<string, NestedClient<Record<never, never>>> {
@@ -142,6 +144,10 @@ export const getBookmarks = async ({
     tagId
   });
 };
+
+export const searchBookmarks = async (
+  input: SearchBookmarksInput
+): Promise<BookmarksPageResponse> => rpc.bookmarks.search(input);
 
 export const createBookmark = async (input: CreateBookmarkInput): Promise<BookmarkItem> =>
   rpc.bookmarks.create(input);

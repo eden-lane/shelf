@@ -6,6 +6,7 @@ import type {
 } from "@bookmarks/api/health";
 import Redis from "ioredis";
 import pg from "pg";
+import { MeilisearchSavedItemSearchIndex } from "./savedItemSearchIndex";
 
 const { Pool } = pg;
 
@@ -51,6 +52,7 @@ export interface RuntimeClients {
   database: PostgresDatabaseHealthClient;
   queue: RedisQueueHealthClient;
   search: MeilisearchHealthClient;
+  savedItemSearchIndex: MeilisearchSavedItemSearchIndex;
   close(): Promise<void>;
 }
 
@@ -70,6 +72,7 @@ export const createRuntimeClients = (options: {
     database: new PostgresDatabaseHealthClient(pool),
     queue: new RedisQueueHealthClient(redis),
     search: new MeilisearchHealthClient(options.meilisearchUrl),
+    savedItemSearchIndex: new MeilisearchSavedItemSearchIndex(options.meilisearchUrl),
     async close() {
       await Promise.allSettled([pool.end(), redis.quit()]);
     }

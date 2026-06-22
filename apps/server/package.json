@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
+    "search:reindex": "bun src/reindexSearch.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

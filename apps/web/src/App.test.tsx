@@ -120,6 +120,13 @@ describe("App", () => {
       }
     ];
     const bookmarkCreateRequests: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string }[] = [];
+    const bookmarkSearchRequests: {
+      cursor?: string | null;
+      libraryId?: string | null;
+      limit?: number;
+      query?: string;
+      scope?: "current" | "all";
+    }[] = [];
     let finishCreate = () => {};
     const copiedLinks: string[] = [];
     const openedLinks: string[] = [];
@@ -236,6 +243,58 @@ describe("App", () => {
         )
           .filter((item) => (body.json?.libraryId ? item.libraryId === body.json.libraryId : true))
           .filter((item) => (tagBookmarks ? tagBookmarks.has(item.id) : true));
+
+        return new Response(
+          JSON.stringify({
+            json: {
+              items,
+              nextCursor: null
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/bookmarks/search") {
+        const body = (await request.json()) as {
+          json?: {
+            cursor?: string | null;
+            libraryId?: string | null;
+            limit?: number;
+            query?: string;
+            scope?: "current" | "all";
+          };
+        };
+        bookmarkSearchRequests.push(body.json ?? {});
+        const query = body.json?.query?.toLowerCase() ?? "";
+        const items = savedItems
+          .filter((item) =>
+            [
+              item.title,
+              item.url,
+              item.description,
+              item.siteName,
+              item.folderName ?? "Inbox"
+            ]
+              .filter(Boolean)
+              .some((value) => value?.toLowerCase().includes(query))
+          )
+          .filter((item) =>
+            body.json?.scope === "current" && body.json.libraryId
+              ? item.libraryId === body.json.libraryId
+              : true
+          )
+          .map((item) => ({
+            ...item,
+            libraryName:
+              item.libraryId === "00000000-0000-4000-8000-000000000003"
+                ? "Personal"
+                : "Team"
+          }));
 
         return new Response(
           JSON.stringify({
@@ -707,6 +766,40 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Tag actions for Important" })).toBeTruthy();
       expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
       expect(screen.queryByText("Libraries")).toBeNull();
+    });
+    const bookmarkSearchInput = screen.getByRole("searchbox", {
+      name: "Search bookmarks"
+    }) as HTMLInputElement;
+    bookmarkSearchInput.value = "plain";
+    fireEvent.input(bookmarkSearchInput);
+    await waitFor(() => {
+      expect(bookmarkSearchRequests.at(-1)?.query).toBe("plain");
+      expect(screen.getByText("Plain Bookmark")).toBeTruthy();
+      expect(screen.getByLabelText("Bookmark location Personal / Inbox")).toBeTruthy();
+    });
+    expect(window.location.search).toBe("?q=plain");
+    expect(bookmarkSearchRequests.at(-1)).toEqual({
+      cursor: null,
+      libraryId: "00000000-0000-4000-8000-000000000003",
+      limit: 20,
+      query: "plain",
+      scope: "current"
+    });
+    fireEvent.click(screen.getByRole("button", { name: "All workspaces" }));
+    await waitFor(() => {
+      expect(window.location.search).toBe("?q=plain&scope=all");
+    });
+    expect(bookmarkSearchRequests.at(-1)).toEqual({
+      cursor: null,
+      libraryId: undefined,
+      limit: 20,
+      query: "plain",
+      scope: "all"
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await waitFor(() => {
+      expect(window.location.search).toBe("");
+      expect(screen.getByText("Example Article")).toBeTruthy();
     });
     const rootDropZone = screen.container.querySelector("[data-folder-root-drop-zone]");
     expect(rootDropZone).toBeTruthy();

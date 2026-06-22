@@ -9,6 +9,7 @@ import { getFavicon } from "./getFavicon";
 import { listBookmarkLocations } from "./listBookmarkLocations";
 import { listBookmarks } from "./listBookmarks";
 import { listFolders } from "./listFolders";
+import { listSavedItemSearchDocuments } from "./listSavedItemSearchDocuments";
 import { listTags } from "./listTags";
 import { moveFolder } from "./moveFolder";
 import { moveBookmarks } from "./moveBookmarks";
@@ -27,6 +28,7 @@ export const createDatabaseBookmarksStore = (db: Database): BookmarksStore => ({
   listBookmarkLocations: (input) => listBookmarkLocations(db, input),
   listBookmarks: (input) => listBookmarks(db, input),
   listFolders: (input) => listFolders(db, input),
+  listSavedItemSearchDocuments: (input) => listSavedItemSearchDocuments(db, input),
   listTags: (input) => listTags(db, input),
   moveFolder: (input) => moveFolder(db, input),
   moveBookmarks: (input) => moveBookmarks(db, input),

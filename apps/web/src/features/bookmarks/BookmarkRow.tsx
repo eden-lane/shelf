@@ -29,6 +29,7 @@ export const BookmarkRow = ({
   const faviconSrc = item.faviconUrl ? apiAssetUrl(item.faviconUrl) : null;
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const title = item.title || host || item.url;
+  const contextLabel = [item.libraryName, item.folderName ?? "Inbox"].filter(Boolean).join(" / ");
   const {
     attributes,
     listeners,
@@ -148,10 +149,10 @@ export const BookmarkRow = ({
                 {showFolderName ? (
                   <span
                     className="flex items-center gap-1.5 rounded-lg border border-[#e7eaf1] bg-[#fbfcff] px-2.5 py-1 text-xs font-extrabold text-[#697080]"
-                    aria-label={`Bookmark folder ${item.folderName}`}
+                    aria-label={`Bookmark location ${contextLabel}`}
                   >
                     <IconFolder size={16} stroke={1.5} aria-hidden="true" focusable="false" />
-                    {item.folderName}
+                    {contextLabel}
                   </span>
                 ) : null}
                 <button
