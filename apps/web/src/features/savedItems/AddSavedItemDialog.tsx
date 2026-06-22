@@ -398,6 +398,7 @@ export const AddSavedItemDialog = ({
                     isUrlShaking ? "field-shake" : ""
                   ].join(" ")}
                   aria-invalid={isUrlInvalid}
+                  autoComplete="url"
                   id="savedItem-url"
                   inputMode="url"
                   name="url"

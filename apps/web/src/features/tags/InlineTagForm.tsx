@@ -93,6 +93,7 @@ export const InlineTagForm = ({
           ].join(" ")}
           aria-label="Tag name"
           aria-invalid={isNameInvalid}
+          autoComplete="off"
           name="name"
           placeholder="Tag name"
           ref={inputRef}

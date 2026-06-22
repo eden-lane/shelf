@@ -85,6 +85,7 @@ export const FolderIconPickerDropdown = ({
                 <input
                   className="min-w-0 flex-1 bg-transparent text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] md:text-xs"
                   aria-label="Search icons"
+                  autoComplete="off"
                   placeholder="Search icons..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}

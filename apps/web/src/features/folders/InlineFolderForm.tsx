@@ -98,6 +98,7 @@ export const InlineFolderForm = ({
             ].join(" ")}
             aria-label="Folder title"
             aria-invalid={isNameInvalid}
+            autoComplete="off"
             name="name"
             placeholder="Folder title"
             ref={inputRef}

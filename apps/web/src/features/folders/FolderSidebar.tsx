@@ -213,6 +213,7 @@ export const FolderSidebar = ({
           <input
             className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-950 outline-none placeholder:text-gray-500"
             aria-label="Search saved items"
+            autoComplete="off"
             placeholder="Search saved links"
             type="search"
             value={searchQuery}
