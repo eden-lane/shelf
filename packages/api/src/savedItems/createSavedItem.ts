@@ -10,6 +10,7 @@ export const createSavedItem = async (db: Database, input: CreateSavedItemInput)
       .insert(schema.savedItems)
       .values({
         createdByUserId: input.createdByUserId,
+        description: input.description,
         folderId: input.folderId,
         libraryId: input.libraryId,
         url: input.url
@@ -17,6 +18,7 @@ export const createSavedItem = async (db: Database, input: CreateSavedItemInput)
       .onConflictDoUpdate({
         target: [schema.savedItems.libraryId, schema.savedItems.url],
         set: {
+          description: input.description,
           folderId: input.folderId,
           updatedAt: sql`now()`
         }

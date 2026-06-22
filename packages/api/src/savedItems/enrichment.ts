@@ -40,6 +40,7 @@ type LinkPreviewResult = Awaited<ReturnType<typeof getPreviewFromContent>>;
 export const enrichSavedItem = async (db: Database, savedItemId: string): Promise<void> => {
   const [savedItem] = await db
     .select({
+      description: schema.savedItems.description,
       id: schema.savedItems.id,
       url: schema.savedItems.url
     })
@@ -61,7 +62,7 @@ export const enrichSavedItem = async (db: Database, savedItemId: string): Promis
     await db
       .update(schema.savedItems)
       .set({
-        description: metadata.description,
+        description: savedItem.description ?? metadata.description,
         faviconId: favicon?.id ?? null,
         imageUrl: metadata.imageUrl,
         metadataFetchedAt: new Date(),
@@ -80,6 +81,9 @@ export const enrichSavedItem = async (db: Database, savedItemId: string): Promis
     await markMetadataFailed(db, savedItem.id);
   }
 };
+
+export const fetchLinkPreviewMetadata = async (url: string): Promise<LinkPreviewMetadata> =>
+  mapLinkPreviewMetadata(await fetchLinkPreview(url));
 
 export const mapLinkPreviewMetadata = (preview: LinkPreviewResult): LinkPreviewMetadata => {
   const record = preview as Partial<{

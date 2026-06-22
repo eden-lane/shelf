@@ -1,6 +1,7 @@
 import type {
   CreateSavedItemInput,
   CreateFolderInput,
+  SavedItemPreviewInput,
   CreateTagInput,
   DeleteSavedItemInput,
   DeleteFolderInput,
@@ -20,6 +21,7 @@ import {
   parseSavedItemsLimit,
   searchSavedItemsPage,
   type SavedItemCursor,
+  fetchLinkPreviewMetadata,
   type SavedItemsStore,
   type SavedItemSearchIndex
 } from "./savedItems";
@@ -47,6 +49,33 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     return getCurrentUserResponse(options.currentUser);
   }),
   savedItems: {
+    preview: os.handler(async ({ input }) => {
+      if (!options.currentUser) {
+        throw new ORPCError("UNAUTHORIZED", {
+          message: "No current user is configured"
+        });
+      }
+
+      const previewInput = parseSavedItemPreviewInput(input);
+
+      if (!previewInput) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Enter a valid URL"
+        });
+      }
+
+      try {
+        const metadata = await fetchLinkPreviewMetadata(previewInput.url);
+
+        return {
+          description: metadata.description
+        };
+      } catch {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Unable to fetch page description"
+        });
+      }
+    }),
     create: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
@@ -118,6 +147,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       const createdSavedItem = await options.savedItemsStore.createSavedItem({
         createdByUserId: options.currentUser.user.id,
+        description: savedItem.description ?? null,
         folderId: targetFolderId,
         libraryId: targetLibraryId,
         tagIds: selectedTagIds,
@@ -519,11 +549,32 @@ const parseCreateSavedItemInput = (input: unknown): CreateSavedItemInput | null 
   }
 
   return {
+    description: normalizeOptionalText(input.description),
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     tagIds: parseSelectedTagIds(input.tagIds),
     url
   };
+};
+
+const parseSavedItemPreviewInput = (input: unknown): SavedItemPreviewInput | null => {
+  if (!isRecord(input) || typeof input.url !== "string") {
+    return null;
+  }
+
+  const url = parseHttpUrl(input.url);
+
+  return url ? { url } : null;
+};
+
+const normalizeOptionalText = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed ? trimmed : null;
 };
 
 const parseSavedItemLocationsInput = (input: unknown): { url: string } | null => {

@@ -387,7 +387,7 @@ describe("savedItems RPC", () => {
           folderName: null,
           url: input.url,
           title: null,
-          description: null,
+          description: input.description,
           siteName: null,
           imageUrl: null,
           metadataStatus: "pending",
@@ -411,7 +411,12 @@ describe("savedItems RPC", () => {
     });
 
     const response = await app.request("/rpc/savedItems/create", {
-      body: JSON.stringify({ json: { url: "https://example.com/article" } }),
+      body: JSON.stringify({
+        json: {
+          description: "User edited description",
+          url: "https://example.com/article"
+        }
+      }),
       headers: {
         "content-type": "application/json"
       },
@@ -421,8 +426,10 @@ describe("savedItems RPC", () => {
 
     expect(response.status).toBe(200);
     expect(body.json.url).toBe("https://example.com/article");
+    expect(body.json.description).toBe("User edited description");
     expect(calls[0]).toEqual({
       createdByUserId: DEV_USER_ID,
+      description: "User edited description",
       folderId: null,
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       tagIds: undefined,
@@ -591,6 +598,7 @@ describe("savedItems RPC", () => {
     expect(response.status).toBe(200);
     expect(calls[0]).toEqual({
       createdByUserId: DEV_USER_ID,
+      description: null,
       folderId: "00000000-0000-4000-8000-000000000020",
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       tagIds: ["00000000-0000-4000-8000-000000000030"],

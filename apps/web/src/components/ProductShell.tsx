@@ -369,6 +369,10 @@ export const ProductShell = () => {
     savedItemTargetTag?.libraryId ??
     activeTag?.libraryId ??
     activeLibraryId;
+  const savedItemDialogFolder =
+    savedItemTargetFolder ?? (savedItemTargetTag ? null : activeFolder);
+  const savedItemDialogTagId =
+    savedItemTargetTag?.id ?? (savedItemTargetFolder ? null : activeTagId);
   const activeFolderDragItem =
     folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
   const activeTagDragItem = tags.data?.find((tag) => tag.id === activeTagDragId) ?? null;
@@ -1079,10 +1083,11 @@ export const ProductShell = () => {
         />
       </section>
       <AddSavedItemDialog
+        folders={folders.data ?? []}
         isOpen={savedItemDialogOpen}
-        targetFolder={savedItemTargetFolder}
+        targetFolder={savedItemDialogFolder}
         targetLibraryId={savedItemTargetLibraryId}
-        targetTagId={savedItemTargetTag?.id ?? activeTagId}
+        targetTagId={savedItemDialogTagId}
         tags={tags.data ?? []}
         visibleFolderId={activeFolderId}
         visibleLibraryId={activeLibraryId}

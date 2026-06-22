@@ -41,6 +41,7 @@ export interface CreateSavedItemInput {
   libraryId: string;
   folderId: string | null;
   createdByUserId: string;
+  description: string | null;
   url: string;
   tagIds?: string[];
 }

@@ -2,6 +2,8 @@ import type {
   AuthCredentials,
   AuthSessionResponse,
   SavedItem,
+  SavedItemPreviewInput,
+  SavedItemPreviewResponse,
   SavedItemsPageResponse,
   CreateSavedItemInput,
   CreateFolderInput,
@@ -63,6 +65,7 @@ interface SavedItemsRpcClient extends Record<string, NestedClient<Record<never, 
     MoveSavedItemsInput,
     { destinationFolderId: string | null; movedSavedItemIds: string[] }
   >;
+  preview: RpcProcedure<SavedItemPreviewInput, SavedItemPreviewResponse>;
   search: RpcProcedure<SearchSavedItemsInput, SavedItemsPageResponse>;
 }
 
@@ -162,6 +165,10 @@ export const searchSavedItems = async (
 
 export const createSavedItem = async (input: CreateSavedItemInput): Promise<SavedItem> =>
   rpc.savedItems.create(input);
+
+export const getSavedItemPreview = async (
+  input: SavedItemPreviewInput
+): Promise<SavedItemPreviewResponse> => rpc.savedItems.preview(input);
 
 export const deleteSavedItem = async (
   input: DeleteSavedItemInput

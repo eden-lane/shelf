@@ -113,9 +113,18 @@ export interface SavedItemsPageResponse {
 
 export interface CreateSavedItemInput {
   url: string;
+  description?: string | null;
   folderId?: string;
   libraryId?: string;
   tagIds?: string[];
+}
+
+export interface SavedItemPreviewInput {
+  url: string;
+}
+
+export interface SavedItemPreviewResponse {
+  description: string | null;
 }
 
 export interface DeleteSavedItemInput {

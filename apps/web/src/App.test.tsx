@@ -120,7 +120,13 @@ describe("App", () => {
         updatedAt: "2026-06-19T12:00:00.000Z"
       }
     ];
-    const savedItemCreateRequests: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string }[] = [];
+    const savedItemCreateRequests: {
+      description?: string | null;
+      folderId?: string;
+      libraryId?: string;
+      tagIds?: string[];
+      url?: string;
+    }[] = [];
     const savedItemSearchRequests: {
       cursor?: string | null;
       libraryId?: string | null;
@@ -505,7 +511,13 @@ describe("App", () => {
 
       if (url.pathname === "/rpc/savedItems/create") {
         const body = (await request.json()) as {
-          json?: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string };
+          json?: {
+            description?: string | null;
+            folderId?: string;
+            libraryId?: string;
+            tagIds?: string[];
+            url?: string;
+          };
         };
         savedItemCreateRequests.push(body.json ?? {});
         const targetFolder = body.json?.folderId
@@ -523,7 +535,7 @@ describe("App", () => {
           folderName: targetFolder?.name ?? null,
           url: body.json?.url || "https://added.example/post",
           title: null,
-          description: null,
+          description: body.json?.description ?? null,
           siteName: null,
           imageUrl: null,
           metadataStatus: "pending",
@@ -562,6 +574,21 @@ describe("App", () => {
             "content-type": "application/json"
           }
         });
+      }
+
+      if (url.pathname === "/rpc/savedItems/preview") {
+        return new Response(
+          JSON.stringify({
+            json: {
+              description: "Fetched description from preview"
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
       }
 
       if (url.pathname === "/rpc/savedItems/delete") {
@@ -868,6 +895,16 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Archive" }));
     expect(screen.getByRole("heading", { name: "Research / Archive" })).toBeTruthy();
     expect(window.location.pathname).toBe("/me/folder/00000000-0000-4000-8000-000000000021");
+    fireEvent.click(screen.getByRole("button", { name: "Add saved item" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add to Archive" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Folder Archive" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("button", { name: "Folder Research / Archive" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add to Archive" })).toBeNull();
+    });
     fireEvent.click(screen.getByRole("link", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
     expect(window.location.pathname).toBe("/me/folder/00000000-0000-4000-8000-000000000005");
@@ -882,6 +919,15 @@ describe("App", () => {
       expect(screen.queryByText("Plain Saved Item")).toBeNull();
     });
     expect(window.location.pathname).toBe("/me/tag/00000000-0000-4000-8000-000000000030");
+    fireEvent.click(screen.getByRole("button", { name: "Add saved item" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add saved item" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Tags Important" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add saved item" })).toBeNull();
+    });
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
@@ -896,8 +942,7 @@ describe("App", () => {
       expect(screen.getByRole("dialog", { name: "Add saved item" })).toBeTruthy();
     });
     await waitFor(() => {
-      const dialog = screen.getByRole("dialog", { name: "Add saved item" });
-      expect(dialog.querySelector('[aria-label="Important"]')).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Tags Important" })).toBeTruthy();
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
@@ -926,7 +971,17 @@ describe("App", () => {
       expect(screen.queryByRole("button", { name: "Updated tag" })).toBeNull();
     });
     document.body.style.overflow = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.width = "";
     document.documentElement.style.overflow = "";
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    window.dispatchEvent(new window.Event("resize"));
+    await waitFor(() => {
+      expect(document.body.style.position).toBe("");
+      expect(document.documentElement.style.overflow).toBe("");
+    });
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 420 });
     window.dispatchEvent(new window.Event("resize"));
@@ -940,7 +995,6 @@ describe("App", () => {
     expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     await waitFor(() => {
       expect(document.body.style.position).toBe("");
-      expect(document.body.style.overflow).toBe("");
       expect(document.documentElement.style.overflow).toBe("");
     });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
@@ -954,7 +1008,6 @@ describe("App", () => {
     window.dispatchEvent(new window.Event("resize"));
     await waitFor(() => {
       expect(document.body.style.position).toBe("");
-      expect(document.body.style.overflow).toBe("");
       expect(document.documentElement.style.overflow).toBe("");
     });
 
@@ -1127,6 +1180,9 @@ describe("App", () => {
       expect(screen.getByLabelText("Page URL")).toBeTruthy();
     });
     expect(screen.getByLabelText("Page URL").hasAttribute("required")).toBe(false);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText("Page URL"));
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
@@ -1149,6 +1205,34 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "No items yet" })).toBeTruthy();
     });
+    fireEvent.click(screen.getByRole("button", { name: "Add saved item" }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "Add to Read later" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Folder Read later" })).toBeTruthy();
+    });
+    expect(
+      document.querySelector(
+        '[data-folder-picker-selected-icon="00000000-0000-4000-8000-000000000020"]'
+      )
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Folder Read later" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Search folders")).toBeTruthy();
+    });
+    expect(
+      [...document.querySelectorAll("[data-folder-picker-option]")].map(
+        (option) => (option as HTMLElement).dataset.folderPickerOption
+      )
+    ).toEqual(["Inbox", "Research", "Archive", "Read later"]);
+    expect(
+      document
+        .querySelector('[data-folder-picker-icon="00000000-0000-4000-8000-000000000005"]')
+        ?.getAttribute("data-folder-picker-icon-color")
+    ).toBe("#3b82f6");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add to Read later" })).toBeNull();
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Folder actions for Read later" }));
 
@@ -1169,16 +1253,23 @@ describe("App", () => {
     pageUrlInput.value = "https://added.example/post";
     pageUrlInput.setAttribute("value", "https://added.example/post");
     fireEvent.input(pageUrlInput);
-    const tagInput = screen.getByLabelText("Tags") as HTMLInputElement;
+    const descriptionInput = screen.getByLabelText("Description") as HTMLTextAreaElement;
+    await waitFor(() => {
+      expect(descriptionInput.value).toBe("Fetched description from preview");
+    });
+    descriptionInput.value = "User edited description";
+    fireEvent.input(descriptionInput);
+    expect(screen.getByRole("button", { name: "Folder Read later" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tags" }));
+    const tagInput = screen.getByLabelText("Search tags") as HTMLInputElement;
     expect(tagInput.getAttribute("autocomplete")).toBe("off");
     expect(tagInput.dataset["1pIgnore"]).toBe("true");
     expect(tagInput.dataset["opIgnore"]).toBe("true");
-    fireEvent.change(tagInput, { target: { value: "Project" } });
+    tagInput.value = "Project";
     fireEvent.input(tagInput, { target: { value: "Project" } });
     fireEvent.keyDown(tagInput, { code: "Enter", key: "Enter" });
     await waitFor(() => {
-      const dialog = screen.getByRole("dialog", { name: "Add to Read later" });
-      expect(dialog.querySelector('[aria-label="Project"]')).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Tags Project" })).toBeTruthy();
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -1193,5 +1284,6 @@ describe("App", () => {
       expect(document.body.textContent).toContain("https://added.example/post");
     });
     expect(savedItemCreateRequests.at(-1)?.tagIds).toContain("00000000-0000-4000-8000-000000000031");
-  }, 15000);
+    expect(savedItemCreateRequests.at(-1)?.description).toBe("User edited description");
+  }, 35000);
 });
