@@ -15,6 +15,7 @@ export const listTags = async (db: Database, input: ListTagsInput): Promise<TagI
       libraryId: schema.tags.libraryId,
       name: schema.tags.name,
       color: schema.tags.color,
+      sortOrder: schema.tags.sortOrder,
       savedItemCount: sql<number>`count(${schema.savedItemTags.savedItemId})`,
       createdAt: schema.tags.createdAt,
       updatedAt: schema.tags.updatedAt
@@ -33,16 +34,18 @@ export const listTags = async (db: Database, input: ListTagsInput): Promise<TagI
       schema.tags.libraryId,
       schema.tags.name,
       schema.tags.color,
+      schema.tags.sortOrder,
       schema.tags.createdAt,
       schema.tags.updatedAt
     )
-    .orderBy(asc(schema.tags.name), asc(schema.tags.id));
+    .orderBy(asc(schema.tags.libraryId), asc(schema.tags.sortOrder), asc(schema.tags.name), asc(schema.tags.id));
 
   return rows.map((row) => ({
     id: row.id,
     libraryId: row.libraryId,
     name: row.name,
     color: row.color,
+    sortOrder: row.sortOrder,
     savedItemCount: Number(row.savedItemCount),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()

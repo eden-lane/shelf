@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import type { CurrentUserResponse, FolderItem, TagItem } from "@shelf/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,6 +9,7 @@ import {
   IconDatabase,
   IconDotsVertical,
   IconFolderPlus,
+  IconGripVertical,
   IconInbox,
   IconLayoutSidebarLeftCollapse,
   IconLogout2,
@@ -42,6 +43,7 @@ const COLLAPSED_FOLDERS_STORAGE_KEY = "savedItems.collapsedFolders";
 export const FolderSidebar = ({
   activeFolderId,
   activeFolderDragId,
+  activeTagDragId,
   activeTagId,
   currentUser,
   folders,
@@ -61,6 +63,7 @@ export const FolderSidebar = ({
 }: {
   activeFolderId: string | null;
   activeFolderDragId: string | null;
+  activeTagDragId: string | null;
   activeTagId: string | null;
   currentUser?: CurrentUserResponse;
   folders: FolderItem[];
@@ -404,6 +407,7 @@ export const FolderSidebar = ({
                     </section>
                     <TagSection
                       activeTagId={activeTagId}
+                      activeTagDragId={activeTagDragId}
                       creatingTagLibraryId={creatingTagLibraryId}
                       createError={createTagMutation.isError}
                       createPending={createTagMutation.isPending}
@@ -562,6 +566,7 @@ const WorkspaceInboxRow = ({
 
 const TagSection = ({
   activeTagId,
+  activeTagDragId,
   creatingTagLibraryId,
   createError,
   createPending,
@@ -582,6 +587,7 @@ const TagSection = ({
   onStartCreate
 }: {
   activeTagId: string | null;
+  activeTagDragId: string | null;
   creatingTagLibraryId: string | null;
   createError: boolean;
   createPending: boolean;
@@ -641,75 +647,195 @@ const TagSection = ({
         </div>
       ) : null}
       {tags.map((tag) => (
-        <div
-          className={[
-            "group grid min-h-8 grid-cols-[minmax(0,1fr)_1.5rem_1.75rem] items-center rounded-xl text-[13px] font-medium",
-            activeTagId === tag.id
-              ? "bg-gray-100/90 text-slate-950"
-              : "text-gray-700 hover:bg-white/70"
-          ].join(" ")}
+        <TagRow
+          activeTagDragId={activeTagDragId}
+          activeTagId={activeTagId}
+          editError={editError}
+          editPending={editPending}
+          editingTagId={editingTagId}
           key={tag.id}
-          style={rowStyle}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            onOpenMenu(tag, event.clientX, event.clientY);
-          }}
-        >
-          {editingTagId === tag.id ? (
-            <div className="col-span-3 min-w-0">
-              <InlineTagForm
-                defaultColor={tag.color}
-                defaultName={tag.name}
-                error={editError ? "Tag could not be updated." : null}
-                isPending={editPending}
-                submitLabel="Save tag"
-                onCancel={onCancelEdit}
-                onSubmit={(value) => onEditTag(tag.id, value)}
-              />
-            </div>
-          ) : (
-            <>
-              <button
-                className="flex min-h-8 min-w-0 items-center gap-0.5 rounded-xl pr-2 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                aria-label={tag.name}
-                type="button"
-                onClick={() => onSelectTag(tag.id)}
-              >
-                <span className="h-6 w-4 shrink-0" aria-hidden="true" />
-                <span className="flex min-h-8 min-w-0 flex-1 items-center gap-2">
-                  <IconTag
-                    size={16}
-                    stroke={1.5}
-                    color={tag.color ?? "#697080"}
-                    aria-hidden="true"
-                    focusable="false"
-                  />
-                  <span className="truncate">{tag.name}</span>
-                </span>
-              </button>
-              <span
-                className="grid h-8 place-items-center text-[11px] font-medium text-gray-400"
-                aria-hidden="true"
-              >
-                {tag.savedItemCount > 0 ? tag.savedItemCount : null}
-              </span>
-              <button
-                className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 opacity-0 outline-none transition-opacity hover:border-gray-200 hover:bg-white hover:text-slate-950 hover:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                aria-label={`Tag actions for ${tag.name}`}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  onOpenMenu(tag, rect.left, rect.bottom + 4);
-                }}
-              >
-                <IconDotsVertical size={14} stroke={1.5} aria-hidden="true" focusable="false" />
-              </button>
-            </>
-          )}
-        </div>
+          rowStyle={rowStyle}
+          tag={tag}
+          onCancelEdit={onCancelEdit}
+          onEditTag={onEditTag}
+          onOpenMenu={onOpenMenu}
+          onSelectTag={onSelectTag}
+        />
       ))}
     </section>
+  );
+};
+
+const TagRow = ({
+  activeTagDragId,
+  activeTagId,
+  editError,
+  editPending,
+  editingTagId,
+  rowStyle,
+  tag,
+  onCancelEdit,
+  onEditTag,
+  onOpenMenu,
+  onSelectTag
+}: {
+  activeTagDragId: string | null;
+  activeTagId: string | null;
+  editError: boolean;
+  editPending: boolean;
+  editingTagId: string | null;
+  rowStyle: { marginLeft: string; width: string };
+  tag: TagItem;
+  onCancelEdit: () => void;
+  onEditTag: (tagId: string, tag: { name: string; color: string }) => void;
+  onOpenMenu: (tag: TagItem, x: number, y: number) => void;
+  onSelectTag: (tagId: string) => void;
+}) => {
+  const isEditing = editingTagId === tag.id;
+  const isActive = activeTagId === tag.id;
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    isDragging
+  } = useDraggable({
+    id: `tag-drag:${tag.id}`,
+    data: {
+      libraryId: tag.libraryId,
+      tagId: tag.id,
+      type: "tag-drag"
+    },
+    disabled: isEditing
+  });
+  const dragStyle =
+    transform && !isDragging
+      ? {
+          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`
+        }
+      : undefined;
+
+  return (
+    <div
+      className={[
+        "group relative grid min-h-8 grid-cols-[minmax(0,1fr)_1.5rem_1.75rem] items-center rounded-xl text-[13px] font-medium transition-[background-color,box-shadow,opacity]",
+        isActive ? "bg-gray-100/90 text-slate-950" : "text-gray-700 hover:bg-white/70",
+        isDragging ? "z-20 opacity-80 shadow-[0_12px_34px_rgb(15_23_42_/_0.14)]" : ""
+      ].join(" ")}
+      key={tag.id}
+      ref={setNodeRef}
+      style={{ ...rowStyle, ...dragStyle }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onOpenMenu(tag, event.clientX, event.clientY);
+      }}
+    >
+      <TagPositionDropZone activeTagDragId={activeTagDragId} position="before" tag={tag} />
+      <TagPositionDropZone activeTagDragId={activeTagDragId} position="after" tag={tag} />
+      {isEditing ? (
+        <div className="col-span-3 min-w-0">
+          <InlineTagForm
+            defaultColor={tag.color}
+            defaultName={tag.name}
+            error={editError ? "Tag could not be updated." : null}
+            isPending={editPending}
+            submitLabel="Save tag"
+            onCancel={onCancelEdit}
+            onSubmit={(value) => onEditTag(tag.id, value)}
+          />
+        </div>
+      ) : (
+        <>
+          <button
+            className="tag-drag-handle absolute top-1/2 -left-4 z-10 grid h-6 w-4 -translate-y-1/2 cursor-grab place-items-center rounded-md text-gray-400 opacity-0 outline-none transition-opacity hover:bg-gray-100 hover:text-slate-950 hover:opacity-100 active:cursor-grabbing active:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-label={`Drag tag ${tag.name}`}
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+          >
+            <IconGripVertical size={13} stroke={1.5} aria-hidden="true" focusable="false" />
+          </button>
+          <button
+            className="flex min-h-8 min-w-0 items-center gap-0.5 rounded-xl pr-2 text-left outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-label={tag.name}
+            type="button"
+            onClick={() => onSelectTag(tag.id)}
+          >
+            <span className="h-6 w-4 shrink-0" aria-hidden="true" />
+            <span className="flex min-h-8 min-w-0 flex-1 items-center gap-2">
+              <IconTag
+                size={16}
+                stroke={1.5}
+                color={tag.color ?? "#697080"}
+                aria-hidden="true"
+                focusable="false"
+              />
+              <span className="truncate">{tag.name}</span>
+            </span>
+          </button>
+          <span
+            className="grid h-8 place-items-center text-[11px] font-medium text-gray-400"
+            aria-hidden="true"
+          >
+            {tag.savedItemCount > 0 ? tag.savedItemCount : null}
+          </span>
+          <button
+            className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 opacity-0 outline-none transition-opacity hover:border-gray-200 hover:bg-white hover:text-slate-950 hover:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-label={`Tag actions for ${tag.name}`}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              onOpenMenu(tag, rect.left, rect.bottom + 4);
+            }}
+          >
+            <IconDotsVertical size={14} stroke={1.5} aria-hidden="true" focusable="false" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+const TagPositionDropZone = ({
+  activeTagDragId,
+  position,
+  tag
+}: {
+  activeTagDragId: string | null;
+  position: "before" | "after";
+  tag: TagItem;
+}) => {
+  const { isOver, setNodeRef } = useDroppable({
+    id: `tag-position:${position}:${tag.id}`,
+    data: {
+      libraryId: tag.libraryId,
+      position,
+      relativeTagId: tag.id,
+      type: "tag-position"
+    },
+    disabled: activeTagDragId === null || activeTagDragId === tag.id
+  });
+
+  return (
+    <div
+      className={[
+        "pointer-events-none absolute right-2 left-2 z-10 h-[35%]",
+        position === "before" ? "top-0" : "bottom-0"
+      ].join(" ")}
+      ref={setNodeRef}
+      aria-hidden="true"
+    >
+      <span
+        className={[
+          "absolute right-0 left-0 h-1 rounded-full transition-colors duration-150",
+          position === "before" ? "-top-0.5" : "-bottom-0.5",
+          isOver ? "bg-blue-500" : "bg-transparent"
+        ].join(" ")}
+      />
+    </div>
   );
 };
 

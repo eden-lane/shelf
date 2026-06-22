@@ -27,6 +27,7 @@ export const updateTag = async (db: Database, input: UpdateTagInput): Promise<Ta
       libraryId: schema.tags.libraryId,
       name: schema.tags.name,
       color: schema.tags.color,
+      sortOrder: schema.tags.sortOrder,
       createdAt: schema.tags.createdAt,
       updatedAt: schema.tags.updatedAt
     });
@@ -40,6 +41,7 @@ export const updateTag = async (db: Database, input: UpdateTagInput): Promise<Ta
     libraryId: row.libraryId,
     name: row.name,
     color: row.color,
+    sortOrder: row.sortOrder,
     savedItemCount: existing.savedItemCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()

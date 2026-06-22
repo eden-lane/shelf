@@ -83,6 +83,12 @@ export interface UpdateTagInput {
   color?: string | null;
 }
 
+export interface MoveTagInput {
+  allowedLibraryIds: string[];
+  tagId: string;
+  orderedTagIds: string[];
+}
+
 export interface DeleteTagInput {
   allowedLibraryIds: string[];
   tagId: string;
@@ -136,6 +142,7 @@ export interface SavedItemsStore {
   listTags(input: ListTagsInput): Promise<TagItem[]>;
   createTag(input: CreateTagInput): Promise<TagItem>;
   updateTag(input: UpdateTagInput): Promise<TagItem>;
+  moveTag(input: MoveTagInput): Promise<TagItem[]>;
   deleteTag(input: DeleteTagInput): Promise<{ deletedTagId: string }>;
   createFolder(input: CreateFolderInput): Promise<FolderItem>;
   updateFolder(input: UpdateFolderInput): Promise<FolderItem>;

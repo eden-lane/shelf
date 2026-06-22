@@ -15,6 +15,7 @@ export * from "./listSavedItemSearchDocuments";
 export * from "./listTags";
 export * from "./moveFolder";
 export * from "./moveSavedItems";
+export * from "./moveTag";
 export * from "./searchCursor";
 export * from "./searchIndex";
 export * from "./store";

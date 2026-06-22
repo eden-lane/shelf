@@ -232,10 +232,12 @@ export const tags = pgTable(
       .references(() => libraries.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color"),
+    sortOrder: integer("sort_order").notNull().default(0),
     ...timestamps
   },
   (table) => [
     index("tags_library_idx").on(table.libraryId),
+    index("tags_library_sort_idx").on(table.libraryId, table.sortOrder),
     uniqueIndex("tags_id_library_unique_idx").on(table.id, table.libraryId),
     uniqueIndex("tags_library_name_unique_idx").on(table.libraryId, sql`lower(${table.name})`)
   ]

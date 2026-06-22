@@ -13,6 +13,7 @@ import { listSavedItemSearchDocuments } from "./listSavedItemSearchDocuments";
 import { listTags } from "./listTags";
 import { moveFolder } from "./moveFolder";
 import { moveSavedItems } from "./moveSavedItems";
+import { moveTag } from "./moveTag";
 import type { SavedItemsStore } from "./types";
 import { updateFolder } from "./updateFolder";
 import { updateTag } from "./updateTag";
@@ -32,6 +33,7 @@ export const createDatabaseSavedItemsStore = (db: Database): SavedItemsStore => 
   listTags: (input) => listTags(db, input),
   moveFolder: (input) => moveFolder(db, input),
   moveSavedItems: (input) => moveSavedItems(db, input),
+  moveTag: (input) => moveTag(db, input),
   updateFolder: (input) => updateFolder(db, input),
   updateTag: (input) => updateTag(db, input)
 });

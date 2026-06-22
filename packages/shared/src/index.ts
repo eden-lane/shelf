@@ -100,6 +100,7 @@ export interface TagItem {
   libraryId: string;
   name: string;
   color: string | null;
+  sortOrder: number;
   savedItemCount: number;
   createdAt: string;
   updatedAt: string;
@@ -180,6 +181,11 @@ export interface UpdateTagInput {
   tagId: string;
   name: string;
   color?: string | null;
+}
+
+export interface MoveTagInput {
+  tagId: string;
+  orderedTagIds: string[];
 }
 
 export interface DeleteTagInput {

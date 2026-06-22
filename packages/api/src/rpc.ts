@@ -7,6 +7,7 @@ import type {
   DeleteTagInput,
   MoveFolderInput,
   MoveSavedItemsInput,
+  MoveTagInput,
   SearchSavedItemsInput,
   UpdateFolderInput,
   UpdateTagInput
@@ -319,6 +320,23 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       return options.savedItemsStore.listTags({
         libraryIds: currentUserLibraryIds(options.currentUser)
+      });
+    }),
+    move: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertSavedItemsStore(options.savedItemsStore);
+
+      const tag = parseMoveTagInput(input);
+
+      if (!tag) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose where to move this tag"
+        });
+      }
+
+      return options.savedItemsStore.moveTag({
+        ...tag,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     update: os.handler(async ({ input }) => {
@@ -641,6 +659,35 @@ const parseUpdateTagInput = (input: unknown): UpdateTagInput | null => {
   return {
     color: parseFolderIconColor(input.color),
     name,
+    tagId: input.tagId
+  };
+};
+
+const parseMoveTagInput = (input: unknown): MoveTagInput | null => {
+  if (!isRecord(input) || typeof input.tagId !== "string" || !input.tagId) {
+    return null;
+  }
+
+  if (!Array.isArray(input.orderedTagIds)) {
+    return null;
+  }
+
+  const orderedTagIds = new Set<string>();
+
+  for (const tagId of input.orderedTagIds) {
+    if (typeof tagId !== "string" || !tagId) {
+      return null;
+    }
+
+    orderedTagIds.add(tagId);
+  }
+
+  if (orderedTagIds.size === 0) {
+    return null;
+  }
+
+  return {
+    orderedTagIds: [...orderedTagIds].slice(0, 200),
     tagId: input.tagId
   };
 };

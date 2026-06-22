@@ -94,6 +94,9 @@ const createSavedItemsStore = (overrides: Partial<SavedItemsStore>): SavedItemsS
   async moveSavedItems() {
     throw new Error("not used");
   },
+  async moveTag() {
+    throw new Error("not used");
+  },
   async updateFolder() {
     throw new Error("not used");
   },
@@ -559,6 +562,7 @@ describe("savedItems RPC", () => {
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               name: "Research",
               color: "#3b82f6",
+              sortOrder: 0,
               savedItemCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -1174,6 +1178,7 @@ describe("tags RPC", () => {
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               name: "Research",
               color: "#16a34a",
+              sortOrder: 0,
               savedItemCount: 2,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -1213,6 +1218,7 @@ describe("tags RPC", () => {
             libraryId: input.libraryId,
             name: input.name,
             color: input.color ?? null,
+            sortOrder: 0,
             savedItemCount: 0,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:00:00.000Z"
@@ -1265,6 +1271,7 @@ describe("tags RPC", () => {
             libraryId: DEV_PERSONAL_LIBRARY_ID,
             name: input.name,
             color: input.color ?? null,
+            sortOrder: 0,
             savedItemCount: 2,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:05:00.000Z"
@@ -1301,6 +1308,60 @@ describe("tags RPC", () => {
       tagId: "00000000-0000-4000-8000-000000000030",
       color: "#f59e0b",
       name: "Updated"
+    });
+  });
+
+  test("moves a tag with explicit sibling order", async () => {
+    const calls: Parameters<SavedItemsStore["moveTag"]>[0][] = [];
+    const app = createApp({
+      savedItemsStore: createSavedItemsStore({
+        async moveTag(input) {
+          calls.push(input);
+
+          return [
+            {
+              id: input.tagId,
+              libraryId: DEV_PERSONAL_LIBRARY_ID,
+              name: "Research",
+              color: "#16a34a",
+              sortOrder: input.orderedTagIds.indexOf(input.tagId),
+              savedItemCount: 0,
+              createdAt: "2026-06-20T12:00:00.000Z",
+              updatedAt: "2026-06-20T12:05:00.000Z"
+            }
+          ];
+        }
+      }),
+      currentUser,
+      dependencies: dependencies()
+    });
+
+    const response = await app.request("/rpc/tags/move", {
+      body: JSON.stringify({
+        json: {
+          tagId: "00000000-0000-4000-8000-000000000031",
+          orderedTagIds: [
+            "00000000-0000-4000-8000-000000000030",
+            "00000000-0000-4000-8000-000000000031"
+          ]
+        }
+      }),
+      headers: {
+        "content-type": "application/json"
+      },
+      method: "POST"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.json[0].sortOrder).toBe(1);
+    expect(calls[0]).toEqual({
+      allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
+      tagId: "00000000-0000-4000-8000-000000000031",
+      orderedTagIds: [
+        "00000000-0000-4000-8000-000000000030",
+        "00000000-0000-4000-8000-000000000031"
+      ]
     });
   });
 

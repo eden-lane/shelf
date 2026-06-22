@@ -15,6 +15,7 @@ import type {
   ListSavedItemsInput,
   MoveFolderInput,
   MoveSavedItemsInput,
+  MoveTagInput,
   SearchSavedItemsInput,
   TagItem,
   UpdateFolderInput,
@@ -77,6 +78,7 @@ interface TagsRpcClient extends Record<string, NestedClient<Record<never, never>
   create: RpcProcedure<CreateTagInput, TagItem>;
   delete: RpcProcedure<DeleteTagInput, { deletedTagId: string }>;
   list: RpcProcedure<undefined, TagItem[]>;
+  move: RpcProcedure<MoveTagInput, TagItem[]>;
   update: RpcProcedure<UpdateTagInput, TagItem>;
 }
 
@@ -180,6 +182,8 @@ export const createFolder = async (input: CreateFolderInput): Promise<FolderItem
 export const createTag = async (input: CreateTagInput): Promise<TagItem> => rpc.tags.create(input);
 
 export const updateTag = async (input: UpdateTagInput): Promise<TagItem> => rpc.tags.update(input);
+
+export const moveTag = async (input: MoveTagInput): Promise<TagItem[]> => rpc.tags.move(input);
 
 export const deleteTag = async (
   input: DeleteTagInput

@@ -300,12 +300,19 @@ const FolderPositionDropZone = ({
   return (
     <div
       className={[
-        "pointer-events-none absolute right-2 left-2 z-10 h-1 rounded-full transition-colors duration-150",
-        position === "before" ? "-top-0.5" : "-bottom-0.5",
-        isOver ? "bg-blue-500" : "bg-transparent"
+        "pointer-events-none absolute right-2 left-2 z-10 h-[35%]",
+        position === "before" ? "top-0" : "bottom-0"
       ].join(" ")}
       ref={setNodeRef}
       aria-hidden="true"
-    />
+    >
+      <span
+        className={[
+          "absolute right-0 left-0 h-1 rounded-full transition-colors duration-150",
+          position === "before" ? "-top-0.5" : "-bottom-0.5",
+          isOver ? "bg-blue-500" : "bg-transparent"
+        ].join(" ")}
+      />
+    </div>
   );
 };

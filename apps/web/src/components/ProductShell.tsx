@@ -11,8 +11,11 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent
 } from "@dnd-kit/core";
@@ -24,6 +27,7 @@ import type {
   CurrentUserResponse,
   FolderItem,
   MoveFolderInput,
+  MoveTagInput,
   TagItem
 } from "@shelf/shared";
 import {
@@ -42,7 +46,8 @@ import {
   getTags,
   logout,
   moveFolder as moveFolderRequest,
-  moveSavedItems as moveSavedItemsRequest
+  moveSavedItems as moveSavedItemsRequest,
+  moveTag as moveTagRequest
 } from "../api";
 import { AddSavedItemDialog } from "../features/savedItems/AddSavedItemDialog";
 import { SavedItemsWorkspace } from "../features/savedItems/SavedItemsWorkspace";
@@ -285,6 +290,7 @@ export const ProductShell = () => {
   const [isStackedSidebar, setIsStackedSidebar] = useState(isStackedSidebarViewport);
   const [activeSavedItemDragItem, setActiveSavedItemDragItem] = useState<SavedItem | null>(null);
   const [activeFolderDragId, setActiveFolderDragId] = useState<string | null>(null);
+  const [activeTagDragId, setActiveTagDragId] = useState<string | null>(null);
   const [moveNotification, setMoveNotification] = useState<string | null>(null);
   const [sidebarDragOffset, setSidebarDragOffset] = useState(0);
   const sensors = useSensors(
@@ -294,6 +300,27 @@ export const ProductShell = () => {
       }
     })
   );
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const activeData = args.active.data.current;
+
+    if (isFolderDragData(activeData) || isTagDragData(activeData)) {
+      const collisions = pointerWithin(args);
+      const positionPrefix = isFolderDragData(activeData) ? "folder-position:" : "tag-position:";
+      const positionCollisions = collisions.filter(({ id }) =>
+        String(id).startsWith(positionPrefix)
+      );
+
+      if (positionCollisions.length > 0) {
+        return positionCollisions;
+      }
+
+      if (collisions.length > 0) {
+        return collisions;
+      }
+    }
+
+    return rectIntersection(args);
+  }, []);
   const currentUser = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser
@@ -344,6 +371,7 @@ export const ProductShell = () => {
     activeLibraryId;
   const activeFolderDragItem =
     folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
+  const activeTagDragItem = tags.data?.find((tag) => tag.id === activeTagDragId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
   const moveSavedItemsMutation = useMutation({
     mutationFn: ({ destinationFolder, ...input }: MoveSavedItemsMutationInput) =>
@@ -505,6 +533,34 @@ export const ProductShell = () => {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
       void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
+    }
+  });
+  const moveTagMutation = useMutation({
+    mutationFn: moveTagRequest,
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ["tags"] });
+
+      const previousTags = queryClient.getQueryData<TagItem[]>(["tags"]);
+
+      queryClient.setQueryData<TagItem[]>(["tags"], (currentTags = []) =>
+        applyTagMove(currentTags, input)
+      );
+
+      return { previousTags };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousTags) {
+        queryClient.setQueryData(["tags"], context.previousTags);
+      }
+
+      setMoveNotification("Tag could not be moved");
+    },
+    onSuccess: (nextTags) => {
+      queryClient.setQueryData(["tags"], nextTags);
+      setMoveNotification("Tag moved");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   });
 
@@ -766,6 +822,7 @@ export const ProductShell = () => {
 
     setActiveSavedItemDragItem(isSavedItemDragData(activeData) ? activeData.item : null);
     setActiveFolderDragId(isFolderDragData(activeData) ? activeData.folderId : null);
+    setActiveTagDragId(isTagDragData(activeData) ? activeData.tagId : null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -774,6 +831,7 @@ export const ProductShell = () => {
 
     setActiveFolderDragId(null);
     setActiveSavedItemDragItem(null);
+    setActiveTagDragId(null);
 
     if (isSavedItemDragData(activeData) && isFolderDropData(overData)) {
       const destinationFolder = overData.folder;
@@ -784,6 +842,16 @@ export const ProductShell = () => {
       }
 
       moveSavedItemsToFolder(activeData.savedItemIds, destinationFolder);
+      return;
+    }
+
+    if (isTagDragData(activeData) && overData && tags.data) {
+      const moveInput = buildTagMoveInput(activeData, overData, tags.data);
+
+      if (moveInput) {
+        moveTagMutation.mutate(moveInput);
+      }
+
       return;
     }
 
@@ -803,6 +871,7 @@ export const ProductShell = () => {
   const handleDragCancel = () => {
     setActiveFolderDragId(null);
     setActiveSavedItemDragItem(null);
+    setActiveTagDragId(null);
   };
 
   const handleSidebarTouchStart = (event: ReactTouchEvent<HTMLElement>) => {
@@ -877,6 +946,7 @@ export const ProductShell = () => {
 
   return (
     <DndContext
+      collisionDetection={collisionDetection}
       sensors={sensors}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
@@ -918,6 +988,7 @@ export const ProductShell = () => {
             searchQuery={activeSearchQuery}
             tags={tags.data ?? []}
             activeFolderDragId={activeFolderDragId}
+            activeTagDragId={activeTagDragId}
             isSigningOut={logoutMutation.isPending}
             onAddSavedItem={openSavedItemDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
@@ -1033,6 +1104,9 @@ export const ProductShell = () => {
         {!activeSavedItemDragItem && activeFolderDragItem ? (
           <FolderDragPreview folder={activeFolderDragItem} />
         ) : null}
+        {!activeSavedItemDragItem && !activeFolderDragItem && activeTagDragItem ? (
+          <TagDragPreview tag={activeTagDragItem} />
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
@@ -1057,6 +1131,12 @@ type FolderDragData = {
   type: "folder-drag";
 };
 
+type TagDragData = {
+  libraryId: string;
+  tagId: string;
+  type: "tag-drag";
+};
+
 type FolderDropData = {
   folder: FolderItem | null;
   type: "folder";
@@ -1073,6 +1153,13 @@ type FolderPositionDropData = {
 type FolderRootDropData = {
   libraryId: string;
   type: "folder-root";
+};
+
+type TagPositionDropData = {
+  libraryId: string;
+  position: "before" | "after";
+  relativeTagId: string;
+  type: "tag-position";
 };
 
 const isSavedItemDragData = (value: unknown): value is SavedItemDragData => {
@@ -1118,6 +1205,22 @@ const isFolderDragData = (value: unknown): value is FolderDragData => {
   );
 };
 
+const isTagDragData = (value: unknown): value is TagDragData => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const data = value as TagDragData;
+
+  return (
+    data.type === "tag-drag" &&
+    typeof data.tagId === "string" &&
+    Boolean(data.tagId) &&
+    typeof data.libraryId === "string" &&
+    Boolean(data.libraryId)
+  );
+};
+
 const isFolderDropData = (value: unknown): value is FolderDropData => {
   if (typeof value !== "object" || value === null) {
     return false;
@@ -1152,6 +1255,21 @@ const isFolderRootDropData = (value: unknown): value is FolderRootDropData => {
   const data = value as FolderRootDropData;
 
   return data.type === "folder-root" && typeof data.libraryId === "string";
+};
+
+const isTagPositionDropData = (value: unknown): value is TagPositionDropData => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const data = value as TagPositionDropData;
+
+  return (
+    data.type === "tag-position" &&
+    typeof data.libraryId === "string" &&
+    typeof data.relativeTagId === "string" &&
+    (data.position === "before" || data.position === "after")
+  );
 };
 
 const buildFolderMoveInput = (
@@ -1277,7 +1395,73 @@ const applyFolderMove = (folders: FolderItem[], input: MoveFolderInput): FolderI
   });
 };
 
+const buildTagMoveInput = (
+  activeData: TagDragData,
+  overData: unknown,
+  tags: TagItem[]
+): MoveTagInput | null => {
+  const draggedTag = tags.find((tag) => tag.id === activeData.tagId);
+
+  if (!draggedTag || !isTagPositionDropData(overData)) {
+    return null;
+  }
+
+  if (
+    overData.libraryId !== draggedTag.libraryId ||
+    overData.relativeTagId === draggedTag.id
+  ) {
+    return null;
+  }
+
+  return {
+    orderedTagIds: insertTagNearSibling(tags, draggedTag, overData),
+    tagId: draggedTag.id
+  };
+};
+
+const insertTagNearSibling = (
+  tags: TagItem[],
+  draggedTag: TagItem,
+  drop: TagPositionDropData
+) => {
+  const tagIds = tags
+    .filter((tag) => tag.libraryId === draggedTag.libraryId && tag.id !== draggedTag.id)
+    .sort(compareTags)
+    .map((tag) => tag.id);
+  const relativeIndex = tagIds.indexOf(drop.relativeTagId);
+
+  if (relativeIndex < 0) {
+    return [...tagIds, draggedTag.id];
+  }
+
+  tagIds.splice(drop.position === "before" ? relativeIndex : relativeIndex + 1, 0, draggedTag.id);
+
+  return tagIds;
+};
+
+const applyTagMove = (tags: TagItem[], input: MoveTagInput): TagItem[] => {
+  const sortOrderById = new Map(input.orderedTagIds.map((tagId, index) => [tagId, index]));
+  const now = new Date().toISOString();
+
+  return tags.map((tag) => {
+    const sortOrder = sortOrderById.get(tag.id);
+
+    return typeof sortOrder === "number"
+      ? {
+          ...tag,
+          sortOrder,
+          updatedAt: now
+        }
+      : tag;
+  });
+};
+
 const compareFolders = (left: FolderItem, right: FolderItem) =>
+  left.sortOrder - right.sortOrder ||
+  left.name.localeCompare(right.name) ||
+  left.id.localeCompare(right.id);
+
+const compareTags = (left: TagItem, right: TagItem) =>
   left.sortOrder - right.sortOrder ||
   left.name.localeCompare(right.name) ||
   left.id.localeCompare(right.id);
@@ -1357,6 +1541,30 @@ const FolderDragPreview = ({ folder }: { folder: FolderItem }) => {
     </div>
   );
 };
+
+const TagDragPreview = ({ tag }: { tag: TagItem }) => (
+  <div className="grid w-[min(260px,calc(100vw-32px))] grid-cols-[minmax(0,1fr)_1.75rem_2rem] items-center gap-1 rounded-xl border border-blue-500 bg-white py-0.5 text-slate-950 opacity-95 shadow-[0_24px_80px_rgb(15_23_42_/_0.24)]">
+    <div className="flex min-h-9 min-w-0 items-center gap-1">
+      <span className="grid h-7 w-6 shrink-0 place-items-center text-gray-400" aria-hidden="true">
+        <IconGripVertical size={15} stroke={1.5} aria-hidden="true" focusable="false" />
+      </span>
+      <span className="flex min-h-9 min-w-0 flex-1 items-center gap-2 pr-2.5 text-sm font-medium">
+        <IconTag
+          size={18}
+          stroke={1.5}
+          color={tag.color ?? "#697080"}
+          aria-hidden="true"
+          focusable="false"
+        />
+        <span className="truncate">{tag.name}</span>
+      </span>
+    </div>
+    <span className="grid h-9 place-items-center text-xs font-medium text-gray-400">
+      {tag.savedItemCount > 0 ? tag.savedItemCount : null}
+    </span>
+    <span aria-hidden="true" />
+  </div>
+);
 
 const FolderBreadcrumbs = ({
   folders,

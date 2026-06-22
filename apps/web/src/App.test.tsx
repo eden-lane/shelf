@@ -114,6 +114,7 @@ describe("App", () => {
         libraryId: "00000000-0000-4000-8000-000000000003",
         name: "Important",
         color: "#16a34a",
+        sortOrder: 0,
         savedItemCount: 1,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
@@ -351,6 +352,11 @@ describe("App", () => {
           libraryId: body.json?.libraryId || "00000000-0000-4000-8000-000000000003",
           name: body.json?.name || "Important",
           color: body.json?.color ?? null,
+          sortOrder: tags.filter(
+            (existingTag) =>
+              existingTag.libraryId ===
+              (body.json?.libraryId || "00000000-0000-4000-8000-000000000003")
+          ).length,
           savedItemCount: 0,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
@@ -384,6 +390,30 @@ describe("App", () => {
         }
 
         return new Response(JSON.stringify({ json: tags[tagIndex] }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.pathname === "/rpc/tags/move") {
+        const body = (await request.json()) as {
+          json?: {
+            orderedTagIds?: string[];
+            tagId?: string;
+          };
+        };
+        const orderedTagIds = body.json?.orderedTagIds ?? [];
+
+        for (const tag of tags) {
+          const nextSortOrder = orderedTagIds.indexOf(tag.id);
+
+          if (nextSortOrder >= 0) {
+            tag.sortOrder = nextSortOrder;
+          }
+        }
+
+        return new Response(JSON.stringify({ json: tags }), {
           headers: {
             "content-type": "application/json"
           }
@@ -664,7 +694,7 @@ describe("App", () => {
     const workspaceHeader = screen.getByLabelText("Items workspace").querySelector("header");
     expect(workspaceHeader).toBeTruthy();
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+      "grid-cols-[2.5rem_minmax(0,1fr)]"
     );
     expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
@@ -673,10 +703,10 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[minmax(0,1fr)_2.5rem]"
+      "grid-cols-[minmax(0,1fr)]"
     );
     expect((workspaceHeader as HTMLElement).className).not.toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+      "grid-cols-[2.5rem_minmax(0,1fr)]"
     );
     expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     const personalSection = screen.getByLabelText("Personal folders");
@@ -722,7 +752,7 @@ describe("App", () => {
       changedTouches: [{ clientX: 160, clientY: 88 }]
     });
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+      "grid-cols-[2.5rem_minmax(0,1fr)]"
     );
     expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
@@ -739,7 +769,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((sidebar as HTMLElement).className).toContain("md:w-[340px]");
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[minmax(0,1fr)_2.5rem]"
+      "grid-cols-[minmax(0,1fr)]"
     );
     expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
