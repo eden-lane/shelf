@@ -31,7 +31,6 @@ import {
   IconDatabase,
   IconGripVertical,
   IconLayoutSidebarLeftExpand,
-  IconLogout2,
   IconPhoto,
   IconSearch,
   IconTag
@@ -919,8 +918,10 @@ export const ProductShell = () => {
             searchQuery={activeSearchQuery}
             tags={tags.data ?? []}
             activeFolderDragId={activeFolderDragId}
+            isSigningOut={logoutMutation.isPending}
             onAddSavedItem={openSavedItemDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
+            onSignOut={() => logoutMutation.mutate()}
             onSearchQueryChange={(query) =>
               updateSearchState({
                 query,
@@ -941,8 +942,8 @@ export const ProductShell = () => {
           className={[
             "grid items-center gap-3",
             isSidebarVisible
-              ? "grid-cols-[minmax(0,1fr)_2.5rem]"
-              : "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
+              ? "grid-cols-[minmax(0,1fr)]"
+              : "grid-cols-[2.5rem_minmax(0,1fr)]"
           ].join(" ")}
         >
           {!isSidebarVisible ? (
@@ -978,16 +979,6 @@ export const ProductShell = () => {
               />
             )}
           </div>
-          <button
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-gray-200 bg-white text-slate-950 outline-none hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-            aria-label="Log out"
-            title="Log out"
-            type="button"
-            disabled={logoutMutation.isPending}
-            onClick={() => logoutMutation.mutate()}
-          >
-            <IconLogout2 size={22} stroke={1.5} aria-hidden="true" focusable="false" />
-          </button>
         </header>
 
         {isSearchRoute && searchState.query.trim().length > 0 ? (

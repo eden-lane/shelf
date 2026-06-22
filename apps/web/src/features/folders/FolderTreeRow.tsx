@@ -210,7 +210,7 @@ export const FolderTreeRow = ({
               </span>
             ) : null}
             <button
-              className="absolute top-1/2 right-0 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="absolute top-1/2 right-0 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg border border-transparent text-gray-500 opacity-0 outline-none transition-opacity hover:border-gray-200 hover:bg-white hover:text-slate-950 hover:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label={`Folder actions for ${folder.name}`}
               type="button"
               onClick={(event) => {

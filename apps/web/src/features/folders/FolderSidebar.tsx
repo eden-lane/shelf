@@ -11,6 +11,7 @@ import {
   IconFolderPlus,
   IconInbox,
   IconLayoutSidebarLeftCollapse,
+  IconLogout2,
   IconPlus,
   IconSearch,
   IconTag,
@@ -50,8 +51,10 @@ export const FolderSidebar = ({
   isTagsLoading,
   searchQuery,
   tags,
+  isSigningOut,
   onAddSavedItem,
   onHideSidebar,
+  onSignOut,
   onSearchQueryChange,
   onSelectFolder,
   onSelectTag
@@ -67,8 +70,10 @@ export const FolderSidebar = ({
   isTagsLoading: boolean;
   searchQuery: string;
   tags: TagItem[];
+  isSigningOut: boolean;
   onAddSavedItem: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
+  onSignOut: () => void;
   onSearchQueryChange: (query: string) => void;
   onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
   onSelectTag: (tagId: string) => void;
@@ -424,6 +429,18 @@ export const FolderSidebar = ({
           );
         })}
       </div>
+      <div className="mt-auto border-t border-gray-200/70 pt-4">
+        <button
+          className="inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 disabled:cursor-not-allowed disabled:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Sign out"
+          disabled={isSigningOut}
+          type="button"
+          onClick={onSignOut}
+        >
+          <IconLogout2 size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+          <span>Sign out</span>
+        </button>
+      </div>
       {menu && menuFolder ? (
         <FolderContextMenu
           folder={menuFolder}
@@ -666,7 +683,7 @@ const TagSection = ({
               {tag.savedItemCount > 0 ? tag.savedItemCount : null}
             </span>
             <button
-              className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 opacity-0 outline-none transition-opacity hover:border-gray-200 hover:bg-white hover:text-slate-950 hover:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
               aria-label={`Tag actions for ${tag.name}`}
               type="button"
               onClick={(event) => {
