@@ -28,11 +28,8 @@ The Compose stack starts:
 - Postgres
 - Redis queue backend
 - Meilisearch search service
-- MinIO object-storage-compatible service
 
 The oRPC endpoint is mounted at `http://localhost:3000/rpc`.
-
-MinIO is available at [http://localhost:9001](http://localhost:9001) using the credentials from `.env.example`.
 
 ## Authentication
 
