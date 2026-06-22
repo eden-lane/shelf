@@ -1,7 +1,7 @@
 {
   "name": "Shelf",
   "short_name": "Shelf",
-  "description": "A personal bookmark shelf.",
+  "description": "A personal saved-link shelf.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

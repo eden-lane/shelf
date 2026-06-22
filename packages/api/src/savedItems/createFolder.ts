@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { and, eq, isNull, max } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -64,5 +64,5 @@ export const createFolder = async (
     throw new Error("Unable to create folder");
   }
 
-  return serializeFolder({ ...row, bookmarkCount: 0 });
+  return serializeFolder({ ...row, savedItemCount: 0 });
 };

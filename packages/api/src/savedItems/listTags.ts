@@ -1,4 +1,4 @@
-import type { TagItem } from "@bookmarks/shared";
+import type { TagItem } from "@shelf/shared";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -15,7 +15,7 @@ export const listTags = async (db: Database, input: ListTagsInput): Promise<TagI
       libraryId: schema.tags.libraryId,
       name: schema.tags.name,
       color: schema.tags.color,
-      bookmarkCount: sql<number>`count(${schema.savedItemTags.savedItemId})`,
+      savedItemCount: sql<number>`count(${schema.savedItemTags.savedItemId})`,
       createdAt: schema.tags.createdAt,
       updatedAt: schema.tags.updatedAt
     })
@@ -43,7 +43,7 @@ export const listTags = async (db: Database, input: ListTagsInput): Promise<TagI
     libraryId: row.libraryId,
     name: row.name,
     color: row.color,
-    bookmarkCount: Number(row.bookmarkCount),
+    savedItemCount: Number(row.savedItemCount),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   }));

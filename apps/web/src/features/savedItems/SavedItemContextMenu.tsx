@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { IconCopy, IconExternalLink, IconTrash } from "@tabler/icons-react";
 import { ContextMenuButton } from "../../components/ContextMenuButton";
 
-export const BookmarkContextMenu = ({
+export const SavedItemContextMenu = ({
   itemTitle,
   x,
   y,
@@ -21,7 +21,7 @@ export const BookmarkContextMenu = ({
     <div
       className="fixed z-[100] grid w-[160px] gap-1 rounded-lg border border-[#dfe4ef] bg-white p-1.5 text-sm font-medium text-[#4b5262] shadow-[0_18px_55px_rgb(22_28_43_/_0.16)]"
       role="menu"
-      aria-label={`Bookmark actions for ${itemTitle}`}
+      aria-label={`Saved item actions for ${itemTitle}`}
       style={{ left: x, top: y }}
       onClick={(event) => event.stopPropagation()}
     >

@@ -1,4 +1,4 @@
-import type { HealthResponse } from "@bookmarks/shared";
+import type { HealthResponse } from "@shelf/shared";
 
 export interface DatabaseHealthClient {
   check(): Promise<void>;

@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import type { FolderNode } from "./types";
 
 export const buildFolderTree = (folders: FolderItem[]): FolderNode[] => {

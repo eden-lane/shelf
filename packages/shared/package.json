@@ -1,5 +1,5 @@
 {
-  "name": "@bookmarks/shared",
+  "name": "@shelf/shared",
   "private": true,
   "type": "module",
   "exports": {

@@ -1,13 +1,13 @@
 import { Buffer } from "node:buffer";
-import type { BookmarkCursor } from "./types";
+import type { SavedItemCursor } from "./types";
 
-export const encodeBookmarkCursor = (cursor: BookmarkCursor): string =>
+export const encodeSavedItemCursor = (cursor: SavedItemCursor): string =>
   Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 
-export const decodeBookmarkCursor = (value: string): BookmarkCursor | null => {
+export const decodeSavedItemCursor = (value: string): SavedItemCursor | null => {
   try {
     const cursor = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Partial<
-      BookmarkCursor
+      SavedItemCursor
     >;
 
     if (

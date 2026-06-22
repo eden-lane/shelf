@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import {
   IconChevronDown,
   IconChevronRight,
@@ -64,7 +64,7 @@ export const FolderTreeRow = ({
   const isCollapsed = hasChildren && collapsedFolderIds.has(folder.id) && !isFiltering;
   const FolderIcon = getFolderIconComponent(folder.iconName);
   const folderIconColor = folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR;
-  const hasBookmarkCount = folder.bookmarkCount > 0;
+  const hasSavedItemCount = folder.savedItemCount > 0;
   const indent = folderRowIndent(level);
   const { isOver, setNodeRef } = useDroppable({
     id: `folder:${folder.id}`,
@@ -107,7 +107,7 @@ export const FolderTreeRow = ({
         ref={setRowRefs}
         className={[
           "folder-tree-row group relative flex min-h-8 items-center rounded-xl transition-[background-color,box-shadow,opacity]",
-          hasBookmarkCount ? "pr-14" : "pr-7",
+          hasSavedItemCount ? "pr-14" : "pr-7",
           isActive ? "bg-gray-100/90 text-slate-950" : "text-slate-950 hover:bg-white/70",
           isOver ? "bg-blue-50 ring-2 ring-blue-500 ring-inset" : "",
           isDragging ? "z-20 opacity-80 shadow-[0_12px_34px_rgb(15_23_42_/_0.14)]" : ""
@@ -204,9 +204,9 @@ export const FolderTreeRow = ({
                 </span>
               </button>
             </div>
-            {hasBookmarkCount ? (
+            {hasSavedItemCount ? (
               <span className="absolute top-0 right-7 grid h-8 w-6 place-items-center text-[11px] font-extrabold text-gray-400">
-                {folder.bookmarkCount}
+                {folder.savedItemCount}
               </span>
             ) : null}
             <button

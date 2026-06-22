@@ -1,4 +1,4 @@
-import { IconBookmark } from "@tabler/icons-react";
+import { IconLink } from "@tabler/icons-react";
 
 export const ContextMenuButton = ({
   icon: Icon,
@@ -6,7 +6,7 @@ export const ContextMenuButton = ({
   tone = "default",
   onClick
 }: {
-  icon: typeof IconBookmark;
+  icon: typeof IconLink;
   label: string;
   tone?: "default" | "danger";
   onClick: () => void;

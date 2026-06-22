@@ -1,4 +1,4 @@
-export * from "./bookmarks";
+export * from "./savedItems";
 export * from "./auth";
 export * from "./currentUser";
 export * from "./db";

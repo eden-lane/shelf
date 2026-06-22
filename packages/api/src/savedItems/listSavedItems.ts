@@ -1,15 +1,15 @@
-import type { BookmarksPageResponse } from "@bookmarks/shared";
+import type { SavedItemsPageResponse } from "@shelf/shared";
 import { and, desc, eq, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import { bookmarkSelectFields, serializeBookmark } from "./bookmarkRows";
-import { encodeBookmarkCursor } from "./cursor";
-import type { BookmarksStore, ListBookmarksInput } from "./types";
+import { savedItemSelectFields, serializeSavedItem } from "./savedItemRows";
+import { encodeSavedItemCursor } from "./cursor";
+import type { SavedItemsStore, ListSavedItemsInput } from "./types";
 
-export const DEFAULT_BOOKMARKS_LIMIT = 20;
-export const MAX_BOOKMARKS_LIMIT = 50;
+export const DEFAULT_SAVED_ITEMS_LIMIT = 20;
+export const MAX_SAVED_ITEMS_LIMIT = 50;
 
-export const listBookmarks = async (db: Database, input: ListBookmarksInput) => {
+export const listSavedItems = async (db: Database, input: ListSavedItemsInput) => {
   if (input.libraryIds.length === 0) {
     return [];
   }
@@ -49,7 +49,7 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
   }
 
   const rows = await db
-    .select(bookmarkSelectFields)
+    .select(savedItemSelectFields)
     .from(schema.savedItems)
     .leftJoin(
       schema.folders,
@@ -62,14 +62,14 @@ export const listBookmarks = async (db: Database, input: ListBookmarksInput) => 
     .orderBy(desc(schema.savedItems.createdAt), desc(schema.savedItems.id))
     .limit(input.limit + 1);
 
-  return rows.map(serializeBookmark);
+  return rows.map(serializeSavedItem);
 };
 
-export const listBookmarksPage = async (
-  store: Pick<BookmarksStore, "listBookmarks">,
-  input: ListBookmarksInput
-): Promise<BookmarksPageResponse> => {
-  const rows = await store.listBookmarks({
+export const listSavedItemsPage = async (
+  store: Pick<SavedItemsStore, "listSavedItems">,
+  input: ListSavedItemsInput
+): Promise<SavedItemsPageResponse> => {
+  const rows = await store.listSavedItems({
     ...input,
     limit: input.limit
   });
@@ -80,7 +80,7 @@ export const listBookmarksPage = async (
     items,
     nextCursor:
       rows.length > input.limit && lastItem
-        ? encodeBookmarkCursor({
+        ? encodeSavedItemCursor({
             createdAt: lastItem.createdAt,
             id: lastItem.id
           })
@@ -88,16 +88,16 @@ export const listBookmarksPage = async (
   };
 };
 
-export const parseBookmarksLimit = (value: string | null): number => {
+export const parseSavedItemsLimit = (value: string | null): number => {
   if (!value) {
-    return DEFAULT_BOOKMARKS_LIMIT;
+    return DEFAULT_SAVED_ITEMS_LIMIT;
   }
 
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || parsed < 1) {
-    return DEFAULT_BOOKMARKS_LIMIT;
+    return DEFAULT_SAVED_ITEMS_LIMIT;
   }
 
-  return Math.min(parsed, MAX_BOOKMARKS_LIMIT);
+  return Math.min(parsed, MAX_SAVED_ITEMS_LIMIT);
 };

@@ -1,10 +1,10 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import { bookmarkSelectFields, serializeBookmark } from "./bookmarkRows";
-import type { CreateBookmarkInput } from "./types";
+import { savedItemSelectFields, serializeSavedItem } from "./savedItemRows";
+import type { CreateSavedItemInput } from "./types";
 
-export const createBookmark = async (db: Database, input: CreateBookmarkInput) => {
+export const createSavedItem = async (db: Database, input: CreateSavedItemInput) => {
   return db.transaction(async (tx) => {
     const [savedItem] = await tx
       .insert(schema.savedItems)
@@ -26,7 +26,7 @@ export const createBookmark = async (db: Database, input: CreateBookmarkInput) =
       });
 
     if (!savedItem) {
-      throw new Error("Unable to save bookmark");
+      throw new Error("Unable to save saved item");
     }
 
     if (input.tagIds) {
@@ -47,7 +47,7 @@ export const createBookmark = async (db: Database, input: CreateBookmarkInput) =
     }
 
     const [row] = await tx
-      .select(bookmarkSelectFields)
+      .select(savedItemSelectFields)
       .from(schema.savedItems)
       .leftJoin(
         schema.folders,
@@ -60,9 +60,9 @@ export const createBookmark = async (db: Database, input: CreateBookmarkInput) =
       .limit(1);
 
     if (!row) {
-      throw new Error("Unable to load saved bookmark");
+      throw new Error("Unable to load saved item");
     }
 
-    return serializeBookmark(row);
+    return serializeSavedItem(row);
   });
 };

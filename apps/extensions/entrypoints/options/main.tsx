@@ -77,7 +77,7 @@ const App = () => {
   return (
     <main class="settings-shell">
       <header class="settings-header">
-        <p class="eyebrow">Bookmarks</p>
+        <p class="eyebrow">Shelf</p>
         <h1>Settings</h1>
       </header>
 
@@ -123,7 +123,7 @@ const App = () => {
 };
 
 const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Unable to connect to Bookmarks";
+  error instanceof Error ? error.message : "Unable to connect to Shelf";
 
 const root = document.querySelector("#root");
 

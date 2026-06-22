@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { BookmarkItem, FolderItem, TagItem } from "@bookmarks/shared";
+import type { SavedItem, FolderItem, TagItem } from "@shelf/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
 
@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe("App", () => {
   test("boots into the authenticated product shell", async () => {
-    const savedItems: BookmarkItem[] = [
+    const savedItems: SavedItem[] = [
       {
         id: "00000000-0000-4000-8000-000000000010",
         libraryId: "00000000-0000-4000-8000-000000000003",
@@ -42,7 +42,7 @@ describe("App", () => {
         folderName: null,
         url: "https://example.com/article",
         title: "Example Article",
-        description: "A saved bookmark from the API.",
+        description: "A saved item from the API.",
         siteName: "Example",
         imageUrl: "https://example.com/cover.png",
         metadataStatus: "fetched",
@@ -58,7 +58,7 @@ describe("App", () => {
         folderId: null,
         folderName: null,
         url: "https://plain.example/post",
-        title: "Plain Bookmark",
+        title: "Plain Saved Item",
         description: null,
         siteName: "Plain",
         imageUrl: null,
@@ -79,7 +79,7 @@ describe("App", () => {
         iconName: "IconBook",
         iconColor: "#3b82f6",
         sortOrder: 0,
-        bookmarkCount: 0,
+        savedItemCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       },
@@ -91,7 +91,7 @@ describe("App", () => {
         iconName: null,
         iconColor: null,
         sortOrder: 1,
-        bookmarkCount: 0,
+        savedItemCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       },
@@ -103,7 +103,7 @@ describe("App", () => {
         iconName: "IconArchive",
         iconColor: "#697080",
         sortOrder: 0,
-        bookmarkCount: 0,
+        savedItemCount: 0,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       }
@@ -114,13 +114,13 @@ describe("App", () => {
         libraryId: "00000000-0000-4000-8000-000000000003",
         name: "Important",
         color: "#16a34a",
-        bookmarkCount: 1,
+        savedItemCount: 1,
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       }
     ];
-    const bookmarkCreateRequests: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string }[] = [];
-    const bookmarkSearchRequests: {
+    const savedItemCreateRequests: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string }[] = [];
+    const savedItemSearchRequests: {
       cursor?: string | null;
       libraryId?: string | null;
       limit?: number;
@@ -221,7 +221,7 @@ describe("App", () => {
         );
       }
 
-      if (url.pathname === "/rpc/bookmarks/list") {
+      if (url.pathname === "/rpc/savedItems/list") {
         const body = (await request.json()) as {
           json?: {
             folderId?: string | null;
@@ -230,7 +230,7 @@ describe("App", () => {
             tagId?: string | null;
           };
         };
-        const tagBookmarks =
+        const tagSavedItems =
           body.json?.tagId === "00000000-0000-4000-8000-000000000030"
             ? new Set(["00000000-0000-4000-8000-000000000010"])
             : null;
@@ -242,7 +242,7 @@ describe("App", () => {
               : savedItems
         )
           .filter((item) => (body.json?.libraryId ? item.libraryId === body.json.libraryId : true))
-          .filter((item) => (tagBookmarks ? tagBookmarks.has(item.id) : true));
+          .filter((item) => (tagSavedItems ? tagSavedItems.has(item.id) : true));
 
         return new Response(
           JSON.stringify({
@@ -259,7 +259,7 @@ describe("App", () => {
         );
       }
 
-      if (url.pathname === "/rpc/bookmarks/search") {
+      if (url.pathname === "/rpc/savedItems/search") {
         const body = (await request.json()) as {
           json?: {
             cursor?: string | null;
@@ -269,7 +269,7 @@ describe("App", () => {
             scope?: "current" | "all";
           };
         };
-        bookmarkSearchRequests.push(body.json ?? {});
+        savedItemSearchRequests.push(body.json ?? {});
         const query = body.json?.query?.toLowerCase() ?? "";
         const items = savedItems
           .filter((item) =>
@@ -351,7 +351,7 @@ describe("App", () => {
           libraryId: body.json?.libraryId || "00000000-0000-4000-8000-000000000003",
           name: body.json?.name || "Important",
           color: body.json?.color ?? null,
-          bookmarkCount: 0,
+          savedItemCount: 0,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
         } satisfies TagItem;
@@ -429,7 +429,7 @@ describe("App", () => {
                 (body.json?.libraryId || "00000000-0000-4000-8000-000000000003") &&
               existingFolder.parentId === (body.json?.parentId ?? null)
           ).length,
-          bookmarkCount: 0,
+          savedItemCount: 0,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
         };
@@ -473,11 +473,11 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/rpc/bookmarks/create") {
+      if (url.pathname === "/rpc/savedItems/create") {
         const body = (await request.json()) as {
           json?: { folderId?: string; libraryId?: string; tagIds?: string[]; url?: string };
         };
-        bookmarkCreateRequests.push(body.json ?? {});
+        savedItemCreateRequests.push(body.json ?? {});
         const targetFolder = body.json?.folderId
           ? (folders.find((folder) => folder.id === body.json?.folderId) ?? null)
           : null;
@@ -502,7 +502,7 @@ describe("App", () => {
           faviconUrl: null,
           createdAt: "2026-06-20T12:00:00.000Z",
           updatedAt: "2026-06-20T12:00:00.000Z"
-        } satisfies BookmarkItem;
+        } satisfies SavedItem;
         savedItems.unshift(savedItem);
         const folderIndex = targetFolder
           ? folders.findIndex((folder) => folder.id === targetFolder.id)
@@ -511,7 +511,7 @@ describe("App", () => {
         if (folderIndex >= 0) {
           folders[folderIndex] = {
             ...folders[folderIndex],
-            bookmarkCount: folders[folderIndex].bookmarkCount + 1,
+            savedItemCount: folders[folderIndex].savedItemCount + 1,
             updatedAt: "2026-06-20T12:00:00.000Z"
           };
         }
@@ -521,7 +521,7 @@ describe("App", () => {
           if (tagIndex >= 0) {
             tags[tagIndex] = {
               ...tags[tagIndex],
-              bookmarkCount: tags[tagIndex].bookmarkCount + 1,
+              savedItemCount: tags[tagIndex].savedItemCount + 1,
               updatedAt: "2026-06-20T12:00:00.000Z"
             };
           }
@@ -534,10 +534,10 @@ describe("App", () => {
         });
       }
 
-      if (url.pathname === "/rpc/bookmarks/delete") {
-        const body = (await request.json()) as { json?: { bookmarkId?: string } };
-        const deletedBookmarkId = body.json?.bookmarkId ?? "";
-        const itemIndex = savedItems.findIndex((item) => item.id === deletedBookmarkId);
+      if (url.pathname === "/rpc/savedItems/delete") {
+        const body = (await request.json()) as { json?: { savedItemId?: string } };
+        const deletedSavedItemId = body.json?.savedItemId ?? "";
+        const itemIndex = savedItems.findIndex((item) => item.id === deletedSavedItemId);
 
         if (itemIndex >= 0) {
           const [deletedItem] = savedItems.splice(itemIndex, 1);
@@ -546,30 +546,30 @@ describe("App", () => {
           if (folderIndex >= 0) {
             folders[folderIndex] = {
               ...folders[folderIndex],
-              bookmarkCount: Math.max(0, folders[folderIndex].bookmarkCount - 1),
+              savedItemCount: Math.max(0, folders[folderIndex].savedItemCount - 1),
               updatedAt: "2026-06-20T12:00:00.000Z"
             };
           }
         }
 
-        return new Response(JSON.stringify({ json: { deletedBookmarkId } }), {
+        return new Response(JSON.stringify({ json: { deletedSavedItemId } }), {
           headers: {
             "content-type": "application/json"
           }
         });
       }
 
-      if (url.pathname === "/rpc/bookmarks/move") {
+      if (url.pathname === "/rpc/savedItems/move") {
         const body = (await request.json()) as {
-          json?: { bookmarkIds?: string[]; destinationFolderId?: string | null };
+          json?: { savedItemIds?: string[]; destinationFolderId?: string | null };
         };
-        const bookmarkIds = [...new Set(body.json?.bookmarkIds ?? [])];
+        const savedItemIds = [...new Set(body.json?.savedItemIds ?? [])];
         const destinationFolder = body.json?.destinationFolderId
           ? (folders.find((folder) => folder.id === body.json?.destinationFolderId) ?? null)
           : null;
 
-        for (const bookmarkId of bookmarkIds) {
-          const itemIndex = savedItems.findIndex((item) => item.id === bookmarkId);
+        for (const savedItemId of savedItemIds) {
+          const itemIndex = savedItems.findIndex((item) => item.id === savedItemId);
 
           if (itemIndex < 0) {
             continue;
@@ -592,14 +592,14 @@ describe("App", () => {
           if (previousFolderIndex >= 0) {
             folders[previousFolderIndex] = {
               ...folders[previousFolderIndex],
-              bookmarkCount: Math.max(0, folders[previousFolderIndex].bookmarkCount - 1)
+              savedItemCount: Math.max(0, folders[previousFolderIndex].savedItemCount - 1)
             };
           }
 
           if (destinationFolderIndex >= 0) {
             folders[destinationFolderIndex] = {
               ...folders[destinationFolderIndex],
-              bookmarkCount: folders[destinationFolderIndex].bookmarkCount + 1
+              savedItemCount: folders[destinationFolderIndex].savedItemCount + 1
             };
           }
         }
@@ -608,7 +608,7 @@ describe("App", () => {
           JSON.stringify({
             json: {
               destinationFolderId: destinationFolder?.id ?? null,
-              movedBookmarkIds: bookmarkIds
+              movedSavedItemIds: savedItemIds
             }
           }),
           {
@@ -666,7 +666,7 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
     await waitFor(() => {
       expect(window.location.pathname).toBe("/me/");
@@ -678,7 +678,7 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).not.toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     const personalSection = screen.getByLabelText("Personal folders");
     const inboxButton = screen.getByRole("button", { name: "Inbox" });
     expect(inboxButton).toBeTruthy();
@@ -724,24 +724,24 @@ describe("App", () => {
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
     window.dispatchEvent(new window.Event("resize"));
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
-    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Hide sidebar" }));
     expect((sidebar as HTMLElement).className).toContain(
       "transition-[transform,opacity,width,border-color]"
     );
     expect((sidebar as HTMLElement).className).toContain("md:w-0");
     expect((sidebar as HTMLElement).className).not.toContain("md:hidden");
-    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((sidebar as HTMLElement).className).toContain("md:w-[340px]");
     expect((workspaceHeader as HTMLElement).className).toContain(
       "grid-cols-[minmax(0,1fr)_2.5rem]"
     );
-    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Search" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Tags" })).toBeNull();
@@ -764,25 +764,25 @@ describe("App", () => {
       expect(screen.getByLabelText("Personal tags")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Important" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Tag actions for Important" })).toBeTruthy();
-      expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
+      expect(screen.queryByLabelText("Saved item folder Inbox")).toBeNull();
       expect(screen.queryByText("Libraries")).toBeNull();
     });
-    const bookmarkSearchInput = screen.getByRole("searchbox", {
-      name: "Search bookmarks"
+    const savedItemSearchInput = screen.getByRole("searchbox", {
+      name: "Search saved items"
     }) as HTMLInputElement;
-    expect(screen.getAllByRole("searchbox", { name: "Search bookmarks" })).toHaveLength(1);
-    bookmarkSearchInput.value = "plain";
-    fireEvent.input(bookmarkSearchInput);
-    expect(bookmarkSearchRequests.some((request) => request.query === "plain")).toBe(false);
+    expect(screen.getAllByRole("searchbox", { name: "Search saved items" })).toHaveLength(1);
+    savedItemSearchInput.value = "plain";
+    fireEvent.input(savedItemSearchInput);
+    expect(savedItemSearchRequests.some((request) => request.query === "plain")).toBe(false);
     await waitFor(() => {
-      expect(bookmarkSearchRequests.at(-1)?.query).toBe("plain");
-      expect(screen.getByText("Plain Bookmark")).toBeTruthy();
-      expect(screen.getByLabelText("Bookmark location Personal / Inbox")).toBeTruthy();
+      expect(savedItemSearchRequests.at(-1)?.query).toBe("plain");
+      expect(screen.getByText("Plain Saved Item")).toBeTruthy();
+      expect(screen.getByLabelText("Saved item location Personal / Inbox")).toBeTruthy();
     });
     expect(screen.getByRole("heading", { name: "Search" })).toBeTruthy();
     expect(window.location.pathname).toBe("/me/search");
     expect(window.location.search).toBe("?q=plain");
-    expect(bookmarkSearchRequests.at(-1)).toEqual({
+    expect(savedItemSearchRequests.at(-1)).toEqual({
       cursor: null,
       libraryId: "00000000-0000-4000-8000-000000000003",
       limit: 20,
@@ -794,15 +794,15 @@ describe("App", () => {
       expect(window.location.pathname).toBe("/me/search");
       expect(window.location.search).toBe("?q=plain&scope=all");
     });
-    expect(bookmarkSearchRequests.at(-1)).toEqual({
+    expect(savedItemSearchRequests.at(-1)).toEqual({
       cursor: null,
       libraryId: undefined,
       limit: 20,
       query: "plain",
       scope: "all"
     });
-    bookmarkSearchInput.value = "";
-    fireEvent.input(bookmarkSearchInput);
+    savedItemSearchInput.value = "";
+    fireEvent.input(savedItemSearchInput);
     await waitFor(() => {
       expect(window.location.pathname).toBe("/me/");
       expect(window.location.search).toBe("");
@@ -846,29 +846,29 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Important" })).toBeTruthy();
       expect(screen.getByText("Example Article")).toBeTruthy();
-      expect(screen.queryByText("Plain Bookmark")).toBeNull();
+      expect(screen.queryByText("Plain Saved Item")).toBeNull();
     });
     expect(window.location.pathname).toBe("/me/tag/00000000-0000-4000-8000-000000000030");
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
-      expect(screen.getByText("Plain Bookmark")).toBeTruthy();
+      expect(screen.getByText("Plain Saved Item")).toBeTruthy();
     });
     expect(window.location.pathname).toBe("/me/");
 
     fireEvent.click(screen.getByRole("button", { name: "Tag actions for Important" }));
     expect(screen.getByRole("menu", { name: "Tag actions for Important" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Add a bookmark" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a saved item" }));
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Add saved item" })).toBeTruthy();
     });
     await waitFor(() => {
-      const dialog = screen.getByRole("dialog", { name: "Add bookmark" });
+      const dialog = screen.getByRole("dialog", { name: "Add saved item" });
       expect(dialog.querySelector('[aria-label="Important"]')).toBeTruthy();
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Add saved item" })).toBeNull();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Tag actions for Important" }));
@@ -904,14 +904,14 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Research" }));
     expect(screen.getByRole("heading", { name: "Research" })).toBeTruthy();
-    expect(screen.queryByRole("searchbox", { name: "Search bookmarks" })).toBeNull();
+    expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     await waitFor(() => {
       expect(document.body.style.position).toBe("");
       expect(document.body.style.overflow).toBe("");
       expect(document.documentElement.style.overflow).toBe("");
     });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
-    expect(screen.getByRole("searchbox", { name: "Search bookmarks" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     await waitFor(() => {
       expect(document.body.style.position).toBe("fixed");
       expect(document.body.style.overflow).toBe("hidden");
@@ -927,7 +927,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collapse folder Research" }));
     expect(screen.queryByRole("button", { name: "Archive" })).toBeNull();
-    expect(window.localStorage.getItem("bookmarks.collapsedFolders")).toBe(
+    expect(window.localStorage.getItem("savedItems.collapsedFolders")).toBe(
       '["00000000-0000-4000-8000-000000000005"]'
     );
     fireEvent.click(screen.getByRole("button", { name: "Folder actions for Research" }));
@@ -938,7 +938,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Folder title")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
-      expect(window.localStorage.getItem("bookmarks.collapsedFolders")).toBe("[]");
+      expect(window.localStorage.getItem("savedItems.collapsedFolders")).toBe("[]");
     });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("button", { name: "Archive" })).toBeTruthy();
@@ -946,7 +946,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Collapse workspace Personal" }));
     expect(screen.queryByRole("button", { name: "Inbox" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
-    expect(window.localStorage.getItem("bookmarks.collapsedLibraries")).toBe(
+    expect(window.localStorage.getItem("savedItems.collapsedLibraries")).toBe(
       '["00000000-0000-4000-8000-000000000003"]'
     );
     fireEvent.click(screen.getByRole("button", { name: "Expand workspace Personal" }));
@@ -955,12 +955,12 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Bookmark actions for Example Article" })
+        screen.getByRole("button", { name: "Saved item actions for Example Article" })
       ).toBeTruthy();
     });
 
     const exampleActionsButton = screen.getByRole("button", {
-      name: "Bookmark actions for Example Article"
+      name: "Saved item actions for Example Article"
     });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 420 });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 640 });
@@ -986,7 +986,7 @@ describe("App", () => {
       expect(screen.getByRole("menuitem", { name: "Copy link" })).toBeTruthy();
       expect(screen.getByRole("menuitem", { name: "Delete" })).toBeTruthy();
     });
-    expect(screen.getByRole("menu", { name: "Bookmark actions for Example Article" }).style.left).toBe(
+    expect(screen.getByRole("menu", { name: "Saved item actions for Example Article" }).style.left).toBe(
       "252px"
     );
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
@@ -1006,7 +1006,7 @@ describe("App", () => {
       expect(screen.getByText("Link copied")).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Bookmark actions for Plain Bookmark" }));
+    fireEvent.click(screen.getByRole("button", { name: "Saved item actions for Plain Saved Item" }));
 
     await waitFor(() => {
       expect(screen.getByRole("menuitem", { name: "Delete" })).toBeTruthy();
@@ -1015,7 +1015,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
 
     await waitFor(() => {
-      expect(screen.queryByText("Plain Bookmark")).toBeNull();
+      expect(screen.queryByText("Plain Saved Item")).toBeNull();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Folder actions for Research" }));
@@ -1076,12 +1076,12 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
 
-    expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Add saved item" })).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add bookmark" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add saved item" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "Add bookmark" })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Add saved item" })).toBeTruthy();
       expect(screen.getByLabelText("Page URL")).toBeTruthy();
     });
     expect(screen.getByLabelText("Page URL").hasAttribute("required")).toBe(false);
@@ -1089,7 +1089,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Add bookmark" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Add saved item" })).toBeNull();
     });
 
     expect(screen.queryByText("Healthy")).toBeNull();
@@ -1100,7 +1100,7 @@ describe("App", () => {
       expect(screen.getByText("Example Article")).toBeTruthy();
     });
 
-    expect(screen.queryByLabelText("Bookmark folder Inbox")).toBeNull();
+    expect(screen.queryByLabelText("Saved item folder Inbox")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Read later" }));
 
@@ -1111,10 +1111,10 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Folder actions for Read later" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("menuitem", { name: "Add a bookmark" })).toBeTruthy();
+      expect(screen.getByRole("menuitem", { name: "Add a saved item" })).toBeTruthy();
     });
 
-    fireEvent.click(screen.getByRole("menuitem", { name: "Add a bookmark" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add a saved item" }));
 
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "Add to Read later" })).toBeTruthy();
@@ -1144,6 +1144,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(document.body.textContent).toContain("https://added.example/post");
     });
-    expect(bookmarkCreateRequests.at(-1)?.tagIds).toContain("00000000-0000-4000-8000-000000000031");
+    expect(savedItemCreateRequests.at(-1)?.tagIds).toContain("00000000-0000-4000-8000-000000000031");
   }, 15000);
 });

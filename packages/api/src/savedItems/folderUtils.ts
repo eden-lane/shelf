@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -21,7 +21,7 @@ export const findFolder = async (
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
       sortOrder: schema.folders.sortOrder,
-      bookmarkCount: sql<number>`count(${schema.savedItems.id})`,
+      savedItemCount: sql<number>`count(${schema.savedItems.id})`,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     })
@@ -74,13 +74,13 @@ export const serializeFolder = (row: {
   iconName: string | null;
   iconColor: string | null;
   sortOrder: number;
-  bookmarkCount: number | string;
+  savedItemCount: number | string;
   createdAt: Date;
   updatedAt: Date;
 }): FolderItem => ({
   ...row,
   sortOrder: Number(row.sortOrder),
-  bookmarkCount: Number(row.bookmarkCount),
+  savedItemCount: Number(row.savedItemCount),
   createdAt: row.createdAt.toISOString(),
   updatedAt: row.updatedAt.toISOString()
 });

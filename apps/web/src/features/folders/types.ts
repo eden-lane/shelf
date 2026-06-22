@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 
 export type FolderNode = FolderItem & {
   children: FolderNode[];

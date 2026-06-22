@@ -1,16 +1,18 @@
+name: shelf
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: bookmarks
-      POSTGRES_PASSWORD: bookmarks
-      POSTGRES_DB: bookmarks
+      POSTGRES_USER: shelf
+      POSTGRES_PASSWORD: shelf
+      POSTGRES_DB: shelf
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bookmarks -d bookmarks"]
+      test: ["CMD-SHELL", "pg_isready -U shelf -d shelf"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -44,7 +46,7 @@ services:
       REGISTRATION_MODE: first-user-only
       APP_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.14:5173
       SESSION_COOKIE_SECURE: "false"
-      DATABASE_URL: postgres://bookmarks:bookmarks@postgres:5432/bookmarks
+      DATABASE_URL: postgres://shelf:shelf@postgres:5432/shelf
       REDIS_URL: redis://redis:6379
       MEILISEARCH_URL: http://meilisearch:7700
     ports:

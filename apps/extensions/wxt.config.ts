@@ -6,8 +6,8 @@ export default defineConfig({
     plugins: [solid()]
   }),
   manifest: {
-    name: "Bookmarks",
-    description: "Save the current page to Bookmarks.",
+    name: "Shelf",
+    description: "Save the current page to Shelf.",
     icons: {
       16: "/icons/icon-16.png",
       32: "/icons/icon-32.png",
@@ -27,7 +27,7 @@ export default defineConfig({
         96: "/icons/icon-96.png",
         128: "/icons/icon-128.png"
       },
-      default_title: "Save to Bookmarks"
+      default_title: "Save to Shelf"
     }
   }
 });

@@ -1,30 +1,30 @@
 import {
-  createDatabaseBookmarksStore,
+  createDatabaseSavedItemsStore,
   enrichSavedItem,
-  type BookmarkEnrichmentQueue,
+  type SavedItemEnrichmentQueue,
   type SavedItemSearchIndex
-} from "@bookmarks/api/bookmarks";
-import type { Database } from "@bookmarks/api/db";
+} from "@shelf/api/savedItems";
+import type { Database } from "@shelf/api/db";
 import type Redis from "ioredis";
 
-const BOOKMARK_ENRICHMENT_QUEUE_KEY = "bookmarks:enrichment";
+const BOOKMARK_ENRICHMENT_QUEUE_KEY = "savedItems:enrichment";
 
-interface BookmarkEnrichmentJob {
+interface SavedItemEnrichmentJob {
   savedItemId: string;
 }
 
-export class RedisBookmarkEnrichmentQueue implements BookmarkEnrichmentQueue {
+export class RedisSavedItemEnrichmentQueue implements SavedItemEnrichmentQueue {
   constructor(private readonly redis: Redis) {}
 
   async enqueueSavedItem(savedItemId: string): Promise<void> {
     await this.redis.lpush(
       BOOKMARK_ENRICHMENT_QUEUE_KEY,
-      JSON.stringify({ savedItemId } satisfies BookmarkEnrichmentJob)
+      JSON.stringify({ savedItemId } satisfies SavedItemEnrichmentJob)
     );
   }
 }
 
-export class BookmarkEnrichmentWorker {
+export class SavedItemEnrichmentWorker {
   private stopping = false;
   private workerRedis: Redis | null = null;
   private loopPromise: Promise<void> | null = null;
@@ -72,7 +72,7 @@ export class BookmarkEnrichmentWorker {
         }
       } catch (error) {
         if (!this.stopping) {
-          console.error("Bookmark enrichment worker failed", error);
+          console.error("SavedItem enrichment worker failed", error);
         }
       }
     }
@@ -85,7 +85,7 @@ export class BookmarkEnrichmentWorker {
       return;
     }
 
-    const store = createDatabaseBookmarksStore(this.options.db);
+    const store = createDatabaseSavedItemsStore(this.options.db);
     const documents = await store.listSavedItemSearchDocuments({
       savedItemIds: [savedItemId]
     });
@@ -95,14 +95,14 @@ export class BookmarkEnrichmentWorker {
     }
 
     await this.options.savedItemSearchIndex.upsert(documents).catch((error: unknown) => {
-      console.error("Unable to sync enriched bookmark to search index", error);
+      console.error("Unable to sync enriched savedItem to search index", error);
     });
   }
 }
 
-const parseJob = (payload: string): BookmarkEnrichmentJob | null => {
+const parseJob = (payload: string): SavedItemEnrichmentJob | null => {
   try {
-    const parsed = JSON.parse(payload) as Partial<BookmarkEnrichmentJob>;
+    const parsed = JSON.parse(payload) as Partial<SavedItemEnrichmentJob>;
 
     return typeof parsed.savedItemId === "string" ? { savedItemId: parsed.savedItemId } : null;
   } catch {

@@ -1,13 +1,13 @@
-export type BookmarkSearchScope = "current" | "all";
+export type SavedItemSearchScope = "current" | "all";
 
 export const SearchScopeControl = ({
   scope,
   workspaceName,
   onScopeChange
 }: {
-  scope: BookmarkSearchScope;
+  scope: SavedItemSearchScope;
   workspaceName: string;
-  onScopeChange: (scope: BookmarkSearchScope) => void;
+  onScopeChange: (scope: SavedItemSearchScope) => void;
 }) => (
   <section className="flex w-full min-w-0 justify-start" aria-label="Search filters">
     <div

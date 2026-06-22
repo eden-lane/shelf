@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -22,7 +22,7 @@ export const listFolders = async (
       iconName: schema.folders.iconName,
       iconColor: schema.folders.iconColor,
       sortOrder: schema.folders.sortOrder,
-      bookmarkCount: sql<number>`count(${schema.savedItems.id})`,
+      savedItemCount: sql<number>`count(${schema.savedItems.id})`,
       createdAt: schema.folders.createdAt,
       updatedAt: schema.folders.updatedAt
     })

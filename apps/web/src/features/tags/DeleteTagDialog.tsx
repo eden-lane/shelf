@@ -1,5 +1,5 @@
 import { Dialog } from "@base-ui/react/dialog";
-import type { TagItem } from "@bookmarks/shared";
+import type { TagItem } from "@shelf/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconX } from "@tabler/icons-react";
 import { deleteTag } from "../../api";
@@ -21,7 +21,7 @@ export const DeleteTagDialog = ({
         currentTags.filter((currentTag) => currentTag.id !== result.deletedTagId)
       );
       onDeleted(result.deletedTagId);
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
       onClose();
     }
@@ -41,7 +41,7 @@ export const DeleteTagDialog = ({
               Delete {tag.name}
             </Dialog.Title>
             <Dialog.Description className="text-sm leading-6 text-[#697080]">
-              This removes the tag from saved bookmarks. The bookmarks will stay in your library.
+              This removes the tag from saved items. The saved items will stay in your library.
             </Dialog.Description>
           </div>
           <Dialog.Close

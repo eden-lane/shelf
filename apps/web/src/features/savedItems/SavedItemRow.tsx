@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import type { BookmarkItem } from "@bookmarks/shared";
+import type { SavedItem } from "@shelf/shared";
 import {
-  IconBookmark,
+  IconLink,
   IconDotsVertical,
   IconExternalLink,
   IconFolder,
@@ -11,18 +11,18 @@ import {
 } from "@tabler/icons-react";
 import { apiAssetUrl } from "../../api";
 import { BOOKMARK_CONTEXT_MENU_SIZE, clampContextMenuPosition } from "../../utils/contextMenu";
-import { BookmarkContextMenu } from "./BookmarkContextMenu";
-import { copyBookmarkLink, formatBookmarkDate, hostFromUrl } from "./bookmarkUtils";
+import { SavedItemContextMenu } from "./SavedItemContextMenu";
+import { copySavedItemLink, formatSavedItemDate, hostFromUrl } from "./savedItemUtils";
 
-export const BookmarkRow = ({
+export const SavedItemRow = ({
   item,
   showFolderName,
-  onDeleteBookmark,
+  onDeleteSavedItem,
   onLinkCopied
 }: {
-  item: BookmarkItem;
+  item: SavedItem;
   showFolderName: boolean;
-  onDeleteBookmark: (bookmarkId: string) => void;
+  onDeleteSavedItem: (savedItemId: string) => void;
   onLinkCopied: () => void;
 }) => {
   const host = hostFromUrl(item.url);
@@ -37,12 +37,12 @@ export const BookmarkRow = ({
     setNodeRef,
     isDragging
   } = useDraggable({
-    id: `bookmark:${item.id}`,
+    id: `savedItem:${item.id}`,
     data: {
-      bookmarkIds: [item.id],
+      savedItemIds: [item.id],
       item,
       sourceFolderId: item.folderId,
-      type: "bookmark"
+      type: "savedItem"
     }
   });
 
@@ -64,12 +64,12 @@ export const BookmarkRow = ({
   };
 
   const copyLink = () => {
-    void copyBookmarkLink(item.url).then(onLinkCopied);
+    void copySavedItemLink(item.url).then(onLinkCopied);
     setMenu(null);
   };
 
   const deleteItem = () => {
-    onDeleteBookmark(item.id);
+    onDeleteSavedItem(item.id);
     setMenu(null);
   };
 
@@ -86,7 +86,7 @@ export const BookmarkRow = ({
       <div className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-3">
         <button
           className="flex h-full min-h-10 cursor-grab items-center justify-center self-stretch border-0 bg-transparent p-0 text-[#9aa1ad] outline-none hover:text-[#697080] active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-          aria-label={`Drag bookmark ${title}`}
+          aria-label={`Drag saved item ${title}`}
           type="button"
           ref={setActivatorNodeRef}
           {...attributes}
@@ -127,7 +127,7 @@ export const BookmarkRow = ({
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <IconBookmark size={19} stroke={1.5} aria-hidden="true" focusable="false" />
+                    <IconLink size={19} stroke={1.5} aria-hidden="true" focusable="false" />
                   )}
                 </div>
                 <div className="min-w-0">
@@ -149,7 +149,7 @@ export const BookmarkRow = ({
                 {showFolderName ? (
                   <span
                     className="flex items-center gap-1.5 rounded-lg border border-[#e7eaf1] bg-[#fbfcff] px-2.5 py-1 text-xs font-extrabold text-[#697080]"
-                    aria-label={`Bookmark location ${contextLabel}`}
+                    aria-label={`Saved item location ${contextLabel}`}
                   >
                     <IconFolder size={16} stroke={1.5} aria-hidden="true" focusable="false" />
                     {contextLabel}
@@ -157,7 +157,7 @@ export const BookmarkRow = ({
                 ) : null}
                 <button
                   className="grid h-8 w-8 place-items-center rounded-lg border border-[#e7eaf1] bg-[#fbfcff] text-[#697080] outline-none hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-                  aria-label={`Bookmark actions for ${title}`}
+                  aria-label={`Saved item actions for ${title}`}
                   type="button"
                   onClick={(event) => {
                     event.stopPropagation();
@@ -181,13 +181,13 @@ export const BookmarkRow = ({
               </p>
             ) : null}
             <time className="text-xs font-bold text-[#858b9a]" dateTime={item.createdAt}>
-              Added {formatBookmarkDate(item.createdAt)}
+              Added {formatSavedItemDate(item.createdAt)}
             </time>
           </div>
         </div>
       </div>
       {menu ? (
-        <BookmarkContextMenu
+        <SavedItemContextMenu
           itemTitle={title}
           x={menu.x}
           y={menu.y}

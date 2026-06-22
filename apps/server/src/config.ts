@@ -1,4 +1,4 @@
-import type { RegistrationMode } from "@bookmarks/api/auth";
+import type { RegistrationMode } from "@shelf/api/auth";
 
 export type AuthMode = "session" | "none";
 
@@ -93,7 +93,7 @@ export const getConfig = (): ServerConfig => {
   return {
     port,
     databaseUrl:
-      Bun.env.DATABASE_URL ?? "postgres://bookmarks:bookmarks@localhost:5432/bookmarks",
+      Bun.env.DATABASE_URL ?? "postgres://shelf:shelf@localhost:5432/shelf",
     redisUrl: Bun.env.REDIS_URL ?? "redis://localhost:6379",
     meilisearchUrl: Bun.env.MEILISEARCH_URL ?? "http://localhost:7700",
     authMode,

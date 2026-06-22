@@ -5,18 +5,18 @@ import {
   resolveSessionToken,
   signup,
   type RegistrationMode
-} from "@bookmarks/api/auth";
+} from "@shelf/api/auth";
 import {
-  createDatabaseBookmarksStore,
-  type BookmarkEnrichmentQueue,
-  type BookmarksStore,
+  createDatabaseSavedItemsStore,
+  type SavedItemEnrichmentQueue,
+  type SavedItemsStore,
   type SavedItemSearchIndex
-} from "@bookmarks/api/bookmarks";
-import { getCurrentUserResponse } from "@bookmarks/api/currentUser";
-import type { CurrentIdentity } from "@bookmarks/api/currentUser";
-import type { Database } from "@bookmarks/api/db";
-import { checkHealth, type HealthDependencies } from "@bookmarks/api/health";
-import { createRpcRouter } from "@bookmarks/api/rpc";
+} from "@shelf/api/savedItems";
+import { getCurrentUserResponse } from "@shelf/api/currentUser";
+import type { CurrentIdentity } from "@shelf/api/currentUser";
+import type { Database } from "@shelf/api/db";
+import { checkHealth, type HealthDependencies } from "@shelf/api/health";
+import { createRpcRouter } from "@shelf/api/rpc";
 import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
@@ -26,8 +26,8 @@ import { rateLimiter } from "hono-rate-limiter";
 export interface AppOptions {
   dependencies: HealthDependencies & { db?: Database };
   currentUser?: CurrentIdentity;
-  bookmarksStore?: BookmarksStore;
-  bookmarkEnrichmentQueue?: BookmarkEnrichmentQueue;
+  savedItemsStore?: SavedItemsStore;
+  savedItemEnrichmentQueue?: SavedItemEnrichmentQueue;
   savedItemSearchIndex?: SavedItemSearchIndex;
   authMode?: "session" | "none";
   registrationMode?: RegistrationMode;
@@ -35,16 +35,16 @@ export interface AppOptions {
   sessionCookieSecure?: boolean;
 }
 
-const SESSION_COOKIE_NAME = "bookmarks_session";
+const SESSION_COOKIE_NAME = "shelf_session";
 
 export const createApp = (options: AppOptions) => {
   const app = new Hono();
   const authMode = options.authMode ?? "session";
   const registrationMode = options.registrationMode ?? "first-user-only";
   const allowedOrigins = options.allowedOrigins ?? [];
-  const bookmarksStore =
-    options.bookmarksStore ??
-    (options.dependencies.db ? createDatabaseBookmarksStore(options.dependencies.db) : undefined);
+  const savedItemsStore =
+    options.savedItemsStore ??
+    (options.dependencies.db ? createDatabaseSavedItemsStore(options.dependencies.db) : undefined);
 
   app.use(
     "*",
@@ -175,11 +175,11 @@ export const createApp = (options: AppOptions) => {
   });
 
   app.get("/favicons/:id", async (context) => {
-    if (!bookmarksStore) {
+    if (!savedItemsStore) {
       return context.notFound();
     }
 
-    const favicon = await bookmarksStore.getFavicon(context.req.param("id"));
+    const favicon = await savedItemsStore.getFavicon(context.req.param("id"));
 
     if (!favicon) {
       return context.notFound();
@@ -206,8 +206,8 @@ export const createApp = (options: AppOptions) => {
     const currentUser = await resolveCurrentUser(context);
     const rpcHandler = new RPCHandler(
       createRpcRouter({
-        bookmarksStore,
-        bookmarkEnrichmentQueue: options.bookmarkEnrichmentQueue,
+        savedItemsStore,
+        savedItemEnrichmentQueue: options.savedItemEnrichmentQueue,
         currentUser: currentUser ?? undefined,
         dependencies: options.dependencies,
         savedItemSearchIndex: options.savedItemSearchIndex

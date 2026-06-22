@@ -1,5 +1,5 @@
 import { createApp } from "./app";
-import { BookmarkEnrichmentWorker, RedisBookmarkEnrichmentQueue } from "./bookmarkEnrichmentQueue";
+import { SavedItemEnrichmentWorker, RedisSavedItemEnrichmentQueue } from "./savedItemEnrichmentQueue";
 import { createRuntimeClients } from "./clients";
 import { getConfig } from "./config";
 
@@ -11,7 +11,7 @@ const clients = createRuntimeClients({
 });
 
 const app = createApp({
-  bookmarkEnrichmentQueue: new RedisBookmarkEnrichmentQueue(clients.redis),
+  savedItemEnrichmentQueue: new RedisSavedItemEnrichmentQueue(clients.redis),
   dependencies: clients,
   savedItemSearchIndex: clients.savedItemSearchIndex,
   authMode: config.authMode,
@@ -19,13 +19,13 @@ const app = createApp({
   allowedOrigins: config.allowedOrigins,
   sessionCookieSecure: config.sessionCookieSecure
 });
-const bookmarkEnrichmentWorker = new BookmarkEnrichmentWorker({
+const savedItemEnrichmentWorker = new SavedItemEnrichmentWorker({
   db: clients.db,
   redis: clients.redis,
   savedItemSearchIndex: clients.savedItemSearchIndex
 });
 
-bookmarkEnrichmentWorker.start();
+savedItemEnrichmentWorker.start();
 
 Bun.serve({
   port: config.port,
@@ -35,7 +35,7 @@ Bun.serve({
 console.log(`API listening on http://localhost:${config.port}`);
 
 const shutdown = async () => {
-  await bookmarkEnrichmentWorker.stop();
+  await savedItemEnrichmentWorker.stop();
   await clients.close();
   process.exit(0);
 };

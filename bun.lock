@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "bookmarks",
+      "name": "shelf",
       "devDependencies": {
         "@types/bun": "latest",
         "drizzle-kit": "latest",
@@ -10,7 +10,7 @@
       },
     },
     "apps/extensions": {
-      "name": "@bookmarks/extensions",
+      "name": "@shelf/extensions",
       "version": "0.1.0",
       "dependencies": {
         "@fontsource/open-sans": "latest",
@@ -24,9 +24,9 @@
       },
     },
     "apps/server": {
-      "name": "@bookmarks/server",
+      "name": "@shelf/server",
       "dependencies": {
-        "@bookmarks/api": "workspace:*",
+        "@shelf/api": "workspace:*",
         "@orpc/server": "latest",
         "hono": "latest",
         "hono-rate-limiter": "latest",
@@ -39,10 +39,10 @@
       },
     },
     "apps/web": {
-      "name": "@bookmarks/web",
+      "name": "@shelf/web",
       "dependencies": {
         "@base-ui/react": "^1.6.0",
-        "@bookmarks/shared": "workspace:*",
+        "@shelf/shared": "workspace:*",
         "@dnd-kit/core": "^6.3.1",
         "@fontsource/open-sans": "latest",
         "@orpc/client": "1.14.6",
@@ -65,9 +65,9 @@
       },
     },
     "packages/api": {
-      "name": "@bookmarks/api",
+      "name": "@shelf/api",
       "dependencies": {
-        "@bookmarks/shared": "workspace:*",
+        "@shelf/shared": "workspace:*",
         "@orpc/server": "latest",
         "drizzle-orm": "latest",
         "link-preview-js": "^4.0.3",
@@ -79,7 +79,7 @@
       },
     },
     "packages/shared": {
-      "name": "@bookmarks/shared",
+      "name": "@shelf/shared",
       "devDependencies": {
         "typescript": "latest",
       },
@@ -134,15 +134,15 @@
 
     "@base-ui/utils": ["@base-ui/utils@0.3.1", "", { "dependencies": { "@babel/runtime": "^7.29.2", "@floating-ui/utils": "^0.2.11", "reselect": "^5.2.0", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-gFFiltORVmW/N6IILTGxizP3PBpVpysqML1ALY5Vk0mH+7faVkCknOU31goYHN5Aoek2dkjxva1XOD2Ce9WuIg=="],
 
-    "@bookmarks/api": ["@bookmarks/api@workspace:packages/api"],
+    "@shelf/api": ["@shelf/api@workspace:packages/api"],
 
-    "@bookmarks/extensions": ["@bookmarks/extensions@workspace:apps/extensions"],
+    "@shelf/extensions": ["@shelf/extensions@workspace:apps/extensions"],
 
-    "@bookmarks/server": ["@bookmarks/server@workspace:apps/server"],
+    "@shelf/server": ["@shelf/server@workspace:apps/server"],
 
-    "@bookmarks/shared": ["@bookmarks/shared@workspace:packages/shared"],
+    "@shelf/shared": ["@shelf/shared@workspace:packages/shared"],
 
-    "@bookmarks/web": ["@bookmarks/web@workspace:apps/web"],
+    "@shelf/web": ["@shelf/web@workspace:apps/web"],
 
     "@devicefarmer/adbkit": ["@devicefarmer/adbkit@3.3.8", "", { "dependencies": { "@devicefarmer/adbkit-logcat": "^2.1.2", "@devicefarmer/adbkit-monkey": "~1.2.1", "bluebird": "~3.7", "commander": "^9.1.0", "debug": "~4.3.1", "node-forge": "^1.3.1", "split": "~1.0.1" }, "bin": { "adbkit": "bin/adbkit" } }, "sha512-7rBLLzWQnBwutH2WZ0EWUkQdihqrnLYCUMaB44hSol9e0/cdIhuNFcqZO0xNheAU6qqHVA8sMiLofkYTgb+lmw=="],
 

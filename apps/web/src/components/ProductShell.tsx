@@ -19,15 +19,15 @@ import {
 import type { InfiniteData } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  BookmarkItem,
-  BookmarksPageResponse,
+  SavedItem,
+  SavedItemsPageResponse,
   CurrentUserResponse,
   FolderItem,
   MoveFolderInput,
   TagItem
-} from "@bookmarks/shared";
+} from "@shelf/shared";
 import {
-  IconBookmark,
+  IconLink,
   IconDatabase,
   IconGripVertical,
   IconLayoutSidebarLeftExpand,
@@ -43,21 +43,21 @@ import {
   getTags,
   logout,
   moveFolder as moveFolderRequest,
-  moveBookmarks as moveBookmarksRequest
+  moveSavedItems as moveSavedItemsRequest
 } from "../api";
-import { AddBookmarkDialog } from "../features/bookmarks/AddBookmarkDialog";
-import { BookmarksWorkspace } from "../features/bookmarks/BookmarksWorkspace";
+import { AddSavedItemDialog } from "../features/savedItems/AddSavedItemDialog";
+import { SavedItemsWorkspace } from "../features/savedItems/SavedItemsWorkspace";
 import {
-  bookmarkQueryKey,
-  bookmarkQueryKeysForFolder,
+  savedItemQueryKey,
+  savedItemQueryKeysForFolder,
   hostFromUrl,
-  insertBookmarkIntoPages,
-  removeBookmarksFromPages
-} from "../features/bookmarks/bookmarkUtils";
+  insertSavedItemIntoPages,
+  removeSavedItemsFromPages
+} from "../features/savedItems/savedItemUtils";
 import {
   SearchScopeControl,
-  type BookmarkSearchScope
-} from "../features/bookmarks/SearchScopeControl";
+  type SavedItemSearchScope
+} from "../features/savedItems/SearchScopeControl";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
 import { folderPathSegments } from "../features/folders/folderTree";
 import {
@@ -90,9 +90,9 @@ type ActiveRoute =
 
 type WorkspaceLibrary = CurrentUserResponse["libraries"][number];
 
-type BookmarkSearchState = {
+type SavedItemSearchState = {
   query: string;
-  scope: BookmarkSearchScope;
+  scope: SavedItemSearchScope;
 };
 
 type SidebarTouchState = {
@@ -147,7 +147,7 @@ const routeFromLocation = (): ActiveRoute => {
   return { type: "inbox", workspaceSlug: firstSegment };
 };
 
-const searchStateFromLocation = (): BookmarkSearchState => {
+const searchStateFromLocation = (): SavedItemSearchState => {
   if (typeof window === "undefined") {
     return { query: "", scope: "current" };
   }
@@ -163,7 +163,7 @@ const searchStateFromLocation = (): BookmarkSearchState => {
 
 const writeLocationToHistory = (
   route: ActiveRoute,
-  search: BookmarkSearchState,
+  search: SavedItemSearchState,
   mode: "push" | "replace"
 ) => {
   if (typeof window === "undefined" || !["http:", "https:"].includes(window.location.protocol)) {
@@ -185,7 +185,7 @@ const writeLocationToHistory = (
   window.history.pushState(null, "", path);
 };
 
-const pathForRoute = (route: ActiveRoute, search: BookmarkSearchState = emptySearchState) => {
+const pathForRoute = (route: ActiveRoute, search: SavedItemSearchState = emptySearchState) => {
   const workspaceSlug = encodeURIComponent(route.workspaceSlug ?? "me");
   const searchSuffix = searchParamsForState(search);
 
@@ -204,12 +204,12 @@ const pathForRoute = (route: ActiveRoute, search: BookmarkSearchState = emptySea
   return `/${workspaceSlug}/`;
 };
 
-const emptySearchState: BookmarkSearchState = {
+const emptySearchState: SavedItemSearchState = {
   query: "",
   scope: "current"
 };
 
-const searchParamsForState = (search: BookmarkSearchState) => {
+const searchParamsForState = (search: SavedItemSearchState) => {
   const query = search.query.trim();
 
   if (!query) {
@@ -276,15 +276,15 @@ export const ProductShell = () => {
   const sidebarScrollRef = useRef<HTMLDivElement | null>(null);
   const sidebarTouchStartRef = useRef<SidebarTouchState | null>(null);
   const [activeRoute, setActiveRoute] = useState<ActiveRoute>(() => routeFromLocation());
-  const [searchState, setSearchState] = useState<BookmarkSearchState>(() =>
+  const [searchState, setSearchState] = useState<SavedItemSearchState>(() =>
     searchStateFromLocation()
   );
-  const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
-  const [bookmarkTargetFolder, setBookmarkTargetFolder] = useState<FolderItem | null>(null);
-  const [bookmarkTargetTag, setBookmarkTargetTag] = useState<TagItem | null>(null);
+  const [savedItemDialogOpen, setSavedItemDialogOpen] = useState(false);
+  const [savedItemTargetFolder, setSavedItemTargetFolder] = useState<FolderItem | null>(null);
+  const [savedItemTargetTag, setSavedItemTargetTag] = useState<TagItem | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(() => !isStackedSidebarViewport());
   const [isStackedSidebar, setIsStackedSidebar] = useState(isStackedSidebarViewport);
-  const [activeBookmarkDragItem, setActiveBookmarkDragItem] = useState<BookmarkItem | null>(null);
+  const [activeSavedItemDragItem, setActiveSavedItemDragItem] = useState<SavedItem | null>(null);
   const [activeFolderDragId, setActiveFolderDragId] = useState<string | null>(null);
   const [moveNotification, setMoveNotification] = useState<string | null>(null);
   const [sidebarDragOffset, setSidebarDragOffset] = useState(0);
@@ -338,59 +338,59 @@ export const ProductShell = () => {
     : (activeRoute.workspaceSlug ?? "me");
   const activeLibraryId =
     activeWorkspace?.id ?? activeFolder?.libraryId ?? activeTag?.libraryId ?? null;
-  const bookmarkTargetLibraryId =
-    bookmarkTargetFolder?.libraryId ??
-    bookmarkTargetTag?.libraryId ??
+  const savedItemTargetLibraryId =
+    savedItemTargetFolder?.libraryId ??
+    savedItemTargetTag?.libraryId ??
     activeTag?.libraryId ??
     activeLibraryId;
   const activeFolderDragItem =
     folders.data?.find((folder) => folder.id === activeFolderDragId) ?? null;
   const activeFolderPath = activeFolder ? folderPathSegments(activeFolder, folders.data ?? []) : [];
-  const moveBookmarksMutation = useMutation({
-    mutationFn: ({ destinationFolder, ...input }: MoveBookmarksMutationInput) =>
-      moveBookmarksRequest({
-        bookmarkIds: input.bookmarkIds,
+  const moveSavedItemsMutation = useMutation({
+    mutationFn: ({ destinationFolder, ...input }: MoveSavedItemsMutationInput) =>
+      moveSavedItemsRequest({
+        savedItemIds: input.savedItemIds,
         destinationFolderId: destinationFolder?.id ?? null
       }),
     onMutate: async (input) => {
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: ["bookmarks"] }),
+        queryClient.cancelQueries({ queryKey: ["savedItems"] }),
         queryClient.cancelQueries({ queryKey: ["folders"] })
       ]);
 
-      const previousBookmarks =
-        queryClient.getQueriesData<InfiniteData<BookmarksPageResponse, string | null>>({
-          queryKey: ["bookmarks"]
+      const previousSavedItems =
+        queryClient.getQueriesData<InfiniteData<SavedItemsPageResponse, string | null>>({
+          queryKey: ["savedItems"]
         });
       const previousFolders = queryClient.getQueryData<FolderItem[]>(["folders"]);
-      const bookmarkIds = new Set(input.bookmarkIds);
-      const movedBookmarks = new Map<string, BookmarkItem>();
+      const savedItemIds = new Set(input.savedItemIds);
+      const movedSavedItems = new Map<string, SavedItem>();
       const now = new Date().toISOString();
 
-      for (const [, data] of previousBookmarks) {
+      for (const [, data] of previousSavedItems) {
         for (const page of data?.pages ?? []) {
           for (const item of page.items) {
-            if (bookmarkIds.has(item.id)) {
-              movedBookmarks.set(item.id, item);
+            if (savedItemIds.has(item.id)) {
+              movedSavedItems.set(item.id, item);
             }
           }
         }
       }
 
-      for (const [queryKey] of previousBookmarks) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+      for (const [queryKey] of previousSavedItems) {
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
           queryKey,
-          (data) => removeBookmarksFromPages(data, bookmarkIds)
+          (data) => removeSavedItemsFromPages(data, savedItemIds)
         );
       }
 
       const destinationFolderId = input.destinationFolder?.id ?? null;
       const destinationLibraryId = input.destinationFolder?.libraryId ?? null;
-      const destinationQueryKey = bookmarkQueryKeysForFolder(
+      const destinationQueryKey = savedItemQueryKeysForFolder(
         destinationFolderId,
         destinationLibraryId
       )[0];
-      const movedItems = [...movedBookmarks.values()]
+      const movedItems = [...movedSavedItems.values()]
         .filter((item) => item.folderId !== destinationFolderId)
         .map((item) => ({
           ...item,
@@ -401,11 +401,11 @@ export const ProductShell = () => {
         }));
 
       if (queryClient.getQueryState(destinationQueryKey)) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
           destinationQueryKey,
           (data) =>
             movedItems.reduce(
-              (currentData, item) => insertBookmarkIntoPages(currentData, item),
+              (currentData, item) => insertSavedItemIntoPages(currentData, item),
               data
             )
         );
@@ -419,7 +419,7 @@ export const ProductShell = () => {
             countDeltas.set(item.folderId, (countDeltas.get(item.folderId) ?? 0) + 1);
           }
 
-          const previousFolderId = movedBookmarks.get(item.id)?.folderId;
+          const previousFolderId = movedSavedItems.get(item.id)?.folderId;
 
           if (previousFolderId) {
             countDeltas.set(previousFolderId, (countDeltas.get(previousFolderId) ?? 0) - 1);
@@ -437,19 +437,19 @@ export const ProductShell = () => {
             ? folder
             : {
                 ...folder,
-                bookmarkCount: Math.max(0, folder.bookmarkCount + delta),
+                savedItemCount: Math.max(0, folder.savedItemCount + delta),
                 updatedAt: now
               };
         });
       });
 
       return {
-        previousBookmarks,
+        previousSavedItems,
         previousFolders
       };
     },
     onError: (_error, _input, context) => {
-      for (const [queryKey, data] of context?.previousBookmarks ?? []) {
+      for (const [queryKey, data] of context?.previousSavedItems ?? []) {
         queryClient.setQueryData(queryKey, data);
       }
 
@@ -457,21 +457,21 @@ export const ProductShell = () => {
         queryClient.setQueryData(["folders"], context.previousFolders);
       }
 
-      setMoveNotification("Bookmark could not be moved");
+      setMoveNotification("Saved item could not be moved");
     },
     onSuccess: (result) => {
-      const count = result.movedBookmarkIds.length;
-      setMoveNotification(count === 1 ? "Moved 1 bookmark" : `Moved ${count} bookmarks`);
+      const count = result.movedSavedItemIds.length;
+      setMoveNotification(count === 1 ? "Moved 1 saved item" : `Moved ${count} saved items`);
     },
     onSettled: (_result, _error, input) => {
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
 
       const destinationFolderId = input.destinationFolder?.id ?? null;
       const destinationLibraryId = input.destinationFolder?.libraryId ?? null;
       void queryClient.invalidateQueries({
         exact: true,
-        queryKey: bookmarkQueryKey({
+        queryKey: savedItemQueryKey({
           folderId: destinationFolderId,
           libraryId: destinationLibraryId,
           tagId: null
@@ -505,7 +505,7 @@ export const ProductShell = () => {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
     }
   });
 
@@ -536,7 +536,7 @@ export const ProductShell = () => {
   }, []);
 
   const updateSearchState = useCallback(
-    (nextSearchState: BookmarkSearchState, mode: "push" | "replace" = "replace") => {
+    (nextSearchState: SavedItemSearchState, mode: "push" | "replace" = "replace") => {
       const query = nextSearchState.query.trim();
       const nextRoute: ActiveRoute = query
         ? { type: "search", workspaceSlug: activeWorkspaceSlug }
@@ -689,24 +689,24 @@ export const ProductShell = () => {
     return () => window.clearTimeout(timeout);
   }, [moveNotification]);
 
-  const openBookmarkDialog = ({
+  const openSavedItemDialog = ({
     folder,
     tag
   }: {
     folder: FolderItem | null;
     tag: TagItem | null;
   }) => {
-    setBookmarkTargetFolder(folder);
-    setBookmarkTargetTag(tag);
-    setBookmarkDialogOpen(true);
+    setSavedItemTargetFolder(folder);
+    setSavedItemTargetTag(tag);
+    setSavedItemDialogOpen(true);
   };
 
-  const updateBookmarkDialogOpen = (open: boolean) => {
-    setBookmarkDialogOpen(open);
+  const updateSavedItemDialogOpen = (open: boolean) => {
+    setSavedItemDialogOpen(open);
 
     if (!open) {
-      setBookmarkTargetFolder(null);
-      setBookmarkTargetTag(null);
+      setSavedItemTargetFolder(null);
+      setSavedItemTargetTag(null);
     }
   };
 
@@ -749,15 +749,15 @@ export const ProductShell = () => {
     }
   };
 
-  const moveBookmarksToFolder = (bookmarkIds: string[], destinationFolder: FolderItem | null) => {
-    const uniqueBookmarkIds = [...new Set(bookmarkIds)].filter(Boolean);
+  const moveSavedItemsToFolder = (savedItemIds: string[], destinationFolder: FolderItem | null) => {
+    const uniqueSavedItemIds = [...new Set(savedItemIds)].filter(Boolean);
 
-    if (uniqueBookmarkIds.length === 0) {
+    if (uniqueSavedItemIds.length === 0) {
       return;
     }
 
-    moveBookmarksMutation.mutate({
-      bookmarkIds: uniqueBookmarkIds,
+    moveSavedItemsMutation.mutate({
+      savedItemIds: uniqueSavedItemIds,
       destinationFolder
     });
   };
@@ -765,7 +765,7 @@ export const ProductShell = () => {
   const handleDragStart = (event: DragStartEvent) => {
     const activeData = event.active.data.current;
 
-    setActiveBookmarkDragItem(isBookmarkDragData(activeData) ? activeData.item : null);
+    setActiveSavedItemDragItem(isSavedItemDragData(activeData) ? activeData.item : null);
     setActiveFolderDragId(isFolderDragData(activeData) ? activeData.folderId : null);
   };
 
@@ -774,9 +774,9 @@ export const ProductShell = () => {
     const overData = event.over?.data.current;
 
     setActiveFolderDragId(null);
-    setActiveBookmarkDragItem(null);
+    setActiveSavedItemDragItem(null);
 
-    if (isBookmarkDragData(activeData) && isFolderDropData(overData)) {
+    if (isSavedItemDragData(activeData) && isFolderDropData(overData)) {
       const destinationFolder = overData.folder;
       const destinationFolderId = destinationFolder?.id ?? null;
 
@@ -784,7 +784,7 @@ export const ProductShell = () => {
         return;
       }
 
-      moveBookmarksToFolder(activeData.bookmarkIds, destinationFolder);
+      moveSavedItemsToFolder(activeData.savedItemIds, destinationFolder);
       return;
     }
 
@@ -803,7 +803,7 @@ export const ProductShell = () => {
 
   const handleDragCancel = () => {
     setActiveFolderDragId(null);
-    setActiveBookmarkDragItem(null);
+    setActiveSavedItemDragItem(null);
   };
 
   const handleSidebarTouchStart = (event: ReactTouchEvent<HTMLElement>) => {
@@ -919,7 +919,7 @@ export const ProductShell = () => {
             searchQuery={activeSearchQuery}
             tags={tags.data ?? []}
             activeFolderDragId={activeFolderDragId}
-            onAddBookmark={openBookmarkDialog}
+            onAddSavedItem={openSavedItemDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
             onSearchQueryChange={(query) =>
               updateSearchState({
@@ -1006,7 +1006,7 @@ export const ProductShell = () => {
           />
         ) : null}
 
-        <BookmarksWorkspace
+        <SavedItemsWorkspace
           folderId={activeFolderId}
           folderName={activeFolder?.name ?? null}
           libraryId={activeLibraryId}
@@ -1016,16 +1016,16 @@ export const ProductShell = () => {
           tagName={activeTag?.name ?? null}
         />
       </section>
-      <AddBookmarkDialog
-        isOpen={bookmarkDialogOpen}
-        targetFolder={bookmarkTargetFolder}
-        targetLibraryId={bookmarkTargetLibraryId}
-        targetTagId={bookmarkTargetTag?.id ?? activeTagId}
+      <AddSavedItemDialog
+        isOpen={savedItemDialogOpen}
+        targetFolder={savedItemTargetFolder}
+        targetLibraryId={savedItemTargetLibraryId}
+        targetTagId={savedItemTargetTag?.id ?? activeTagId}
         tags={tags.data ?? []}
         visibleFolderId={activeFolderId}
         visibleLibraryId={activeLibraryId}
         visibleTagId={activeTagId}
-        onOpenChange={updateBookmarkDialogOpen}
+        onOpenChange={updateSavedItemDialogOpen}
       />
       {moveNotification ? (
         <div
@@ -1038,8 +1038,8 @@ export const ProductShell = () => {
       ) : null}
       </main>
       <DragOverlay zIndex={1000}>
-        {activeBookmarkDragItem ? <BookmarkDragPreview item={activeBookmarkDragItem} /> : null}
-        {!activeBookmarkDragItem && activeFolderDragItem ? (
+        {activeSavedItemDragItem ? <SavedItemDragPreview item={activeSavedItemDragItem} /> : null}
+        {!activeSavedItemDragItem && activeFolderDragItem ? (
           <FolderDragPreview folder={activeFolderDragItem} />
         ) : null}
       </DragOverlay>
@@ -1047,16 +1047,16 @@ export const ProductShell = () => {
   );
 };
 
-type MoveBookmarksMutationInput = {
-  bookmarkIds: string[];
+type MoveSavedItemsMutationInput = {
+  savedItemIds: string[];
   destinationFolder: FolderItem | null;
 };
 
-type BookmarkDragData = {
-  bookmarkIds: string[];
-  item: BookmarkItem;
+type SavedItemDragData = {
+  savedItemIds: string[];
+  item: SavedItem;
   sourceFolderId: string | null;
-  type: "bookmark";
+  type: "savedItem";
 };
 
 type FolderDragData = {
@@ -1084,28 +1084,28 @@ type FolderRootDropData = {
   type: "folder-root";
 };
 
-const isBookmarkDragData = (value: unknown): value is BookmarkDragData => {
+const isSavedItemDragData = (value: unknown): value is SavedItemDragData => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  const data = value as BookmarkDragData;
+  const data = value as SavedItemDragData;
 
   return (
-    data.type === "bookmark" &&
-    Array.isArray(data.bookmarkIds) &&
-    data.bookmarkIds.every((bookmarkId) => typeof bookmarkId === "string" && bookmarkId) &&
-    isBookmarkItem(data.item) &&
+    data.type === "savedItem" &&
+    Array.isArray(data.savedItemIds) &&
+    data.savedItemIds.every((savedItemId) => typeof savedItemId === "string" && savedItemId) &&
+    isSavedItem(data.item) &&
     (typeof data.sourceFolderId === "string" || data.sourceFolderId === null)
   );
 };
 
-const isBookmarkItem = (value: unknown): value is BookmarkItem => {
+const isSavedItem = (value: unknown): value is SavedItem => {
   if (typeof value !== "object" || value === null) {
     return false;
   }
 
-  const item = value as BookmarkItem;
+  const item = value as SavedItem;
 
   return typeof item.id === "string" && typeof item.url === "string";
 };
@@ -1291,7 +1291,7 @@ const compareFolders = (left: FolderItem, right: FolderItem) =>
   left.name.localeCompare(right.name) ||
   left.id.localeCompare(right.id);
 
-const BookmarkDragPreview = ({ item }: { item: BookmarkItem }) => {
+const SavedItemDragPreview = ({ item }: { item: SavedItem }) => {
   const host = hostFromUrl(item.url);
   const title = item.title || host || item.url;
 
@@ -1325,7 +1325,7 @@ const BookmarkDragPreview = ({ item }: { item: BookmarkItem }) => {
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <IconBookmark size={19} stroke={1.5} aria-hidden="true" focusable="false" />
+              <IconLink size={19} stroke={1.5} aria-hidden="true" focusable="false" />
             )}
           </div>
           <div className="min-w-0">
@@ -1360,7 +1360,7 @@ const FolderDragPreview = ({ folder }: { folder: FolderItem }) => {
         </span>
       </div>
       <span className="grid h-9 place-items-center text-xs font-extrabold text-gray-400">
-        {folder.bookmarkCount > 0 ? folder.bookmarkCount : null}
+        {folder.savedItemCount > 0 ? folder.savedItemCount : null}
       </span>
       <span aria-hidden="true" />
     </div>
@@ -1406,7 +1406,7 @@ const FolderBreadcrumbs = ({
         ))
       ) : (
         <BreadcrumbLink route={inboxRoute} isCurrent onNavigate={onNavigate}>
-          <IconBookmark
+          <IconLink
             className="shrink-0 text-[#3b8df5]"
             size={16}
             stroke={1.5}

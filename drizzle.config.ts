@@ -5,7 +5,7 @@ export default defineConfig({
   schema: "./packages/api/src/db/schema.ts",
   out: "./packages/api/drizzle",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://bookmarks:bookmarks@localhost:5432/bookmarks"
+    url: process.env.DATABASE_URL ?? "postgres://shelf:shelf@localhost:5432/shelf"
   },
   migrations: {
     schema: "public"

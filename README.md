@@ -1,6 +1,6 @@
-# Bookmarks
+# Shelf
 
-A self-hosted bookmarks app, currently bootstrapped as a runnable product shell with API health checks and local services.
+A self-hosted saved-link app, currently bootstrapped as a runnable product shell with API health checks and local services.
 
 ## Local startup
 

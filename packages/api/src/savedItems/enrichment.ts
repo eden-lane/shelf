@@ -1,4 +1,4 @@
-import type { BookmarkItem } from "@bookmarks/shared";
+import type { SavedItem } from "@shelf/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { getPreviewFromContent } from "link-preview-js";
 import { Buffer } from "node:buffer";
@@ -12,7 +12,7 @@ const FAVICON_FETCH_TIMEOUT_MS = 5000;
 const MAX_PAGE_BYTES = 5 * 1024 * 1024;
 const MAX_FAVICON_BYTES = 256 * 1024;
 const USER_AGENT =
-  "Mozilla/5.0 (compatible; ShelfBot/1.0; +https://localhost/bookmarks)";
+  "Mozilla/5.0 (compatible; ShelfBot/1.0; +https://localhost/shelf)";
 
 const SUPPORTED_FAVICON_CONTENT_TYPES = new Set([
   "image/gif",
@@ -23,7 +23,7 @@ const SUPPORTED_FAVICON_CONTENT_TYPES = new Set([
   "image/x-icon"
 ]);
 
-export interface BookmarkEnrichmentQueue {
+export interface SavedItemEnrichmentQueue {
   enqueueSavedItem(savedItemId: string): Promise<void>;
 }
 
@@ -72,7 +72,7 @@ export const enrichSavedItem = async (db: Database, savedItemId: string): Promis
       })
       .where(eq(schema.savedItems.id, savedItem.id));
   } catch (error) {
-    console.error("Bookmark enrichment failed", {
+    console.error("SavedItem enrichment failed", {
       error,
       savedItemId: savedItem.id,
       url: savedItem.url

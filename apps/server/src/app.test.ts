@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import type { BookmarksStore, SavedItemSearchIndex } from "@bookmarks/api/bookmarks";
-import type { HealthDependencies } from "@bookmarks/api/health";
+import type { SavedItemsStore, SavedItemSearchIndex } from "@shelf/api/savedItems";
+import type { HealthDependencies } from "@shelf/api/health";
 import { Buffer } from "node:buffer";
 import { createApp } from "./app";
 
@@ -48,8 +48,8 @@ const currentUser = {
   ]
 };
 
-const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStore => ({
-  async createBookmark() {
+const createSavedItemsStore = (overrides: Partial<SavedItemsStore>): SavedItemsStore => ({
+  async createSavedItem() {
     throw new Error("not used");
   },
   async createFolder() {
@@ -58,7 +58,7 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async createTag() {
     throw new Error("not used");
   },
-  async deleteBookmark() {
+  async deleteSavedItem() {
     throw new Error("not used");
   },
   async deleteFolder() {
@@ -70,10 +70,10 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async getFavicon() {
     return null;
   },
-  async listBookmarks() {
+  async listSavedItems() {
     return [];
   },
-  async listBookmarkLocations() {
+  async listSavedItemLocations() {
     return [];
   },
   async listSavedItemSearchDocuments() {
@@ -88,7 +88,7 @@ const createBookmarksStore = (overrides: Partial<BookmarksStore>): BookmarksStor
   async moveFolder() {
     throw new Error("not used");
   },
-  async moveBookmarks() {
+  async moveSavedItems() {
     throw new Error("not used");
   },
   async updateFolder() {
@@ -159,11 +159,11 @@ describe("current user endpoint", () => {
   });
 });
 
-describe("bookmarks RPC", () => {
-  test("returns cursor-paginated bookmark items through oRPC", async () => {
-    const calls: Parameters<BookmarksStore["listBookmarks"]>[0][] = [];
-    const bookmarksStore = createBookmarksStore({
-      async listBookmarks(input) {
+describe("savedItems RPC", () => {
+  test("returns cursor-paginated savedItem items through oRPC", async () => {
+    const calls: Parameters<SavedItemsStore["listSavedItems"]>[0][] = [];
+    const savedItemsStore = createSavedItemsStore({
+      async listSavedItems(input) {
         calls.push(input);
 
         return [
@@ -205,12 +205,12 @@ describe("bookmarks RPC", () => {
       }
     });
     const app = createApp({
-      bookmarksStore,
+      savedItemsStore,
       currentUser,
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/list", {
+    const response = await app.request("/rpc/savedItems/list", {
       body: JSON.stringify({ json: { limit: 1 } }),
       headers: {
         "content-type": "application/json"
@@ -233,13 +233,13 @@ describe("bookmarks RPC", () => {
     });
   });
 
-  test("rejects bookmark RPC calls without a current user", async () => {
+  test("rejects savedItem RPC calls without a current user", async () => {
     const app = createApp({
-      bookmarksStore: createBookmarksStore({}),
+      savedItemsStore: createSavedItemsStore({}),
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/list", {
+    const response = await app.request("/rpc/savedItems/list", {
       body: JSON.stringify({ json: { limit: 1 } }),
       headers: {
         "content-type": "application/json"
@@ -250,11 +250,11 @@ describe("bookmarks RPC", () => {
     expect(response.status).toBe(401);
   });
 
-  test("lists existing bookmark locations for the current URL", async () => {
-    const calls: Parameters<BookmarksStore["listBookmarkLocations"]>[0][] = [];
+  test("lists existing savedItem locations for the current URL", async () => {
+    const calls: Parameters<SavedItemsStore["listSavedItemLocations"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
-        async listBookmarkLocations(input) {
+      savedItemsStore: createSavedItemsStore({
+        async listSavedItemLocations(input) {
           calls.push(input);
 
           return [
@@ -281,7 +281,7 @@ describe("bookmarks RPC", () => {
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/locations", {
+    const response = await app.request("/rpc/savedItems/locations", {
       body: JSON.stringify({ json: { url: "https://example.com/article" } }),
       headers: {
         "content-type": "application/json"
@@ -298,11 +298,11 @@ describe("bookmarks RPC", () => {
     });
   });
 
-  test("creates a bookmark through oRPC in the personal inbox", async () => {
-    const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
+  test("creates a savedItem through oRPC in the personal inbox", async () => {
+    const calls: Parameters<SavedItemsStore["createSavedItem"]>[0][] = [];
     const queuedIds: string[] = [];
-    const bookmarksStore = createBookmarksStore({
-      async createBookmark(input) {
+    const savedItemsStore = createSavedItemsStore({
+      async createSavedItem(input) {
         calls.push(input);
 
         return {
@@ -325,17 +325,17 @@ describe("bookmarks RPC", () => {
       }
     });
     const app = createApp({
-      bookmarkEnrichmentQueue: {
+      savedItemEnrichmentQueue: {
         async enqueueSavedItem(savedItemId) {
           queuedIds.push(savedItemId);
         }
       },
-      bookmarksStore,
+      savedItemsStore,
       currentUser,
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/create", {
+    const response = await app.request("/rpc/savedItems/create", {
       body: JSON.stringify({ json: { url: "https://example.com/article" } }),
       headers: {
         "content-type": "application/json"
@@ -356,12 +356,12 @@ describe("bookmarks RPC", () => {
     expect(queuedIds).toEqual(["00000000-0000-4000-8000-000000000010"]);
   });
 
-  test("indexes a created bookmark without blocking creation on search failures", async () => {
+  test("indexes a created savedItem without blocking creation on search failures", async () => {
     const consoleError = spyOn(console, "error").mockImplementation(() => {});
     const indexedDocuments: unknown[] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
-        async createBookmark(input) {
+      savedItemsStore: createSavedItemsStore({
+        async createSavedItem(input) {
           return {
             id: "00000000-0000-4000-8000-000000000010",
             libraryId: input.libraryId,
@@ -369,7 +369,7 @@ describe("bookmarks RPC", () => {
             folderId: input.folderId,
             folderName: null,
             url: input.url,
-            title: "Searchable bookmark",
+            title: "Searchable savedItem",
             description: null,
             siteName: "Example",
             imageUrl: null,
@@ -395,7 +395,7 @@ describe("bookmarks RPC", () => {
               folderId: null,
               folderName: null,
               url: "https://example.com/article",
-              title: "Searchable bookmark",
+              title: "Searchable savedItem",
               description: null,
               siteName: "Example",
               imageUrl: null,
@@ -424,7 +424,7 @@ describe("bookmarks RPC", () => {
       }
     });
 
-    const response = await app.request("/rpc/bookmarks/create", {
+    const response = await app.request("/rpc/savedItems/create", {
       body: JSON.stringify({ json: { url: "https://example.com/article" } }),
       headers: {
         "content-type": "application/json"
@@ -434,16 +434,16 @@ describe("bookmarks RPC", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.json.title).toBe("Searchable bookmark");
+    expect(body.json.title).toBe("Searchable savedItem");
     expect(indexedDocuments).toHaveLength(1);
     consoleError.mockRestore();
   });
 
-  test("creates a bookmark with selected tags from the target folder library", async () => {
-    const calls: Parameters<BookmarksStore["createBookmark"]>[0][] = [];
+  test("creates a savedItem with selected tags from the target folder library", async () => {
+    const calls: Parameters<SavedItemsStore["createSavedItem"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
-        async createBookmark(input) {
+      savedItemsStore: createSavedItemsStore({
+        async createSavedItem(input) {
           calls.push(input);
 
           return {
@@ -474,7 +474,7 @@ describe("bookmarks RPC", () => {
               iconName: null,
               iconColor: null,
               sortOrder: 0,
-              bookmarkCount: 0,
+              savedItemCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             }
@@ -487,7 +487,7 @@ describe("bookmarks RPC", () => {
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               name: "Research",
               color: "#3b82f6",
-              bookmarkCount: 0,
+              savedItemCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             }
@@ -498,7 +498,7 @@ describe("bookmarks RPC", () => {
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/create", {
+    const response = await app.request("/rpc/savedItems/create", {
       body: JSON.stringify({
         json: {
           folderId: "00000000-0000-4000-8000-000000000020",
@@ -522,14 +522,14 @@ describe("bookmarks RPC", () => {
     });
   });
 
-  test("rejects invalid bookmark URLs", async () => {
+  test("rejects invalid savedItem URLs", async () => {
     const app = createApp({
-      bookmarksStore: createBookmarksStore({}),
+      savedItemsStore: createSavedItemsStore({}),
       currentUser,
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/create", {
+    const response = await app.request("/rpc/savedItems/create", {
       body: JSON.stringify({ json: { url: "not-a-url" } }),
       headers: {
         "content-type": "application/json"
@@ -540,24 +540,24 @@ describe("bookmarks RPC", () => {
     expect(response.status).toBe(400);
   });
 
-  test("deletes a bookmark through oRPC for the current user's libraries", async () => {
-    const calls: Parameters<BookmarksStore["deleteBookmark"]>[0][] = [];
-    const bookmarksStore = createBookmarksStore({
-      async deleteBookmark(input) {
+  test("deletes a savedItem through oRPC for the current user's libraries", async () => {
+    const calls: Parameters<SavedItemsStore["deleteSavedItem"]>[0][] = [];
+    const savedItemsStore = createSavedItemsStore({
+      async deleteSavedItem(input) {
         calls.push(input);
 
-        return { deletedBookmarkId: input.bookmarkId };
+        return { deletedSavedItemId: input.savedItemId };
       }
     });
     const app = createApp({
-      bookmarksStore,
+      savedItemsStore,
       currentUser,
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/delete", {
+    const response = await app.request("/rpc/savedItems/delete", {
       body: JSON.stringify({
-        json: { bookmarkId: "00000000-0000-4000-8000-000000000010" }
+        json: { savedItemId: "00000000-0000-4000-8000-000000000010" }
       }),
       headers: {
         "content-type": "application/json"
@@ -567,19 +567,19 @@ describe("bookmarks RPC", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.json.deletedBookmarkId).toBe("00000000-0000-4000-8000-000000000010");
+    expect(body.json.deletedSavedItemId).toBe("00000000-0000-4000-8000-000000000010");
     expect(calls[0]).toEqual({
       allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
-      bookmarkId: "00000000-0000-4000-8000-000000000010"
+      savedItemId: "00000000-0000-4000-8000-000000000010"
     });
   });
 
-  test("removes deleted bookmarks from the search index", async () => {
+  test("removes deleted savedItems from the search index", async () => {
     const deletedIds: string[][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
-        async deleteBookmark(input) {
-          return { deletedBookmarkId: input.bookmarkId };
+      savedItemsStore: createSavedItemsStore({
+        async deleteSavedItem(input) {
+          return { deletedSavedItemId: input.savedItemId };
         }
       }),
       currentUser,
@@ -595,9 +595,9 @@ describe("bookmarks RPC", () => {
       }
     });
 
-    const response = await app.request("/rpc/bookmarks/delete", {
+    const response = await app.request("/rpc/savedItems/delete", {
       body: JSON.stringify({
-        json: { bookmarkId: "00000000-0000-4000-8000-000000000010" }
+        json: { savedItemId: "00000000-0000-4000-8000-000000000010" }
       }),
       headers: {
         "content-type": "application/json"
@@ -609,28 +609,28 @@ describe("bookmarks RPC", () => {
     expect(deletedIds).toEqual([["00000000-0000-4000-8000-000000000010"]]);
   });
 
-  test("moves multiple bookmarks through oRPC for the current user's libraries", async () => {
-    const calls: Parameters<BookmarksStore["moveBookmarks"]>[0][] = [];
-    const bookmarksStore = createBookmarksStore({
-      async moveBookmarks(input) {
+  test("moves multiple savedItems through oRPC for the current user's libraries", async () => {
+    const calls: Parameters<SavedItemsStore["moveSavedItems"]>[0][] = [];
+    const savedItemsStore = createSavedItemsStore({
+      async moveSavedItems(input) {
         calls.push(input);
 
         return {
           destinationFolderId: input.destinationFolderId ?? null,
-          movedBookmarkIds: input.bookmarkIds
+          movedSavedItemIds: input.savedItemIds
         };
       }
     });
     const app = createApp({
-      bookmarksStore,
+      savedItemsStore,
       currentUser,
       dependencies: dependencies()
     });
 
-    const response = await app.request("/rpc/bookmarks/move", {
+    const response = await app.request("/rpc/savedItems/move", {
       body: JSON.stringify({
         json: {
-          bookmarkIds: [
+          savedItemIds: [
             "00000000-0000-4000-8000-000000000010",
             "00000000-0000-4000-8000-000000000011",
             "00000000-0000-4000-8000-000000000010"
@@ -648,14 +648,14 @@ describe("bookmarks RPC", () => {
     expect(response.status).toBe(200);
     expect(body.json).toEqual({
       destinationFolderId: TEST_FOLDER_ID,
-      movedBookmarkIds: [
+      movedSavedItemIds: [
         "00000000-0000-4000-8000-000000000010",
         "00000000-0000-4000-8000-000000000011"
       ]
     });
     expect(calls[0]).toEqual({
       allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
-      bookmarkIds: [
+      savedItemIds: [
         "00000000-0000-4000-8000-000000000010",
         "00000000-0000-4000-8000-000000000011"
       ],
@@ -663,14 +663,14 @@ describe("bookmarks RPC", () => {
     });
   });
 
-  test("reindexes moved bookmarks with their updated folder context", async () => {
+  test("reindexes moved savedItems with their updated folder context", async () => {
     const indexedDocuments: unknown[] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
-        async moveBookmarks(input) {
+      savedItemsStore: createSavedItemsStore({
+        async moveSavedItems(input) {
           return {
             destinationFolderId: input.destinationFolderId ?? null,
-            movedBookmarkIds: input.bookmarkIds
+            movedSavedItemIds: input.savedItemIds
           };
         },
         async listSavedItemSearchDocuments(input) {
@@ -687,7 +687,7 @@ describe("bookmarks RPC", () => {
               folderId: TEST_FOLDER_ID,
               folderName: "Research",
               url: "https://example.com/article",
-              title: "Moved bookmark",
+              title: "Moved savedItem",
               description: null,
               siteName: "Example",
               imageUrl: null,
@@ -715,10 +715,10 @@ describe("bookmarks RPC", () => {
       }
     });
 
-    const response = await app.request("/rpc/bookmarks/move", {
+    const response = await app.request("/rpc/savedItems/move", {
       body: JSON.stringify({
         json: {
-          bookmarkIds: ["00000000-0000-4000-8000-000000000010"],
+          savedItemIds: ["00000000-0000-4000-8000-000000000010"],
           destinationFolderId: TEST_FOLDER_ID
         }
       }),
@@ -732,14 +732,14 @@ describe("bookmarks RPC", () => {
     expect(indexedDocuments).toHaveLength(1);
     expect(indexedDocuments[0]).toMatchObject({
       folderName: "Research",
-      title: "Moved bookmark"
+      title: "Moved savedItem"
     });
   });
 
-  test("searches bookmarks in the current workspace through oRPC", async () => {
+  test("searches savedItems in the current workspace through oRPC", async () => {
     const calls: Parameters<SavedItemSearchIndex["search"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({}),
+      savedItemsStore: createSavedItemsStore({}),
       currentUser: {
         ...currentUser,
         libraries: [
@@ -787,7 +787,7 @@ describe("bookmarks RPC", () => {
       }
     });
 
-    const response = await app.request("/rpc/bookmarks/search", {
+    const response = await app.request("/rpc/savedItems/search", {
       body: JSON.stringify({
         json: {
           libraryId: DEV_PERSONAL_LIBRARY_ID,
@@ -816,7 +816,7 @@ describe("bookmarks RPC", () => {
   test("searches all current user workspaces through oRPC", async () => {
     const calls: Parameters<SavedItemSearchIndex["search"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({}),
+      savedItemsStore: createSavedItemsStore({}),
       currentUser: {
         ...currentUser,
         libraries: [
@@ -845,7 +845,7 @@ describe("bookmarks RPC", () => {
       }
     });
 
-    const response = await app.request("/rpc/bookmarks/search", {
+    const response = await app.request("/rpc/savedItems/search", {
       body: JSON.stringify({
         json: {
           libraryId: DEV_PERSONAL_LIBRARY_ID,
@@ -872,7 +872,7 @@ describe("bookmarks RPC", () => {
 describe("favicon endpoint", () => {
   test("streams stored favicon bytes", async () => {
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async getFavicon(id) {
           if (id !== "00000000-0000-4000-8000-000000000030") {
             return null;
@@ -898,9 +898,9 @@ describe("favicon endpoint", () => {
 
 describe("folders RPC", () => {
   test("lists folders for the current user's libraries", async () => {
-    const calls: Parameters<BookmarksStore["listFolders"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["listFolders"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async listFolders(input) {
           calls.push(input);
 
@@ -913,7 +913,7 @@ describe("folders RPC", () => {
               iconName: "IconInbox",
               iconColor: "#3b82f6",
               sortOrder: 0,
-              bookmarkCount: 0,
+              savedItemCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             }
@@ -941,9 +941,9 @@ describe("folders RPC", () => {
   });
 
   test("creates a folder with the current user's allowed libraries", async () => {
-    const calls: Parameters<BookmarksStore["createFolder"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["createFolder"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async createFolder(input) {
           calls.push(input);
 
@@ -955,7 +955,7 @@ describe("folders RPC", () => {
             iconName: input.iconName ?? null,
             iconColor: input.iconColor ?? null,
             sortOrder: 0,
-            bookmarkCount: 0,
+            savedItemCount: 0,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:00:00.000Z"
           };
@@ -995,9 +995,9 @@ describe("folders RPC", () => {
   });
 
   test("moves a folder with explicit sibling order", async () => {
-    const calls: Parameters<BookmarksStore["moveFolder"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["moveFolder"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async moveFolder(input) {
           calls.push(input);
 
@@ -1010,7 +1010,7 @@ describe("folders RPC", () => {
               iconName: null,
               iconColor: null,
               sortOrder: input.orderedSiblingIds.indexOf(input.folderId),
-              bookmarkCount: 0,
+              savedItemCount: 0,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             }
@@ -1046,10 +1046,10 @@ describe("folders RPC", () => {
     });
   });
 
-  test("deletes a folder with explicit bookmark handling", async () => {
-    const calls: Parameters<BookmarksStore["deleteFolder"]>[0][] = [];
+  test("deletes a folder with explicit savedItem handling", async () => {
+    const calls: Parameters<SavedItemsStore["deleteFolder"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async deleteFolder(input) {
           calls.push(input);
 
@@ -1090,9 +1090,9 @@ describe("folders RPC", () => {
 
 describe("tags RPC", () => {
   test("lists tags for the current user's libraries", async () => {
-    const calls: Parameters<BookmarksStore["listTags"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["listTags"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async listTags(input) {
           calls.push(input);
 
@@ -1102,7 +1102,7 @@ describe("tags RPC", () => {
               libraryId: DEV_PERSONAL_LIBRARY_ID,
               name: "Research",
               color: "#16a34a",
-              bookmarkCount: 2,
+              savedItemCount: 2,
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
             }
@@ -1130,9 +1130,9 @@ describe("tags RPC", () => {
   });
 
   test("creates a tag with the current user's allowed libraries", async () => {
-    const calls: Parameters<BookmarksStore["createTag"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["createTag"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async createTag(input) {
           calls.push(input);
 
@@ -1141,7 +1141,7 @@ describe("tags RPC", () => {
             libraryId: input.libraryId,
             name: input.name,
             color: input.color ?? null,
-            bookmarkCount: 0,
+            savedItemCount: 0,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:00:00.000Z"
           };
@@ -1171,7 +1171,7 @@ describe("tags RPC", () => {
       libraryId: DEV_PERSONAL_LIBRARY_ID,
       name: "Research",
       color: "#3b82f6",
-      bookmarkCount: 0
+      savedItemCount: 0
     });
     expect(calls[0]).toEqual({
       allowedLibraryIds: [DEV_PERSONAL_LIBRARY_ID],
@@ -1182,9 +1182,9 @@ describe("tags RPC", () => {
   });
 
   test("updates a tag with the current user's allowed libraries", async () => {
-    const calls: Parameters<BookmarksStore["updateTag"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["updateTag"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async updateTag(input) {
           calls.push(input);
 
@@ -1193,7 +1193,7 @@ describe("tags RPC", () => {
             libraryId: DEV_PERSONAL_LIBRARY_ID,
             name: input.name,
             color: input.color ?? null,
-            bookmarkCount: 2,
+            savedItemCount: 2,
             createdAt: "2026-06-20T12:00:00.000Z",
             updatedAt: "2026-06-20T12:05:00.000Z"
           };
@@ -1233,9 +1233,9 @@ describe("tags RPC", () => {
   });
 
   test("deletes a tag with the current user's allowed libraries", async () => {
-    const calls: Parameters<BookmarksStore["deleteTag"]>[0][] = [];
+    const calls: Parameters<SavedItemsStore["deleteTag"]>[0][] = [];
     const app = createApp({
-      bookmarksStore: createBookmarksStore({
+      savedItemsStore: createSavedItemsStore({
         async deleteTag(input) {
           calls.push(input);
 

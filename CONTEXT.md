@@ -1,6 +1,6 @@
-# Bookmarks
+# Shelf
 
-This context describes the saved-link library model for the bookmarks product.
+This context describes the saved-link library model for the Shelf product.
 
 ## Language
 
@@ -10,7 +10,7 @@ _Avoid_: Workspace, project
 
 **Saved Item**:
 A page or link stored in a library. A saved item belongs to exactly one folder and may have many tags or system labels.
-_Avoid_: Bookmark when discussing the persisted domain object
+_Avoid_: legacy saved-link naming when discussing the persisted domain object
 
 **Folder**:
 A user-managed container inside one library. Folders can be nested, and a saved item belongs to exactly one folder.

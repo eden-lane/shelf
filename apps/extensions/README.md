@@ -1,6 +1,6 @@
 # Browser Extension
 
-WXT extension for saving the active browser tab into the Bookmarks app.
+WXT extension for saving the active browser tab into Shelf.
 
 ## Development
 
@@ -33,7 +33,7 @@ bun run build:safari
 
 This writes WXT's Safari web-extension output to `.output/safari-mv2`, stages a
 converter-friendly copy at `safari-web-extension`, and creates the local Xcode
-project at `safari-extension/Bookmarks/Bookmarks.xcodeproj`.
+project at `safari-extension/Shelf/Shelf.xcodeproj`.
 
 The popup defaults to `http://localhost:3000` for the API. Change the API URL in
 the popup when saving to a different self-hosted instance.

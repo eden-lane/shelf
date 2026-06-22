@@ -1,9 +1,9 @@
-import { createDatabase, type Database } from "@bookmarks/api/db";
+import { createDatabase, type Database } from "@shelf/api/db";
 import type {
   DatabaseHealthClient,
   QueueHealthClient,
   SearchHealthClient
-} from "@bookmarks/api/health";
+} from "@shelf/api/health";
 import Redis from "ioredis";
 import pg from "pg";
 import { MeilisearchSavedItemSearchIndex } from "./savedItemSearchIndex";

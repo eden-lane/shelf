@@ -1,21 +1,21 @@
 import { type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import type { TagItem } from "@bookmarks/shared";
-import { IconBookmark, IconPencil, IconTrash } from "@tabler/icons-react";
+import type { TagItem } from "@shelf/shared";
+import { IconLink, IconPencil, IconTrash } from "@tabler/icons-react";
 import { ContextMenuButton } from "../../components/ContextMenuButton";
 
 export const TagContextMenu = ({
   tag,
   x,
   y,
-  onAddBookmark,
+  onAddSavedItem,
   onDeleteTag,
   onEditTag
 }: {
   tag: TagItem;
   x: number;
   y: number;
-  onAddBookmark: () => void;
+  onAddSavedItem: () => void;
   onDeleteTag: () => void;
   onEditTag: () => void;
 }) => {
@@ -32,7 +32,7 @@ export const TagContextMenu = ({
         }
       }}
     >
-      <ContextMenuButton icon={IconBookmark} label="Add a bookmark" onClick={onAddBookmark} />
+      <ContextMenuButton icon={IconLink} label="Add a saved item" onClick={onAddSavedItem} />
       <ContextMenuButton icon={IconPencil} label="Edit tag" onClick={onEditTag} />
       <ContextMenuButton icon={IconTrash} label="Delete tag" tone="danger" onClick={onDeleteTag} />
     </div>

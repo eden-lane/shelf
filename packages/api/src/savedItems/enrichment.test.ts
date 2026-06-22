@@ -5,8 +5,8 @@ import {
   mapLinkPreviewMetadata
 } from "./enrichment";
 
-describe("bookmark enrichment metadata", () => {
-  test("maps link-preview-js results to saved item metadata", () => {
+describe("savedItem enrichment metadata", () => {
+  test("maps link-preview-js results to savedItem metadata", () => {
     const metadata = mapLinkPreviewMetadata({
       author: undefined,
       charset: "utf-8",
@@ -31,7 +31,7 @@ describe("bookmark enrichment metadata", () => {
   });
 });
 
-describe("bookmark enrichment URL safety", () => {
+describe("savedItem enrichment URL safety", () => {
   test("rejects obviously unsafe URL shapes before DNS lookup", () => {
     expect(isPotentiallySafeHttpUrl("file:///etc/passwd")).toBe(false);
     expect(isPotentiallySafeHttpUrl("http://localhost:3000")).toBe(false);

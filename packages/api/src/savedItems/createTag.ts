@@ -1,4 +1,4 @@
-import type { TagItem } from "@bookmarks/shared";
+import type { TagItem } from "@shelf/shared";
 import type { Database } from "../db";
 import { schema } from "../db";
 import { assertAllowedLibrary } from "./folderUtils";
@@ -32,7 +32,7 @@ export const createTag = async (db: Database, input: CreateTagInput): Promise<Ta
     libraryId: row.libraryId,
     name: row.name,
     color: row.color,
-    bookmarkCount: 0,
+    savedItemCount: 0,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   };

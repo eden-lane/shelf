@@ -1,4 +1,4 @@
-import type { TagItem } from "@bookmarks/shared";
+import type { TagItem } from "@shelf/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -40,7 +40,7 @@ export const updateTag = async (db: Database, input: UpdateTagInput): Promise<Ta
     libraryId: row.libraryId,
     name: row.name,
     color: row.color,
-    bookmarkCount: existing.bookmarkCount,
+    savedItemCount: existing.savedItemCount,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   };

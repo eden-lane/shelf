@@ -1,13 +1,13 @@
-import type { BookmarkLocationItem } from "@bookmarks/shared";
+import type { SavedItemLocation } from "@shelf/shared";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import type { ListBookmarkLocationsInput } from "./types";
+import type { ListSavedItemLocationsInput } from "./types";
 
-export const listBookmarkLocations = async (
+export const listSavedItemLocations = async (
   db: Database,
-  input: ListBookmarkLocationsInput
-): Promise<BookmarkLocationItem[]> => {
+  input: ListSavedItemLocationsInput
+): Promise<SavedItemLocation[]> => {
   if (input.libraryIds.length === 0) {
     return [];
   }

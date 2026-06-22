@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import { bookmarkSelectFields, serializeBookmark } from "./bookmarkRows";
+import { savedItemSelectFields, serializeSavedItem } from "./savedItemRows";
 import type { ListSavedItemSearchDocumentsInput, SavedItemSearchDocument } from "./types";
 
 export const listSavedItemSearchDocuments = async (
@@ -28,7 +28,7 @@ export const listSavedItemSearchDocuments = async (
 
   const rows = await db
     .select({
-      ...bookmarkSelectFields,
+      ...savedItemSelectFields,
       libraryName: schema.libraries.name,
       tagName: schema.tags.name
     })
@@ -72,7 +72,7 @@ export const listSavedItemSearchDocuments = async (
     }
 
     documents.set(row.id, {
-      ...serializeBookmark(row as Parameters<typeof serializeBookmark>[0]),
+      ...serializeSavedItem(row as Parameters<typeof serializeSavedItem>[0]),
       libraryName: row.libraryName,
       tagNames: row.tagName ? [row.tagName] : []
     });

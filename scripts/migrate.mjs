@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
 const databaseUrl =
-  process.env.DATABASE_URL ?? "postgres://bookmarks:bookmarks@127.0.0.1:5432/bookmarks";
+  process.env.DATABASE_URL ?? "postgres://shelf:shelf@127.0.0.1:5432/shelf";
 
 const pool = new pg.Pool({
   connectionString: databaseUrl

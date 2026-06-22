@@ -3,18 +3,18 @@ import { Combobox } from "@base-ui/react/combobox";
 import { Dialog } from "@base-ui/react/dialog";
 import type { InfiniteData } from "@tanstack/react-query";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BookmarkItem, BookmarksPageResponse, FolderItem, TagItem } from "@bookmarks/shared";
+import type { SavedItem, SavedItemsPageResponse, FolderItem, TagItem } from "@shelf/shared";
 import { IconCheck, IconPlus, IconX } from "@tabler/icons-react";
-import { createBookmark, createTag } from "../../api";
+import { createSavedItem, createTag } from "../../api";
 import {
-  bookmarkQueryKey,
-  bookmarkQueryKeysForFolder,
-  bookmarkQueryKeysForTag,
-  insertBookmarkIntoPages,
-  isValidBookmarkUrl
-} from "./bookmarkUtils";
+  savedItemQueryKey,
+  savedItemQueryKeysForFolder,
+  savedItemQueryKeysForTag,
+  insertSavedItemIntoPages,
+  isValidSavedItemUrl
+} from "./savedItemUtils";
 
-export const AddBookmarkDialog = ({
+export const AddSavedItemDialog = ({
   isOpen,
   targetFolder,
   targetLibraryId,
@@ -72,13 +72,13 @@ export const AddBookmarkDialog = ({
       .map((tag): TagComboboxOption => ({ kind: "existing", tag })),
     ...(canCreateTag ? [{ kind: "create", name: normalizedTagInput } satisfies TagComboboxOption] : [])
   ];
-  const addBookmark = useMutation({
+  const addSavedItem = useMutation({
     mutationFn: async ({
       existingTagIds,
       newTagNames,
       optimisticFolder: _optimisticFolder,
       ...input
-    }: AddBookmarkMutationInput) => {
+    }: AddSavedItemMutationInput) => {
       if (newTagNames.length > 0 && !input.libraryId) {
         throw new Error("A library is required to create tags");
       }
@@ -88,7 +88,7 @@ export const AddBookmarkDialog = ({
       );
       const tagIds = [...existingTagIds, ...createdTags.map((tag) => tag.id)];
 
-      return createBookmark({
+      return createSavedItem({
         folderId: input.folderId,
         libraryId: input.folderId ? undefined : input.libraryId,
         tagIds,
@@ -103,24 +103,24 @@ export const AddBookmarkDialog = ({
       }
 
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: ["bookmarks"] }),
+        queryClient.cancelQueries({ queryKey: ["savedItems"] }),
         queryClient.cancelQueries({ queryKey: ["folders"] }),
         queryClient.cancelQueries({ queryKey: ["tags"] })
       ]);
 
-      const bookmarkQueryKeys = bookmarkQueryKeysForFolder(
+      const savedItemQueryKeys = savedItemQueryKeysForFolder(
         optimisticFolder.id,
         optimisticFolder.libraryId
       );
-      const previousBookmarks = bookmarkQueryKeys.map((queryKey) => ({
-        data: queryClient.getQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey),
+      const previousSavedItems = savedItemQueryKeys.map((queryKey) => ({
+        data: queryClient.getQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(queryKey),
         hadData: Boolean(queryClient.getQueryState(queryKey)),
         queryKey
       }));
       const previousFolders = queryClient.getQueryData<FolderItem[]>(["folders"]);
       const previousTags = queryClient.getQueryData<TagItem[]>(["tags"]);
       const now = new Date().toISOString();
-      const optimisticBookmark: BookmarkItem = {
+      const optimisticSavedItem: SavedItem = {
         id: `optimistic-${crypto.randomUUID()}`,
         libraryId: optimisticFolder.libraryId,
         folderId: optimisticFolder.id,
@@ -138,16 +138,16 @@ export const AddBookmarkDialog = ({
         updatedAt: now
       };
 
-      for (const queryKey of bookmarkQueryKeys) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey, (data) =>
-          insertBookmarkIntoPages(data, optimisticBookmark)
+      for (const queryKey of savedItemQueryKeys) {
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(queryKey, (data) =>
+          insertSavedItemIntoPages(data, optimisticSavedItem)
         );
       }
 
       queryClient.setQueryData<FolderItem[]>(["folders"], (currentFolders = []) =>
         currentFolders.map((folder) =>
           folder.id === optimisticFolder.id
-            ? { ...folder, bookmarkCount: folder.bookmarkCount + 1, updatedAt: now }
+            ? { ...folder, savedItemCount: folder.savedItemCount + 1, updatedAt: now }
             : folder
         )
       );
@@ -158,26 +158,26 @@ export const AddBookmarkDialog = ({
         queryClient.setQueryData<TagItem[]>(["tags"], (currentTags = []) =>
           currentTags.map((tag) =>
             selectedTagIds.has(tag.id)
-              ? { ...tag, bookmarkCount: tag.bookmarkCount + 1, updatedAt: now }
+              ? { ...tag, savedItemCount: tag.savedItemCount + 1, updatedAt: now }
               : tag
           )
         );
       }
 
       return {
-        optimisticBookmarkId: optimisticBookmark.id,
-        previousBookmarks,
+        optimisticSavedItemId: optimisticSavedItem.id,
+        previousSavedItems,
         previousFolders,
         previousTags,
         targetFolderId: optimisticFolder.id
       };
     },
     onError: (_error, _input, context) => {
-      for (const previousBookmark of context?.previousBookmarks ?? []) {
-        if (previousBookmark.hadData) {
-          queryClient.setQueryData(previousBookmark.queryKey, previousBookmark.data);
+      for (const previousSavedItem of context?.previousSavedItems ?? []) {
+        if (previousSavedItem.hadData) {
+          queryClient.setQueryData(previousSavedItem.queryKey, previousSavedItem.data);
         } else {
-          queryClient.removeQueries({ exact: true, queryKey: previousBookmark.queryKey });
+          queryClient.removeQueries({ exact: true, queryKey: previousSavedItem.queryKey });
         }
       }
 
@@ -189,26 +189,26 @@ export const AddBookmarkDialog = ({
         queryClient.setQueryData(["tags"], context.previousTags);
       }
     },
-    onSuccess: (bookmark, _input, context) => {
+    onSuccess: (savedItem, _input, context) => {
       if (
         !visibleTagId &&
-        bookmark.folderId === visibleFolderId &&
-        (!visibleLibraryId || bookmark.libraryId === visibleLibraryId)
+        savedItem.folderId === visibleFolderId &&
+        (!visibleLibraryId || savedItem.libraryId === visibleLibraryId)
       ) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
-          bookmarkQueryKey({ folderId: visibleFolderId, libraryId: visibleLibraryId, tagId: null }),
-          (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
+          savedItemQueryKey({ folderId: visibleFolderId, libraryId: visibleLibraryId, tagId: null }),
+          (data) => insertSavedItemIntoPages(data, savedItem, context?.optimisticSavedItemId)
         );
       }
 
       if (
         visibleTagId &&
         _input.existingTagIds.includes(visibleTagId) &&
-        (!visibleLibraryId || bookmark.libraryId === visibleLibraryId)
+        (!visibleLibraryId || savedItem.libraryId === visibleLibraryId)
       ) {
-        queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
-          bookmarkQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: visibleTagId }),
-          (data) => insertBookmarkIntoPages(data, bookmark, context?.optimisticBookmarkId)
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
+          savedItemQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: visibleTagId }),
+          (data) => insertSavedItemIntoPages(data, savedItem, context?.optimisticSavedItemId)
         );
       }
 
@@ -219,29 +219,29 @@ export const AddBookmarkDialog = ({
       setIsUrlShaking(false);
       onOpenChange(false);
     },
-    onSettled: (bookmark, _error, input, context) => {
+    onSettled: (savedItem, _error, input, context) => {
       const targetFolderId =
-        bookmark?.folderId ?? context?.targetFolderId ?? input.optimisticFolder?.id ?? null;
-      const targetLibraryId = bookmark?.libraryId ?? input.optimisticFolder?.libraryId ?? visibleLibraryId;
+        savedItem?.folderId ?? context?.targetFolderId ?? input.optimisticFolder?.id ?? null;
+      const targetLibraryId = savedItem?.libraryId ?? input.optimisticFolder?.libraryId ?? visibleLibraryId;
 
-      if (bookmark && context?.optimisticBookmarkId) {
-        for (const queryKey of bookmarkQueryKeysForFolder(bookmark.folderId, bookmark.libraryId)) {
-          queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+      if (savedItem && context?.optimisticSavedItemId) {
+        for (const queryKey of savedItemQueryKeysForFolder(savedItem.folderId, savedItem.libraryId)) {
+          queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
             queryKey,
-            (data) => insertBookmarkIntoPages(data, bookmark, context.optimisticBookmarkId)
+            (data) => insertSavedItemIntoPages(data, savedItem, context.optimisticSavedItemId)
           );
         }
       }
 
       void queryClient.invalidateQueries({
         exact: true,
-        queryKey: bookmarkQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: null })
+        queryKey: savedItemQueryKey({ folderId: null, libraryId: visibleLibraryId, tagId: null })
       });
 
       if (targetFolderId) {
         void queryClient.invalidateQueries({
           exact: true,
-          queryKey: bookmarkQueryKey({
+          queryKey: savedItemQueryKey({
             folderId: targetFolderId,
             libraryId: targetLibraryId,
             tagId: null
@@ -250,7 +250,7 @@ export const AddBookmarkDialog = ({
       }
 
       for (const tagId of input.existingTagIds) {
-        for (const queryKey of bookmarkQueryKeysForTag(tagId, visibleLibraryId)) {
+        for (const queryKey of savedItemQueryKeysForTag(tagId, visibleLibraryId)) {
           void queryClient.invalidateQueries({ exact: true, queryKey });
         }
       }
@@ -308,12 +308,12 @@ export const AddBookmarkDialog = ({
     }
   };
 
-  const submitBookmark = (event: FormEvent<HTMLFormElement>) => {
+  const submitSavedItem = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const url = (urlInputRef.current?.value ?? String(formData.get("url") ?? "")).trim();
 
-    if (!isValidBookmarkUrl(url)) {
+    if (!isValidSavedItemUrl(url)) {
       setIsUrlInvalid(true);
       setIsUrlShaking(false);
       requestAnimationFrame(() => setIsUrlShaking(true));
@@ -341,7 +341,7 @@ export const AddBookmarkDialog = ({
       option.kind === "new" ? [option.name] : []
     );
 
-    addBookmark.mutate({
+    addSavedItem.mutate({
       existingTagIds,
       folderId: targetFolder?.id,
       libraryId: targetFolder?.libraryId ?? targetLibraryId ?? undefined,
@@ -357,7 +357,7 @@ export const AddBookmarkDialog = ({
       onOpenChange={(open) => {
         onOpenChange(open);
         if (open) {
-          addBookmark.reset();
+          addSavedItem.reset();
           setTagInputValue("");
           setIsUrlInvalid(false);
           setIsUrlShaking(false);
@@ -369,7 +369,7 @@ export const AddBookmarkDialog = ({
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 grid w-[min(calc(100vw-32px),420px)] -translate-x-1/2 -translate-y-1/2 grid-rows-[auto_minmax(0,1fr)] gap-5 rounded-lg border border-[#e4e7ef] bg-white p-5 text-[#242833] shadow-[0_24px_80px_rgb(22_28_43_/_0.22)] outline-none max-md:inset-0 max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:p-0 max-md:shadow-none">
           <div className="grid gap-1 pr-9 max-md:border-b max-md:border-[#eef1f6] max-md:px-4 max-md:pt-[calc(1rem+env(safe-area-inset-top))] max-md:pb-3">
             <Dialog.Title className="text-lg leading-[1.25] font-extrabold">
-              {targetFolder ? `Add to ${targetFolder.name}` : "Add bookmark"}
+              {targetFolder ? `Add to ${targetFolder.name}` : "Add saved item"}
             </Dialog.Title>
             <Dialog.Description className="text-sm leading-6 text-[#697080]">
               Paste the page link you want to save.
@@ -377,7 +377,7 @@ export const AddBookmarkDialog = ({
           </div>
           <Dialog.Close
             className="absolute top-4 right-4 grid h-8 w-8 place-items-center rounded-lg border border-transparent text-[#697080] outline-none hover:border-[#e4e7ef] hover:bg-[#f7f8fc] hover:text-[#242833] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:top-[calc(1rem+env(safe-area-inset-top))]"
-            aria-label="Close add bookmark dialog"
+            aria-label="Close add saved item dialog"
             type="button"
           >
             <IconX size={16} stroke={1.5} aria-hidden="true" focusable="false" />
@@ -386,10 +386,10 @@ export const AddBookmarkDialog = ({
             className="grid min-h-0 gap-4 max-md:grid-rows-[minmax(0,1fr)_auto]"
             ref={formRef}
             noValidate
-            onSubmit={submitBookmark}
+            onSubmit={submitSavedItem}
           >
             <div className="grid min-h-0 content-start gap-4 overflow-y-auto overscroll-contain max-md:px-4 max-md:py-4">
-              <label className="grid gap-2 text-sm font-bold" htmlFor="bookmark-url">
+              <label className="grid gap-2 text-sm font-bold" htmlFor="savedItem-url">
                 Page URL
                 <input
                   className={[
@@ -398,7 +398,7 @@ export const AddBookmarkDialog = ({
                     isUrlShaking ? "field-shake" : ""
                   ].join(" ")}
                   aria-invalid={isUrlInvalid}
-                  id="bookmark-url"
+                  id="savedItem-url"
                   inputMode="url"
                   name="url"
                   placeholder="https://example.com/article"
@@ -406,19 +406,19 @@ export const AddBookmarkDialog = ({
                   type="text"
                   onAnimationEnd={() => setIsUrlShaking(false)}
                   onChange={(event) => {
-                    if (isValidBookmarkUrl(event.target.value.trim())) {
+                    if (isValidSavedItemUrl(event.target.value.trim())) {
                       setIsUrlInvalid(false);
                     }
                   }}
                   onInput={(event) => {
-                    if (isValidBookmarkUrl(event.currentTarget.value.trim())) {
+                    if (isValidSavedItemUrl(event.currentTarget.value.trim())) {
                       setIsUrlInvalid(false);
                     }
                   }}
                 />
               </label>
               <div className="grid gap-2 text-sm font-bold">
-                <label htmlFor="bookmark-tags">Tags</label>
+                <label htmlFor="savedItem-tags">Tags</label>
                 <Combobox.Root<TagComboboxOption, true>
                   items={tagOptions}
                   multiple
@@ -465,7 +465,7 @@ export const AddBookmarkDialog = ({
                             <Combobox.Input
                               className="h-7 min-w-24 flex-1 border-0 bg-transparent p-0 text-base font-medium text-[#242833] outline-none placeholder:text-[#9aa1ad] md:text-sm"
                               autoComplete="off"
-                              id="bookmark-tags"
+                              id="savedItem-tags"
                               placeholder={value.length > 0 ? "" : "Type a tag"}
                               ref={tagInputRef}
                               value={tagInputValue}
@@ -524,26 +524,26 @@ export const AddBookmarkDialog = ({
                   </Combobox.Portal>
                 </Combobox.Root>
               </div>
-              {addBookmark.isError ? (
+              {addSavedItem.isError ? (
                 <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">
-                  Bookmark could not be saved.
+                  Saved item could not be saved.
                 </p>
               ) : null}
             </div>
             <div className="flex justify-end gap-2 max-md:border-t max-md:border-[#eef1f6] max-md:bg-white max-md:px-4 max-md:pt-3 max-md:pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <Dialog.Close
                 className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:flex-1"
-                disabled={addBookmark.isPending}
+                disabled={addSavedItem.isPending}
                 type="button"
               >
                 Cancel
               </Dialog.Close>
               <button
                 className="min-h-10 rounded-lg border border-[#3b8df5] bg-[#3b8df5] px-3 text-sm font-extrabold text-white outline-none hover:bg-[#2f80ed] disabled:cursor-not-allowed disabled:border-[#91bff8] disabled:bg-[#91bff8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5] max-md:flex-1"
-                disabled={addBookmark.isPending}
+                disabled={addSavedItem.isPending}
                 type="submit"
               >
-                {addBookmark.isPending ? "Saving" : "Save"}
+                {addSavedItem.isPending ? "Saving" : "Save"}
               </button>
             </div>
           </form>
@@ -553,7 +553,7 @@ export const AddBookmarkDialog = ({
   );
 };
 
-type AddBookmarkMutationInput = {
+type AddSavedItemMutationInput = {
   existingTagIds: string[];
   folderId?: string;
   libraryId?: string;

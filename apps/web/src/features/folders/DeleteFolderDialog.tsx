@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IconX } from "@tabler/icons-react";
 import { deleteFolder } from "../../api";
@@ -41,7 +41,7 @@ export const DeleteFolderDialog = ({
         currentFolders.filter((currentFolder) => !result.deletedFolderIds.includes(currentFolder.id))
       );
       onDeleted(result.deletedFolderIds);
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
       onClose();
     }
@@ -68,7 +68,7 @@ export const DeleteFolderDialog = ({
               Delete {folder.name}
             </Dialog.Title>
             <Dialog.Description className="text-sm leading-6 text-[#697080]">
-              Choose what happens to bookmarks inside this folder and its nested folders.
+              Choose what happens to saved items inside this folder and its nested folders.
             </Dialog.Description>
           </div>
           <Dialog.Close
@@ -98,7 +98,7 @@ export const DeleteFolderDialog = ({
                 onChange={() => setMode("move")}
               />
               <span className="grid gap-2">
-                <span>Move bookmarks to Inbox or another folder</span>
+                <span>Move saved items to Inbox or another folder</span>
                 <select
                   className="min-h-10 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-semibold text-[#242833] outline-none disabled:bg-[#f3f5f9] disabled:text-[#9aa1ad] focus:border-[#3b8df5] focus:ring-3 focus:ring-[#d9eaff]"
                   disabled={mode !== "move"}
@@ -122,7 +122,7 @@ export const DeleteFolderDialog = ({
                 type="radio"
                 onChange={() => setMode("delete")}
               />
-              <span>Remove bookmarks along with the folder</span>
+              <span>Remove saved items along with the folder</span>
             </label>
             {deleteFolderMutation.isError ? (
               <p className="m-0 rounded-lg border border-[#f0b37e] bg-[#fff8f1] px-3 py-2 text-sm font-bold text-[#9a4d0a]">

@@ -1,5 +1,5 @@
 {
-  "name": "@bookmarks/web",
+  "name": "@shelf/web",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
-    "@bookmarks/shared": "workspace:*",
+    "@shelf/shared": "workspace:*",
     "@dnd-kit/core": "^6.3.1",
     "@fontsource/open-sans": "latest",
     "@orpc/client": "1.14.6",

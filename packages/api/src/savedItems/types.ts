@@ -1,43 +1,43 @@
-import type { BookmarkItem, BookmarkLocationItem, FolderItem, TagItem } from "@bookmarks/shared";
+import type { SavedItem, SavedItemLocation, FolderItem, TagItem } from "@shelf/shared";
 import type { Buffer } from "node:buffer";
 
-export interface BookmarkCursor {
+export interface SavedItemCursor {
   createdAt: string;
   id: string;
 }
 
-export interface ListBookmarksInput {
+export interface ListSavedItemsInput {
   libraryIds: string[];
   limit: number;
   folderId?: string;
   inbox?: boolean;
   libraryId?: string;
   tagId?: string;
-  cursor?: BookmarkCursor;
+  cursor?: SavedItemCursor;
 }
 
 export interface SavedItemSearchCursor {
   offset: number;
 }
 
-export interface SavedItemSearchDocument extends BookmarkItem {
+export interface SavedItemSearchDocument extends SavedItem {
   libraryName: string;
   tagNames: string[];
 }
 
-export interface SearchBookmarksInput {
+export interface SearchSavedItemsInput {
   cursor?: SavedItemSearchCursor;
   libraryIds: string[];
   limit: number;
   query: string;
 }
 
-export interface ListBookmarkLocationsInput {
+export interface ListSavedItemLocationsInput {
   libraryIds: string[];
   url: string;
 }
 
-export interface CreateBookmarkInput {
+export interface CreateSavedItemInput {
   libraryId: string;
   folderId: string | null;
   createdByUserId: string;
@@ -45,9 +45,9 @@ export interface CreateBookmarkInput {
   tagIds?: string[];
 }
 
-export interface DeleteBookmarkInput {
+export interface DeleteSavedItemInput {
   allowedLibraryIds: string[];
-  bookmarkId: string;
+  savedItemId: string;
 }
 
 export interface ListSavedItemSearchDocumentsInput {
@@ -55,9 +55,9 @@ export interface ListSavedItemSearchDocumentsInput {
   savedItemIds?: string[];
 }
 
-export interface MoveBookmarksInput {
+export interface MoveSavedItemsInput {
   allowedLibraryIds: string[];
-  bookmarkIds: string[];
+  savedItemIds: string[];
   destinationFolderId?: string | null;
 }
 
@@ -119,17 +119,17 @@ export interface DeleteFolderInput {
   destinationFolderId?: string | null;
 }
 
-export interface BookmarksStore {
-  listBookmarks(input: ListBookmarksInput): Promise<BookmarkItem[]>;
-  listBookmarkLocations(input: ListBookmarkLocationsInput): Promise<BookmarkLocationItem[]>;
+export interface SavedItemsStore {
+  listSavedItems(input: ListSavedItemsInput): Promise<SavedItem[]>;
+  listSavedItemLocations(input: ListSavedItemLocationsInput): Promise<SavedItemLocation[]>;
   listSavedItemSearchDocuments(
     input: ListSavedItemSearchDocumentsInput
   ): Promise<SavedItemSearchDocument[]>;
-  createBookmark(input: CreateBookmarkInput): Promise<BookmarkItem>;
-  deleteBookmark(input: DeleteBookmarkInput): Promise<{ deletedBookmarkId: string }>;
-  moveBookmarks(input: MoveBookmarksInput): Promise<{
+  createSavedItem(input: CreateSavedItemInput): Promise<SavedItem>;
+  deleteSavedItem(input: DeleteSavedItemInput): Promise<{ deletedSavedItemId: string }>;
+  moveSavedItems(input: MoveSavedItemsInput): Promise<{
     destinationFolderId: string | null;
-    movedBookmarkIds: string[];
+    movedSavedItemIds: string[];
   }>;
   getFavicon(id: string): Promise<{ contentType: string; imageBytes: Buffer } | null>;
   listFolders(input: ListFoldersInput): Promise<FolderItem[]>;

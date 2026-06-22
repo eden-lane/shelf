@@ -1,10 +1,10 @@
-import type { BookmarkItem } from "@bookmarks/shared";
+import type { SavedItem } from "@shelf/shared";
 import {
   nextSavedItemSearchCursor,
   type SavedItemSearchDocument,
   type SavedItemSearchIndex,
-  type SearchBookmarksInput
-} from "@bookmarks/api/bookmarks";
+  type SearchSavedItemsInput
+} from "@shelf/api/savedItems";
 
 const SAVED_ITEMS_INDEX_UID = "saved_items";
 const SEARCHABLE_ATTRIBUTES = [
@@ -23,7 +23,7 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
 
   constructor(private readonly baseUrl: string) {}
 
-  async search(input: SearchBookmarksInput) {
+  async search(input: SearchSavedItemsInput) {
     await this.ensureIndex();
 
     const offset = input.cursor?.offset ?? 0;
@@ -58,7 +58,7 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
       },
       method: "POST"
     });
-    const hits = response.hits.map(searchHitToBookmark).filter((item) => item !== null);
+    const hits = response.hits.map(searchHitToSavedItem).filter((item) => item !== null);
     const items = hits.slice(0, input.limit);
 
     return {
@@ -238,7 +238,7 @@ const chunkDocuments = <T>(items: T[], size: number): T[][] => {
 const libraryFilter = (libraryIds: string[]) =>
   `libraryId IN [${libraryIds.map((libraryId) => JSON.stringify(libraryId)).join(", ")}]`;
 
-const searchHitToBookmark = (hit: Partial<SavedItemSearchDocument>): BookmarkItem | null => {
+const searchHitToSavedItem = (hit: Partial<SavedItemSearchDocument>): SavedItem | null => {
   if (
     typeof hit.id !== "string" ||
     typeof hit.libraryId !== "string" ||

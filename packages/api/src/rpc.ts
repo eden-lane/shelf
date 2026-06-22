@@ -1,27 +1,27 @@
 import type {
-  CreateBookmarkInput,
+  CreateSavedItemInput,
   CreateFolderInput,
   CreateTagInput,
-  DeleteBookmarkInput,
+  DeleteSavedItemInput,
   DeleteFolderInput,
   DeleteTagInput,
   MoveFolderInput,
-  MoveBookmarksInput,
-  SearchBookmarksInput,
+  MoveSavedItemsInput,
+  SearchSavedItemsInput,
   UpdateFolderInput,
   UpdateTagInput
-} from "@bookmarks/shared";
+} from "@shelf/shared";
 import { ORPCError, os } from "@orpc/server";
 import {
-  decodeBookmarkCursor,
-  type BookmarkEnrichmentQueue,
-  listBookmarksPage,
-  parseBookmarksLimit,
+  decodeSavedItemCursor,
+  type SavedItemEnrichmentQueue,
+  listSavedItemsPage,
+  parseSavedItemsLimit,
   searchSavedItemsPage,
-  type BookmarkCursor,
-  type BookmarksStore,
+  type SavedItemCursor,
+  type SavedItemsStore,
   type SavedItemSearchIndex
-} from "./bookmarks";
+} from "./savedItems";
 import { getCurrentUserResponse, type CurrentIdentity } from "./currentUser";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
@@ -29,8 +29,8 @@ import { checkHealth } from "./health";
 export interface RpcRouterOptions {
   dependencies: HealthDependencies;
   currentUser?: CurrentIdentity;
-  bookmarksStore?: BookmarksStore;
-  bookmarkEnrichmentQueue?: BookmarkEnrichmentQueue;
+  savedItemsStore?: SavedItemsStore;
+  savedItemEnrichmentQueue?: SavedItemEnrichmentQueue;
   savedItemSearchIndex?: SavedItemSearchIndex;
 }
 
@@ -45,7 +45,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
     return getCurrentUserResponse(options.currentUser);
   }),
-  bookmarks: {
+  savedItems: {
     create: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
@@ -53,32 +53,32 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      if (!options.bookmarksStore) {
+      if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Bookmarks storage is not configured"
+          message: "Saved item storage is not configured"
         });
       }
 
-      const bookmark = parseCreateBookmarkInput(input);
+      const savedItem = parseCreateSavedItemInput(input);
 
-      if (!bookmark) {
+      if (!savedItem) {
         throw new ORPCError("BAD_REQUEST", {
           message: "Enter a valid URL"
         });
       }
 
       const allowedLibraryIds = currentUserLibraryIds(options.currentUser);
-      const folders = bookmark.folderId
-        ? await options.bookmarksStore.listFolders({ libraryIds: allowedLibraryIds })
+      const folders = savedItem.folderId
+        ? await options.savedItemsStore.listFolders({ libraryIds: allowedLibraryIds })
         : [];
-      const targetFolder = bookmark.folderId
-        ? folders.find((folder) => folder.id === bookmark.folderId)
+      const targetFolder = savedItem.folderId
+        ? folders.find((folder) => folder.id === savedItem.folderId)
         : null;
       const personalLibrary = options.currentUser.libraries.find(
         (library) => library.kind === "personal"
       );
 
-      if (bookmark.folderId && !targetFolder) {
+      if (savedItem.folderId && !targetFolder) {
         throw new ORPCError("BAD_REQUEST", {
           message: "Choose an available folder"
         });
@@ -92,11 +92,11 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       const targetFolderId = targetFolder?.id ?? null;
       const requestedLibraryId =
-        !targetFolder && bookmark.libraryId && allowedLibraryIds.includes(bookmark.libraryId)
-          ? bookmark.libraryId
+        !targetFolder && savedItem.libraryId && allowedLibraryIds.includes(savedItem.libraryId)
+          ? savedItem.libraryId
           : null;
       const targetLibraryId = targetFolder?.libraryId ?? requestedLibraryId ?? personalLibrary?.id;
-      const selectedTagIds = bookmark.tagIds;
+      const selectedTagIds = savedItem.tagIds;
 
       if (!targetLibraryId) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -105,7 +105,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       }
 
       if (selectedTagIds && selectedTagIds.length > 0) {
-        const tags = await options.bookmarksStore.listTags({ libraryIds: [targetLibraryId] });
+        const tags = await options.savedItemsStore.listTags({ libraryIds: [targetLibraryId] });
         const availableTagIds = new Set(tags.map((tag) => tag.id));
 
         if (selectedTagIds.some((tagId) => !availableTagIds.has(tagId))) {
@@ -115,48 +115,48 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         }
       }
 
-      const createdBookmark = await options.bookmarksStore.createBookmark({
+      const createdSavedItem = await options.savedItemsStore.createSavedItem({
         createdByUserId: options.currentUser.user.id,
         folderId: targetFolderId,
         libraryId: targetLibraryId,
         tagIds: selectedTagIds,
-        url: bookmark.url
+        url: savedItem.url
       });
 
-      await upsertSavedItemSearchDocuments(options.bookmarksStore, options.savedItemSearchIndex, {
+      await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: allowedLibraryIds,
-        savedItemIds: [createdBookmark.id]
+        savedItemIds: [createdSavedItem.id]
       });
 
-      if (createdBookmark.metadataStatus !== "fetched") {
-        await options.bookmarkEnrichmentQueue
-          ?.enqueueSavedItem(createdBookmark.id)
+      if (createdSavedItem.metadataStatus !== "fetched") {
+        await options.savedItemEnrichmentQueue
+          ?.enqueueSavedItem(createdSavedItem.id)
           .catch((error: unknown) => {
-            console.error("Unable to enqueue bookmark enrichment", error);
+            console.error("Unable to enqueue saved item enrichment", error);
           });
       }
 
-      return createdBookmark;
+      return createdSavedItem;
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
-      const bookmark = parseDeleteBookmarkInput(input);
+      const savedItem = parseDeleteSavedItemInput(input);
 
-      if (!bookmark) {
+      if (!savedItem) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose a bookmark to delete"
+          message: "Choose a saved item to delete"
         });
       }
 
-      const result = await options.bookmarksStore.deleteBookmark({
-        ...bookmark,
+      const result = await options.savedItemsStore.deleteSavedItem({
+        ...savedItem,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
 
-      await options.savedItemSearchIndex?.delete([result.deletedBookmarkId]).catch((error: unknown) => {
-        console.error("Unable to delete bookmark from search index", error);
+      await options.savedItemSearchIndex?.delete([result.deletedSavedItemId]).catch((error: unknown) => {
+        console.error("Unable to delete saved item from search index", error);
       });
 
       return result;
@@ -168,17 +168,17 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      if (!options.bookmarksStore) {
+      if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Bookmarks storage is not configured"
+          message: "Saved item storage is not configured"
         });
       }
 
-      const pagination = parseBookmarksInput(input);
+      const pagination = parseSavedItemsInput(input);
 
       if (!pagination) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Invalid bookmark cursor"
+          message: "Invalid saved item cursor"
         });
       }
 
@@ -190,16 +190,16 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return listBookmarksPage(options.bookmarksStore, {
+      return listSavedItemsPage(options.savedItemsStore, {
         ...pagination,
         libraryIds: allowedLibraryIds
       });
     }),
     locations: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
-      const lookup = parseBookmarkLocationsInput(input);
+      const lookup = parseSavedItemLocationsInput(input);
 
       if (!lookup) {
         throw new ORPCError("BAD_REQUEST", {
@@ -207,31 +207,31 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.listBookmarkLocations({
+      return options.savedItemsStore.listSavedItemLocations({
         libraryIds: currentUserLibraryIds(options.currentUser),
         url: lookup.url
       });
     }),
     move: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
-      const move = parseMoveBookmarksInput(input);
+      const move = parseMoveSavedItemsInput(input);
 
       if (!move) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose bookmarks to move"
+          message: "Choose saved items to move"
         });
       }
 
-      const result = await options.bookmarksStore.moveBookmarks({
+      const result = await options.savedItemsStore.moveSavedItems({
         ...move,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
 
-      await upsertSavedItemSearchDocuments(options.bookmarksStore, options.savedItemSearchIndex, {
+      await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: currentUserLibraryIds(options.currentUser),
-        savedItemIds: result.movedBookmarkIds
+        savedItemIds: result.movedSavedItemIds
       });
 
       return result;
@@ -240,7 +240,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       assertCurrentUser(options.currentUser);
       assertSavedItemSearchIndex(options.savedItemSearchIndex);
 
-      const search = parseSearchBookmarksInput(input);
+      const search = parseSearchSavedItemsInput(input);
 
       if (!search) {
         throw new ORPCError("BAD_REQUEST", {
@@ -281,7 +281,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
   tags: {
     create: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseCreateTagInput(input);
 
@@ -291,14 +291,14 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.createTag({
+      return options.savedItemsStore.createTag({
         ...tag,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseDeleteTagInput(input);
 
@@ -308,22 +308,22 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.deleteTag({
+      return options.savedItemsStore.deleteTag({
         ...tag,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     list: os.handler(() => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
-      return options.bookmarksStore.listTags({
+      return options.savedItemsStore.listTags({
         libraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     update: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseUpdateTagInput(input);
 
@@ -333,7 +333,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.updateTag({
+      return options.savedItemsStore.updateTag({
         ...tag,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
@@ -342,7 +342,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
   folders: {
     create: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseCreateFolderInput(input);
 
@@ -352,14 +352,14 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.createFolder({
+      return options.savedItemsStore.createFolder({
         ...folder,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseDeleteFolderInput(input);
 
@@ -369,22 +369,22 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.deleteFolder({
+      return options.savedItemsStore.deleteFolder({
         ...folder,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     list: os.handler(() => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
-      return options.bookmarksStore.listFolders({
+      return options.savedItemsStore.listFolders({
         libraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     move: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseMoveFolderInput(input);
 
@@ -394,14 +394,14 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.moveFolder({
+      return options.savedItemsStore.moveFolder({
         ...folder,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
     }),
     update: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
-      assertBookmarksStore(options.bookmarksStore);
+      assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseUpdateFolderInput(input);
 
@@ -411,7 +411,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         });
       }
 
-      return options.bookmarksStore.updateFolder({
+      return options.savedItemsStore.updateFolder({
         ...folder,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser)
       });
@@ -421,11 +421,11 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
 export type RpcRouter = ReturnType<typeof createRpcRouter>;
 
-const parseBookmarksInput = (
+const parseSavedItemsInput = (
   input: unknown
 ): {
   limit: number;
-  cursor?: BookmarkCursor;
+  cursor?: SavedItemCursor;
   folderId?: string;
   inbox?: boolean;
   libraryId?: string;
@@ -433,12 +433,12 @@ const parseBookmarksInput = (
 } | null => {
   if (!isRecord(input)) {
     return {
-      limit: parseBookmarksLimit(null)
+      limit: parseSavedItemsLimit(null)
     };
   }
 
   const cursorValue = typeof input.cursor === "string" ? input.cursor : null;
-  const cursor = cursorValue ? decodeBookmarkCursor(cursorValue) : undefined;
+  const cursor = cursorValue ? decodeSavedItemCursor(cursorValue) : undefined;
 
   if (cursorValue && !cursor) {
     return null;
@@ -449,19 +449,19 @@ const parseBookmarksInput = (
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
     inbox: input.inbox === true,
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
-    limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null),
+    limit: parseSavedItemsLimit(typeof input.limit === "number" ? String(input.limit) : null),
     tagId: typeof input.tagId === "string" && input.tagId ? input.tagId : undefined
   };
 };
 
-const parseSearchBookmarksInput = (
+const parseSearchSavedItemsInput = (
   input: unknown
 ): {
   cursor?: string;
   libraryId?: string;
   limit: number;
   query: string;
-  scope: SearchBookmarksInput["scope"];
+  scope: SearchSavedItemsInput["scope"];
 } | null => {
   if (!isRecord(input) || typeof input.query !== "string") {
     return null;
@@ -480,7 +480,7 @@ const parseSearchBookmarksInput = (
   return {
     cursor: typeof input.cursor === "string" && input.cursor ? input.cursor : undefined,
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
-    limit: parseBookmarksLimit(typeof input.limit === "number" ? String(input.limit) : null),
+    limit: parseSavedItemsLimit(typeof input.limit === "number" ? String(input.limit) : null),
     query,
     scope: input.scope
   };
@@ -489,7 +489,7 @@ const parseSearchBookmarksInput = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null => {
+const parseCreateSavedItemInput = (input: unknown): CreateSavedItemInput | null => {
   if (!isRecord(input) || typeof input.url !== "string") {
     return null;
   }
@@ -508,7 +508,7 @@ const parseCreateBookmarkInput = (input: unknown): CreateBookmarkInput | null =>
   };
 };
 
-const parseBookmarkLocationsInput = (input: unknown): { url: string } | null => {
+const parseSavedItemLocationsInput = (input: unknown): { url: string } | null => {
   if (!isRecord(input) || typeof input.url !== "string") {
     return null;
   }
@@ -532,37 +532,37 @@ const parseHttpUrl = (value: string) => {
   }
 };
 
-const parseDeleteBookmarkInput = (input: unknown): DeleteBookmarkInput | null => {
-  if (!isRecord(input) || typeof input.bookmarkId !== "string" || !input.bookmarkId) {
+const parseDeleteSavedItemInput = (input: unknown): DeleteSavedItemInput | null => {
+  if (!isRecord(input) || typeof input.savedItemId !== "string" || !input.savedItemId) {
     return null;
   }
 
   return {
-    bookmarkId: input.bookmarkId
+    savedItemId: input.savedItemId
   };
 };
 
-const parseMoveBookmarksInput = (input: unknown): MoveBookmarksInput | null => {
-  if (!isRecord(input) || !Array.isArray(input.bookmarkIds)) {
+const parseMoveSavedItemsInput = (input: unknown): MoveSavedItemsInput | null => {
+  if (!isRecord(input) || !Array.isArray(input.savedItemIds)) {
     return null;
   }
 
-  const bookmarkIds = new Set<string>();
+  const savedItemIds = new Set<string>();
 
-  for (const bookmarkId of input.bookmarkIds) {
-    if (typeof bookmarkId !== "string" || !bookmarkId) {
+  for (const savedItemId of input.savedItemIds) {
+    if (typeof savedItemId !== "string" || !savedItemId) {
       return null;
     }
 
-    bookmarkIds.add(bookmarkId);
+    savedItemIds.add(savedItemId);
   }
 
-  if (bookmarkIds.size === 0) {
+  if (savedItemIds.size === 0) {
     return null;
   }
 
   return {
-    bookmarkIds: [...bookmarkIds].slice(0, 100),
+    savedItemIds: [...savedItemIds].slice(0, 100),
     destinationFolderId:
       typeof input.destinationFolderId === "string" && input.destinationFolderId
         ? input.destinationFolderId
@@ -765,12 +765,12 @@ function assertCurrentUser(
   }
 }
 
-function assertBookmarksStore(
-  bookmarksStore: BookmarksStore | undefined
-): asserts bookmarksStore is BookmarksStore {
-  if (!bookmarksStore) {
+function assertSavedItemsStore(
+  savedItemsStore: SavedItemsStore | undefined
+): asserts savedItemsStore is SavedItemsStore {
+  if (!savedItemsStore) {
     throw new ORPCError("INTERNAL_SERVER_ERROR", {
-      message: "Bookmarks storage is not configured"
+      message: "Saved item storage is not configured"
     });
   }
 }
@@ -786,21 +786,21 @@ function assertSavedItemSearchIndex(
 }
 
 async function upsertSavedItemSearchDocuments(
-  bookmarksStore: BookmarksStore,
+  savedItemsStore: SavedItemsStore,
   savedItemSearchIndex: SavedItemSearchIndex | undefined,
-  input: Parameters<BookmarksStore["listSavedItemSearchDocuments"]>[0]
+  input: Parameters<SavedItemsStore["listSavedItemSearchDocuments"]>[0]
 ) {
   if (!savedItemSearchIndex) {
     return;
   }
 
-  const documents = await bookmarksStore.listSavedItemSearchDocuments(input);
+  const documents = await savedItemsStore.listSavedItemSearchDocuments(input);
 
   if (documents.length === 0) {
     return;
   }
 
   await savedItemSearchIndex.upsert(documents).catch((error: unknown) => {
-    console.error("Unable to upsert bookmarks into search index", error);
+    console.error("Unable to upsert saved items into search index", error);
   });
 }

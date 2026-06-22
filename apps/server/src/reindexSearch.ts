@@ -1,5 +1,5 @@
-import { createDatabaseBookmarksStore } from "@bookmarks/api/bookmarks";
-import { createDatabase } from "@bookmarks/api/db";
+import { createDatabaseSavedItemsStore } from "@shelf/api/savedItems";
+import { createDatabase } from "@shelf/api/db";
 import { existsSync } from "node:fs";
 import pg from "pg";
 import { getConfig } from "./config";
@@ -21,7 +21,7 @@ const savedItemSearchIndex = new ServerMeilisearchSavedItemSearchIndex(
 );
 
 try {
-  const store = createDatabaseBookmarksStore(db);
+  const store = createDatabaseSavedItemsStore(db);
   const documents = await store.listSavedItemSearchDocuments({});
 
   await savedItemSearchIndex.replaceAll(documents);

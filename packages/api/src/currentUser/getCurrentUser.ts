@@ -1,4 +1,4 @@
-import type { CurrentUserResponse } from "@bookmarks/shared";
+import type { CurrentUserResponse } from "@shelf/shared";
 
 export interface CurrentIdentity {
   user: {

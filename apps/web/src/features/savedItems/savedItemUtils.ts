@@ -1,13 +1,13 @@
 import type { InfiniteData } from "@tanstack/react-query";
-import type { BookmarkItem, BookmarksPageResponse } from "@bookmarks/shared";
+import type { SavedItem, SavedItemsPageResponse } from "@shelf/shared";
 
-export type BookmarkFilter = {
+export type SavedItemFilter = {
   folderId: string | null;
   libraryId: string | null;
   tagId: string | null;
 };
 
-export const copyBookmarkLink = async (url: string) => {
+export const copySavedItemLink = async (url: string) => {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(url);
     return;
@@ -32,7 +32,7 @@ export const hostFromUrl = (url: string) => {
   }
 };
 
-export const isValidBookmarkUrl = (url: string) => {
+export const isValidSavedItemUrl = (url: string) => {
   try {
     const parsedUrl = new URL(url);
     return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
@@ -41,23 +41,23 @@ export const isValidBookmarkUrl = (url: string) => {
   }
 };
 
-export const formatBookmarkDate = (date: string) =>
+export const formatSavedItemDate = (date: string) =>
   new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(date));
 
-export const insertBookmarkIntoPages = (
-  data: InfiniteData<BookmarksPageResponse, string | null> | undefined,
-  bookmark: BookmarkItem,
+export const insertSavedItemIntoPages = (
+  data: InfiniteData<SavedItemsPageResponse, string | null> | undefined,
+  savedItem: SavedItem,
   replacementId?: string
-): InfiniteData<BookmarksPageResponse, string | null> => {
+): InfiniteData<SavedItemsPageResponse, string | null> => {
   if (!data) {
     return {
       pageParams: [null],
       pages: [
         {
-          items: [bookmark],
+          items: [savedItem],
           nextCursor: null
         }
       ]
@@ -66,7 +66,7 @@ export const insertBookmarkIntoPages = (
 
   const pagesWithoutDuplicate = data.pages.map((page) => ({
     ...page,
-    items: page.items.filter((item) => item.id !== bookmark.id && item.id !== replacementId)
+    items: page.items.filter((item) => item.id !== savedItem.id && item.id !== replacementId)
   }));
   const [firstPage, ...restPages] = pagesWithoutDuplicate;
 
@@ -75,17 +75,17 @@ export const insertBookmarkIntoPages = (
     pages: [
       {
         ...(firstPage ?? { nextCursor: null }),
-        items: [bookmark, ...(firstPage?.items ?? [])]
+        items: [savedItem, ...(firstPage?.items ?? [])]
       },
       ...restPages
     ]
   };
 };
 
-export const removeBookmarksFromPages = (
-  data: InfiniteData<BookmarksPageResponse, string | null> | undefined,
-  bookmarkIds: ReadonlySet<string>
-): InfiniteData<BookmarksPageResponse, string | null> | undefined => {
+export const removeSavedItemsFromPages = (
+  data: InfiniteData<SavedItemsPageResponse, string | null> | undefined,
+  savedItemIds: ReadonlySet<string>
+): InfiniteData<SavedItemsPageResponse, string | null> | undefined => {
   if (!data) {
     return data;
   }
@@ -94,27 +94,27 @@ export const removeBookmarksFromPages = (
     ...data,
     pages: data.pages.map((page) => ({
       ...page,
-      items: page.items.filter((item) => !bookmarkIds.has(item.id))
+      items: page.items.filter((item) => !savedItemIds.has(item.id))
     }))
   };
 };
 
-export const bookmarkQueryKey = (filter: BookmarkFilter): ["bookmarks", BookmarkFilter] => [
-  "bookmarks",
+export const savedItemQueryKey = (filter: SavedItemFilter): ["savedItems", SavedItemFilter] => [
+  "savedItems",
   filter
 ];
 
-export const bookmarkQueryKeysForFolder = (
+export const savedItemQueryKeysForFolder = (
   folderId: string | null,
   libraryId: string | null = null
-): Array<["bookmarks", BookmarkFilter]> =>
+): Array<["savedItems", SavedItemFilter]> =>
   folderId
-    ? [bookmarkQueryKey({ folderId, libraryId, tagId: null })]
-    : [bookmarkQueryKey({ folderId: null, libraryId, tagId: null })];
+    ? [savedItemQueryKey({ folderId, libraryId, tagId: null })]
+    : [savedItemQueryKey({ folderId: null, libraryId, tagId: null })];
 
-export const bookmarkQueryKeysForTag = (
+export const savedItemQueryKeysForTag = (
   tagId: string,
   libraryId: string | null = null
-): Array<["bookmarks", BookmarkFilter]> => [
-  bookmarkQueryKey({ folderId: null, libraryId, tagId })
+): Array<["savedItems", SavedItemFilter]> => [
+  savedItemQueryKey({ folderId: null, libraryId, tagId })
 ];

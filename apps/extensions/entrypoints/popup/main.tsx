@@ -21,7 +21,7 @@ interface FolderItem {
   name: string;
   iconName: string | null;
   iconColor: string | null;
-  bookmarkCount: number;
+  savedItemCount: number;
 }
 
 interface TagItem {
@@ -29,10 +29,10 @@ interface TagItem {
   libraryId: string;
   name: string;
   color: string | null;
-  bookmarkCount: number;
+  savedItemCount: number;
 }
 
-interface BookmarkLocationItem {
+interface SavedItemLocation {
   id: string;
   libraryId: string;
   folderId: string | null;
@@ -56,7 +56,7 @@ const App = () => {
   const [currentUser, setCurrentUser] = createSignal<CurrentUserResponse | null>(null);
   const [folders, setFolders] = createSignal<FolderItem[]>([]);
   const [tags, setTags] = createSignal<TagItem[]>([]);
-  const [savedLocations, setSavedLocations] = createSignal<BookmarkLocationItem[]>([]);
+  const [savedLocations, setSavedLocations] = createSignal<SavedItemLocation[]>([]);
   const [selectedFolderId, setSelectedFolderId] = createSignal("");
   const [selectedTagIds, setSelectedTagIds] = createSignal<string[]>([]);
   const [pickerLibraryId, setPickerLibraryId] = createSignal<string | null>(null);
@@ -138,7 +138,7 @@ const App = () => {
         rpcCall<FolderItem[]>(apiUrl, "folders/list", null),
         rpcCall<TagItem[]>(apiUrl, "tags/list", null),
         page
-          ? rpcCall<BookmarkLocationItem[]>(apiUrl, "bookmarks/locations", { url: page.url })
+          ? rpcCall<SavedItemLocation[]>(apiUrl, "savedItems/locations", { url: page.url })
           : Promise.resolve([])
       ]);
 
@@ -169,7 +169,7 @@ const App = () => {
     }
   };
 
-  const saveBookmark = async () => {
+  const saveSavedItem = async () => {
     const page = activePage();
 
     if (!page) {
@@ -178,12 +178,12 @@ const App = () => {
     }
 
     setIsBusy(true);
-    writeMessage("Saving bookmark", "neutral");
+    writeMessage("Saving page", "neutral");
 
     try {
       const apiUrl = await getApiBaseUrl();
 
-      await rpcCall(apiUrl, "bookmarks/create", {
+      await rpcCall(apiUrl, "savedItems/create", {
         folderId: selectedFolderId() || undefined,
         tagIds: selectedTagIds(),
         url: page.url
@@ -263,7 +263,7 @@ const App = () => {
       <main class="popup-shell">
         <header class="popup-header">
           <div>
-            <p class="eyebrow">Bookmarks</p>
+            <p class="eyebrow">Shelf</p>
             <h1>Save page</h1>
           </div>
           <div class="header-actions">
@@ -318,7 +318,7 @@ const App = () => {
           class="save-form"
           onSubmit={(event) => {
             event.preventDefault();
-            void saveBookmark();
+            void saveSavedItem();
           }}
         >
           <label class="field">
@@ -373,7 +373,7 @@ const App = () => {
                         onChange={(event) => toggleTag(tag.id, event.currentTarget.checked)}
                       />
                       <span>{tag.name}</span>
-                      <span class="tag-count">{tag.bookmarkCount}</span>
+                      <span class="tag-count">{tag.savedItemCount}</span>
                     </label>
                   )}
                 </For>
@@ -386,7 +386,7 @@ const App = () => {
           </p>
 
           <button class="save-button" type="submit" disabled={saveDisabled()}>
-            Save bookmark
+            Save page
           </button>
         </form>
       </main>
@@ -399,7 +399,7 @@ const App = () => {
         <main class="popup-shell folder-picker-shell">
           <header class="popup-header">
             <div>
-              <p class="eyebrow">Bookmarks</p>
+              <p class="eyebrow">Shelf</p>
               <h1>Choose workspace</h1>
             </div>
             <button class="icon-button" type="button" onClick={closeFolderPicker}>
@@ -439,7 +439,7 @@ const App = () => {
       <main class="popup-shell folder-picker-shell">
         <header class="popup-header">
           <div>
-            <p class="eyebrow">Bookmarks</p>
+            <p class="eyebrow">Shelf</p>
             <h1>Choose folder</h1>
           </div>
           <button class="icon-button" type="button" onClick={closeFolderPicker}>
@@ -495,7 +495,7 @@ const App = () => {
             <TablerIcon color={folder.iconColor ?? DEFAULT_FOLDER_ICON_COLOR} name={folder.iconName} size={21} />
             <span>{folder.name}</span>
           </button>
-          <span class="folder-count">{folder.bookmarkCount > 0 ? folder.bookmarkCount : null}</span>
+          <span class="folder-count">{folder.savedItemCount > 0 ? folder.savedItemCount : null}</span>
         </div>
         <Show when={hasChildren && isExpanded()}>
           <For each={folder.children}>{(child) => renderFolderNode(child, level + 1)}</For>
@@ -580,7 +580,7 @@ const folderPath = (folder: FolderItem, allFolders: FolderItem[]) => {
 };
 
 const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "Unable to connect to Bookmarks";
+  error instanceof Error ? error.message : "Unable to connect to Shelf";
 
 const root = document.querySelector("#root");
 

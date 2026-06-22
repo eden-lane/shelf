@@ -1,7 +1,7 @@
-import type { BookmarkItem } from "@bookmarks/shared";
+import type { SavedItem } from "@shelf/shared";
 import { schema } from "../db";
 
-export const bookmarkSelectFields = {
+export const savedItemSelectFields = {
   id: schema.savedItems.id,
   libraryId: schema.savedItems.libraryId,
   folderId: schema.savedItems.folderId,
@@ -18,7 +18,7 @@ export const bookmarkSelectFields = {
   updatedAt: schema.savedItems.updatedAt
 };
 
-export interface BookmarkRow {
+export interface SavedItemRow {
   id: string;
   libraryId: string;
   folderId: string | null;
@@ -28,14 +28,14 @@ export interface BookmarkRow {
   description: string | null;
   siteName: string | null;
   imageUrl: string | null;
-  metadataStatus: BookmarkItem["metadataStatus"];
+  metadataStatus: SavedItem["metadataStatus"];
   metadataFetchedAt: Date | null;
   faviconId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export const serializeBookmark = (row: BookmarkRow): BookmarkItem => ({
+export const serializeSavedItem = (row: SavedItemRow): SavedItem => ({
   id: row.id,
   libraryId: row.libraryId,
   folderId: row.folderId,

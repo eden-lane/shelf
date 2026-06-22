@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { InfiniteData } from "@tanstack/react-query";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { BookmarksPageResponse } from "@bookmarks/shared";
-import { IconAlertTriangle, IconBookmark, IconRefresh } from "@tabler/icons-react";
-import { deleteBookmark, getBookmarks, searchBookmarks } from "../../api";
-import { bookmarkQueryKey } from "./bookmarkUtils";
-import type { BookmarkSearchScope } from "./SearchScopeControl";
-import { BookmarkRow } from "./BookmarkRow";
+import type { SavedItemsPageResponse } from "@shelf/shared";
+import { IconAlertTriangle, IconLink, IconRefresh } from "@tabler/icons-react";
+import { deleteSavedItem, getSavedItems, searchSavedItems } from "../../api";
+import { savedItemQueryKey } from "./savedItemUtils";
+import type { SavedItemSearchScope } from "./SearchScopeControl";
+import { SavedItemRow } from "./SavedItemRow";
 
-export const BookmarksWorkspace = ({
+export const SavedItemsWorkspace = ({
   folderId,
   folderName,
   libraryId,
@@ -21,7 +21,7 @@ export const BookmarksWorkspace = ({
   folderName: string | null;
   libraryId: string | null;
   searchQuery: string;
-  searchScope: BookmarkSearchScope;
+  searchScope: SavedItemSearchScope;
   tagId: string | null;
   tagName: string | null;
 }) => {
@@ -35,7 +35,7 @@ export const BookmarksWorkspace = ({
   const isWaitingForSearchDebounce = isSearching && trimmedSearchQuery !== debouncedSearchQuery;
   const currentQueryKey = isSearching
     ? [
-        "bookmarks",
+        "savedItems",
         "search",
         {
           libraryId: searchScope === "current" ? libraryId : null,
@@ -43,22 +43,22 @@ export const BookmarksWorkspace = ({
           scope: searchScope
         }
       ]
-    : bookmarkQueryKey({ folderId, libraryId, tagId });
-  const bookmarks = useInfiniteQuery({
+    : savedItemQueryKey({ folderId, libraryId, tagId });
+  const savedItems = useInfiniteQuery({
     enabled:
       (!isSearching || (hasDebouncedSearchQuery && !isWaitingForSearchDebounce)) &&
       (!isSearching || searchScope === "all" || Boolean(libraryId)),
     queryKey: currentQueryKey,
     queryFn: ({ pageParam }) =>
       isSearching
-        ? searchBookmarks({
+        ? searchSavedItems({
             cursor: pageParam,
             libraryId: searchScope === "current" ? libraryId : undefined,
             limit: 20,
             query: debouncedSearchQuery,
             scope: searchScope
           })
-        : getBookmarks({
+        : getSavedItems({
             cursor: pageParam,
             folderId,
             inbox: folderId === null && tagId === null,
@@ -69,20 +69,20 @@ export const BookmarksWorkspace = ({
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor
   });
-  const { fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = bookmarks;
-  const items = bookmarks.data?.pages.flatMap((page) => page.items) ?? [];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = savedItems;
+  const items = savedItems.data?.pages.flatMap((page) => page.items) ?? [];
   const hasPendingMetadata = items.some((item) => item.metadataStatus === "pending");
-  const deleteBookmarkMutation = useMutation({
-    mutationFn: deleteBookmark,
-    onMutate: async ({ bookmarkId }) => {
+  const deleteSavedItemMutation = useMutation({
+    mutationFn: deleteSavedItem,
+    onMutate: async ({ savedItemId }) => {
       const queryKey = currentQueryKey;
 
       await queryClient.cancelQueries({ queryKey });
 
-      const previousBookmarks =
-        queryClient.getQueryData<InfiniteData<BookmarksPageResponse, string | null>>(queryKey);
+      const previousSavedItems =
+        queryClient.getQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(queryKey);
 
-      queryClient.setQueryData<InfiniteData<BookmarksPageResponse, string | null>>(
+      queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
         queryKey,
         (current) =>
           current
@@ -90,21 +90,21 @@ export const BookmarksWorkspace = ({
                 ...current,
                 pages: current.pages.map((page) => ({
                   ...page,
-                  items: page.items.filter((item) => item.id !== bookmarkId)
+                  items: page.items.filter((item) => item.id !== savedItemId)
                 }))
               }
             : current
       );
 
-      return { previousBookmarks, queryKey };
+      return { previousSavedItems, queryKey };
     },
     onError: (_error, _input, context) => {
-      if (context?.previousBookmarks) {
-        queryClient.setQueryData(context.queryKey, context.previousBookmarks);
+      if (context?.previousSavedItems) {
+        queryClient.setQueryData(context.queryKey, context.previousSavedItems);
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
     }
   });
@@ -157,7 +157,7 @@ export const BookmarksWorkspace = ({
     return () => window.clearTimeout(timeout);
   }, [notification]);
 
-  if (bookmarks.isLoading || isWaitingForSearchDebounce) {
+  if (savedItems.isLoading || isWaitingForSearchDebounce) {
     return (
       <section
         className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
@@ -173,7 +173,7 @@ export const BookmarksWorkspace = ({
     );
   }
 
-  if (bookmarks.isError) {
+  if (savedItems.isError) {
     return (
       <section
         className="grid w-full min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-[#f0b37e] bg-white p-5 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
@@ -192,14 +192,14 @@ export const BookmarksWorkspace = ({
               Items could not be loaded
             </h2>
             <p className="mt-1 mb-0 text-sm leading-6 text-[#697080]">
-              The API did not return the bookmark list.
+              The API did not return the saved item list.
             </p>
           </div>
         </div>
         <button
           className="flex min-h-10 w-fit items-center gap-2 rounded-lg border border-[#dfe4ef] bg-white px-3 text-sm font-extrabold text-[#4b5262] outline-none hover:bg-[#f7f8fc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
           type="button"
-          onClick={() => void bookmarks.refetch()}
+          onClick={() => void savedItems.refetch()}
         >
           <IconRefresh size={16} stroke={1.5} aria-hidden="true" focusable="false" />
           <span>Retry</span>
@@ -214,7 +214,7 @@ export const BookmarksWorkspace = ({
         className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-7 shadow-[0_20px_60px_rgb(46_54_77_/_0.06)]"
         aria-labelledby="empty-items-title"
       >
-        <IconBookmark
+        <IconLink
           className="text-[#3b8df5]"
           size={24}
           stroke={1.5}
@@ -229,10 +229,10 @@ export const BookmarksWorkspace = ({
             {isSearching
               ? "No saved links match this search."
               : tagName
-              ? "Bookmarks with this tag will appear here."
+              ? "Saved items with this tag will appear here."
               : folderName
-                ? "Bookmarks added to this folder will appear here."
-                : "Bookmarks without a folder will appear here as soon as they are saved."}
+                ? "Saved items added to this folder will appear here."
+                : "Saved items without a folder will appear here as soon as they are saved."}
           </p>
         </div>
       </section>
@@ -246,24 +246,24 @@ export const BookmarksWorkspace = ({
         aria-label={
           tagName ? `${tagName} tagged items` : folderName ? `${folderName} items` : "Inbox items"
         }
-        aria-busy={bookmarks.isFetchingNextPage}
+        aria-busy={savedItems.isFetchingNextPage}
       >
         {items.map((item) => (
-          <BookmarkRow
+          <SavedItemRow
             item={item}
             key={item.id}
             showFolderName={isSearching}
-            onDeleteBookmark={(bookmarkId) => deleteBookmarkMutation.mutate({ bookmarkId })}
+            onDeleteSavedItem={(savedItemId) => deleteSavedItemMutation.mutate({ savedItemId })}
             onLinkCopied={() => setNotification("Link copied")}
           />
         ))}
         <div ref={loadMoreRef} className="min-h-6" aria-hidden="true" />
-        {bookmarks.isFetchingNextPage ? (
+        {savedItems.isFetchingNextPage ? (
           <p className="m-0 rounded-lg border border-[#e4e7ef] bg-white px-4 py-3 text-sm font-bold text-[#697080]">
             Loading more items
           </p>
         ) : null}
-        {!bookmarks.hasNextPage ? (
+        {!savedItems.hasNextPage ? (
           <p className="m-0 px-1 py-2 text-sm font-bold text-[#858b9a]">All items loaded</p>
         ) : null}
       </section>

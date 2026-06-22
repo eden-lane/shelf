@@ -1,14 +1,14 @@
 import { type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import type { FolderItem } from "@bookmarks/shared";
-import { IconBookmark, IconFolderPlus, IconPencil, IconTrash } from "@tabler/icons-react";
+import type { FolderItem } from "@shelf/shared";
+import { IconLink, IconFolderPlus, IconPencil, IconTrash } from "@tabler/icons-react";
 import { ContextMenuButton } from "../../components/ContextMenuButton";
 
 export const FolderContextMenu = ({
   folder,
   x,
   y,
-  onAddBookmark,
+  onAddSavedItem,
   onCreateFolder,
   onDeleteFolder,
   onEditFolder
@@ -16,7 +16,7 @@ export const FolderContextMenu = ({
   folder: FolderItem;
   x: number;
   y: number;
-  onAddBookmark: () => void;
+  onAddSavedItem: () => void;
   onCreateFolder: () => void;
   onDeleteFolder: () => void;
   onEditFolder: () => void;
@@ -34,7 +34,7 @@ export const FolderContextMenu = ({
         }
       }}
     >
-      <ContextMenuButton icon={IconBookmark} label="Add a bookmark" onClick={onAddBookmark} />
+      <ContextMenuButton icon={IconLink} label="Add a saved item" onClick={onAddSavedItem} />
       <ContextMenuButton icon={IconFolderPlus} label="Create new folder" onClick={onCreateFolder} />
       <ContextMenuButton icon={IconPencil} label="Edit folder" onClick={onEditFolder} />
       <ContextMenuButton icon={IconTrash} label="Delete folder" tone="danger" onClick={onDeleteFolder} />

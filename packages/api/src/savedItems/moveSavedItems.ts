@@ -1,18 +1,18 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import type { MoveBookmarksInput } from "./types";
+import type { MoveSavedItemsInput } from "./types";
 
-export const moveBookmarks = async (
+export const moveSavedItems = async (
   db: Database,
-  input: MoveBookmarksInput
-): Promise<{ destinationFolderId: string | null; movedBookmarkIds: string[] }> => {
-  const bookmarkIds = [...new Set(input.bookmarkIds)];
+  input: MoveSavedItemsInput
+): Promise<{ destinationFolderId: string | null; movedSavedItemIds: string[] }> => {
+  const savedItemIds = [...new Set(input.savedItemIds)];
 
-  if (bookmarkIds.length === 0 || input.allowedLibraryIds.length === 0) {
+  if (savedItemIds.length === 0 || input.allowedLibraryIds.length === 0) {
     return {
       destinationFolderId: input.destinationFolderId ?? null,
-      movedBookmarkIds: []
+      movedSavedItemIds: []
     };
   }
 
@@ -37,7 +37,7 @@ export const moveBookmarks = async (
     throw new Error("Destination folder does not exist");
   }
 
-  const bookmarks = await db
+  const savedItems = await db
     .select({
       id: schema.savedItems.id,
       libraryId: schema.savedItems.libraryId
@@ -45,20 +45,20 @@ export const moveBookmarks = async (
     .from(schema.savedItems)
     .where(
       and(
-        inArray(schema.savedItems.id, bookmarkIds),
+        inArray(schema.savedItems.id, savedItemIds),
         inArray(schema.savedItems.libraryId, input.allowedLibraryIds)
       )
     );
 
-  if (bookmarks.length !== bookmarkIds.length) {
-    throw new Error("Choose available bookmarks");
+  if (savedItems.length !== savedItemIds.length) {
+    throw new Error("Choose available saved items");
   }
 
   if (
     destinationFolder &&
-    bookmarks.some((bookmark) => bookmark.libraryId !== destinationFolder.libraryId)
+    savedItems.some((savedItem) => savedItem.libraryId !== destinationFolder.libraryId)
   ) {
-    throw new Error("Choose a destination folder in the bookmark library");
+    throw new Error("Choose a destination folder in the saved item library");
   }
 
   const rows = await db
@@ -69,7 +69,7 @@ export const moveBookmarks = async (
     })
     .where(
       and(
-        inArray(schema.savedItems.id, bookmarkIds),
+        inArray(schema.savedItems.id, savedItemIds),
         inArray(schema.savedItems.libraryId, input.allowedLibraryIds)
       )
     )
@@ -77,6 +77,6 @@ export const moveBookmarks = async (
 
   return {
     destinationFolderId,
-    movedBookmarkIds: rows.map((row) => row.id)
+    movedSavedItemIds: rows.map((row) => row.id)
   };
 };

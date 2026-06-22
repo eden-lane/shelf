@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";

@@ -1,4 +1,4 @@
-import type { FolderItem } from "@bookmarks/shared";
+import type { FolderItem } from "@shelf/shared";
 import { eq, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
@@ -40,5 +40,5 @@ export const updateFolder = async (
     throw new Error("Unable to update folder");
   }
 
-  return serializeFolder({ ...row, bookmarkCount: existing.bookmarkCount });
+  return serializeFolder({ ...row, savedItemCount: existing.savedItemCount });
 };

@@ -1,25 +1,25 @@
 import type {
   AuthCredentials,
   AuthSessionResponse,
-  BookmarkItem,
-  BookmarksPageResponse,
-  CreateBookmarkInput,
+  SavedItem,
+  SavedItemsPageResponse,
+  CreateSavedItemInput,
   CreateFolderInput,
   CreateTagInput,
-  DeleteBookmarkInput,
+  DeleteSavedItemInput,
   CurrentUserResponse,
   DeleteFolderInput,
   DeleteTagInput,
   FolderItem,
   HealthResponse,
-  ListBookmarksInput,
+  ListSavedItemsInput,
   MoveFolderInput,
-  MoveBookmarksInput,
-  SearchBookmarksInput,
+  MoveSavedItemsInput,
+  SearchSavedItemsInput,
   TagItem,
   UpdateFolderInput,
   UpdateTagInput
-} from "@bookmarks/shared";
+} from "@shelf/shared";
 import { createORPCClient, type Client, type NestedClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 
@@ -40,20 +40,20 @@ type RpcProcedure<TInput, TOutput> = Client<Record<never, never>, TInput, TOutpu
 interface WebRpcClient extends Record<string, NestedClient<Record<never, never>>> {
   health: RpcProcedure<undefined, HealthResponse>;
   currentUser: RpcProcedure<undefined, CurrentUserResponse>;
-  bookmarks: BookmarksRpcClient;
+  savedItems: SavedItemsRpcClient;
   folders: FoldersRpcClient;
   tags: TagsRpcClient;
 }
 
-interface BookmarksRpcClient extends Record<string, NestedClient<Record<never, never>>> {
-  create: RpcProcedure<CreateBookmarkInput, BookmarkItem>;
-  delete: RpcProcedure<DeleteBookmarkInput, { deletedBookmarkId: string }>;
-  list: RpcProcedure<ListBookmarksInput, BookmarksPageResponse>;
+interface SavedItemsRpcClient extends Record<string, NestedClient<Record<never, never>>> {
+  create: RpcProcedure<CreateSavedItemInput, SavedItem>;
+  delete: RpcProcedure<DeleteSavedItemInput, { deletedSavedItemId: string }>;
+  list: RpcProcedure<ListSavedItemsInput, SavedItemsPageResponse>;
   move: RpcProcedure<
-    MoveBookmarksInput,
-    { destinationFolderId: string | null; movedBookmarkIds: string[] }
+    MoveSavedItemsInput,
+    { destinationFolderId: string | null; movedSavedItemIds: string[] }
   >;
-  search: RpcProcedure<SearchBookmarksInput, BookmarksPageResponse>;
+  search: RpcProcedure<SearchSavedItemsInput, SavedItemsPageResponse>;
 }
 
 interface FoldersRpcClient extends Record<string, NestedClient<Record<never, never>>> {
@@ -120,7 +120,7 @@ export const logout = async (): Promise<void> => {
   await readJsonResponse(response);
 };
 
-export const getBookmarks = async ({
+export const getSavedItems = async ({
   cursor,
   folderId,
   inbox,
@@ -134,8 +134,8 @@ export const getBookmarks = async ({
   libraryId?: string | null;
   limit?: number;
   tagId?: string | null;
-} = {}): Promise<BookmarksPageResponse> => {
-  return rpc.bookmarks.list({
+} = {}): Promise<SavedItemsPageResponse> => {
+  return rpc.savedItems.list({
     cursor,
     folderId,
     inbox,
@@ -145,21 +145,21 @@ export const getBookmarks = async ({
   });
 };
 
-export const searchBookmarks = async (
-  input: SearchBookmarksInput
-): Promise<BookmarksPageResponse> => rpc.bookmarks.search(input);
+export const searchSavedItems = async (
+  input: SearchSavedItemsInput
+): Promise<SavedItemsPageResponse> => rpc.savedItems.search(input);
 
-export const createBookmark = async (input: CreateBookmarkInput): Promise<BookmarkItem> =>
-  rpc.bookmarks.create(input);
+export const createSavedItem = async (input: CreateSavedItemInput): Promise<SavedItem> =>
+  rpc.savedItems.create(input);
 
-export const deleteBookmark = async (
-  input: DeleteBookmarkInput
-): Promise<{ deletedBookmarkId: string }> => rpc.bookmarks.delete(input);
+export const deleteSavedItem = async (
+  input: DeleteSavedItemInput
+): Promise<{ deletedSavedItemId: string }> => rpc.savedItems.delete(input);
 
-export const moveBookmarks = async (
-  input: MoveBookmarksInput
-): Promise<{ destinationFolderId: string | null; movedBookmarkIds: string[] }> =>
-  rpc.bookmarks.move(input);
+export const moveSavedItems = async (
+  input: MoveSavedItemsInput
+): Promise<{ destinationFolderId: string | null; movedSavedItemIds: string[] }> =>
+  rpc.savedItems.move(input);
 
 export const getFolders = async (): Promise<FolderItem[]> => rpc.folders.list();
 

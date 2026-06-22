@@ -54,7 +54,7 @@ export interface AuthCredentials {
   locale?: string | null;
 }
 
-export interface BookmarkItem {
+export interface SavedItem {
   id: string;
   libraryId: string;
   libraryName?: string | null;
@@ -73,7 +73,7 @@ export interface BookmarkItem {
   updatedAt: string;
 }
 
-export interface BookmarkLocationItem {
+export interface SavedItemLocation {
   id: string;
   libraryId: string;
   folderId: string | null;
@@ -90,7 +90,7 @@ export interface FolderItem {
   iconName: string | null;
   iconColor: string | null;
   sortOrder: number;
-  bookmarkCount: number;
+  savedItemCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,33 +100,33 @@ export interface TagItem {
   libraryId: string;
   name: string;
   color: string | null;
-  bookmarkCount: number;
+  savedItemCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface BookmarksPageResponse {
-  items: BookmarkItem[];
+export interface SavedItemsPageResponse {
+  items: SavedItem[];
   nextCursor: string | null;
 }
 
-export interface CreateBookmarkInput {
+export interface CreateSavedItemInput {
   url: string;
   folderId?: string;
   libraryId?: string;
   tagIds?: string[];
 }
 
-export interface DeleteBookmarkInput {
-  bookmarkId: string;
+export interface DeleteSavedItemInput {
+  savedItemId: string;
 }
 
-export interface MoveBookmarksInput {
-  bookmarkIds: string[];
+export interface MoveSavedItemsInput {
+  savedItemIds: string[];
   destinationFolderId?: string | null;
 }
 
-export interface ListBookmarksInput {
+export interface ListSavedItemsInput {
   cursor?: string | null;
   folderId?: string | null;
   inbox?: boolean;
@@ -135,7 +135,7 @@ export interface ListBookmarksInput {
   tagId?: string | null;
 }
 
-export interface SearchBookmarksInput {
+export interface SearchSavedItemsInput {
   cursor?: string | null;
   libraryId?: string | null;
   limit?: number;

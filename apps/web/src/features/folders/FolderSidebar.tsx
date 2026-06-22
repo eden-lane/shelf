@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import type { CurrentUserResponse, FolderItem, TagItem } from "@bookmarks/shared";
+import type { CurrentUserResponse, FolderItem, TagItem } from "@shelf/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  IconBookmark,
+  IconLink,
   IconChevronDown,
   IconChevronRight,
   IconDatabase,
@@ -34,8 +34,8 @@ import { buildFolderTree } from "./folderTree";
 import { folderRowIndent } from "./folderIcons";
 import type { FolderFormValue } from "./types";
 
-const COLLAPSED_LIBRARIES_STORAGE_KEY = "bookmarks.collapsedLibraries";
-const COLLAPSED_FOLDERS_STORAGE_KEY = "bookmarks.collapsedFolders";
+const COLLAPSED_LIBRARIES_STORAGE_KEY = "savedItems.collapsedLibraries";
+const COLLAPSED_FOLDERS_STORAGE_KEY = "savedItems.collapsedFolders";
 
 export const FolderSidebar = ({
   activeFolderId,
@@ -49,7 +49,7 @@ export const FolderSidebar = ({
   isTagsLoading,
   searchQuery,
   tags,
-  onAddBookmark,
+  onAddSavedItem,
   onHideSidebar,
   onSearchQueryChange,
   onSelectFolder,
@@ -66,7 +66,7 @@ export const FolderSidebar = ({
   isTagsLoading: boolean;
   searchQuery: string;
   tags: TagItem[];
-  onAddBookmark: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
+  onAddSavedItem: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
   onSearchQueryChange: (query: string) => void;
   onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
@@ -130,7 +130,7 @@ export const FolderSidebar = ({
         )
       );
       setEditingFolderId(null);
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["folders"] });
     }
   });
@@ -141,7 +141,7 @@ export const FolderSidebar = ({
         currentTags.map((currentTag) => (currentTag.id === tag.id ? tag : currentTag))
       );
       setEditingTagId(null);
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   });
@@ -206,7 +206,7 @@ export const FolderSidebar = ({
           <IconSearch size={18} stroke={1.5} aria-hidden="true" focusable="false" />
           <input
             className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-950 outline-none placeholder:text-gray-500"
-            aria-label="Search bookmarks"
+            aria-label="Search saved items"
             placeholder="Search saved links"
             type="search"
             value={searchQuery}
@@ -215,10 +215,10 @@ export const FolderSidebar = ({
         </label>
         <button
           className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-red-500 text-white shadow-sm outline-none hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          aria-label="Add bookmark"
-          title="Add bookmark"
+          aria-label="Add saved item"
+          title="Add saved item"
           type="button"
-          onClick={() => onAddBookmark({ folder: null, tag: null })}
+          onClick={() => onAddSavedItem({ folder: null, tag: null })}
         >
           <IconPlus size={20} stroke={1.7} aria-hidden="true" focusable="false" />
         </button>
@@ -433,9 +433,9 @@ export const FolderSidebar = ({
           folder={menuFolder}
           x={menu.x}
           y={menu.y}
-          onAddBookmark={() => {
+          onAddSavedItem={() => {
             setMenu(null);
-            onAddBookmark({ folder: menuFolder, tag: null });
+            onAddSavedItem({ folder: menuFolder, tag: null });
           }}
           onCreateFolder={() => {
             setMenu(null);
@@ -459,9 +459,9 @@ export const FolderSidebar = ({
           tag={menuTag}
           x={tagMenu.x}
           y={tagMenu.y}
-          onAddBookmark={() => {
+          onAddSavedItem={() => {
             setTagMenu(null);
-            onAddBookmark({ folder: null, tag: menuTag });
+            onAddSavedItem({ folder: null, tag: menuTag });
           }}
           onDeleteTag={() => {
             setTagMenu(null);
@@ -535,7 +535,7 @@ const WorkspaceInboxRow = ({
     >
       <span className="h-6 w-4 shrink-0" aria-hidden="true" />
       <span className="flex min-h-8 min-w-0 flex-1 items-center gap-2 pr-2">
-        <IconBookmark size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+        <IconLink size={17} stroke={1.5} aria-hidden="true" focusable="false" />
         <span className="truncate" data-workspace-inbox-title={libraryId}>
           Inbox
         </span>
@@ -667,7 +667,7 @@ const TagSection = ({
               className="grid h-8 place-items-center text-[11px] font-extrabold text-gray-400"
               aria-hidden="true"
             >
-              {tag.bookmarkCount > 0 ? tag.bookmarkCount : null}
+              {tag.savedItemCount > 0 ? tag.savedItemCount : null}
             </span>
             <button
               className="grid h-7 w-7 place-items-center justify-self-center rounded-lg border border-transparent text-gray-500 outline-none hover:border-gray-200 hover:bg-white hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"

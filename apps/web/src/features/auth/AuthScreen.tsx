@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { RegistrationStatus } from "@bookmarks/shared";
+import type { RegistrationStatus } from "@shelf/shared";
 import { IconLock, IconLogin2, IconUserPlus } from "@tabler/icons-react";
 import { login, signup } from "../../api";
 
