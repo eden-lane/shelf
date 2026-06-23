@@ -2,6 +2,10 @@
 
 WXT extension for saving the active browser tab into Shelf.
 
+Clicking the browser toolbar button injects a floating Shelf panel into the
+current page instead of opening the browser's native popup surface. The panel
+shows the page preview, title, URL, description, folder picker, and tag picker.
+
 ## Development
 
 Install dependencies from the repository root:
@@ -35,5 +39,5 @@ This writes WXT's Safari web-extension output to `.output/safari-mv2`, stages a
 converter-friendly copy at `safari-web-extension`, and creates the local Xcode
 project at `safari-extension/Shelf/Shelf.xcodeproj`.
 
-The popup defaults to `http://localhost:3000` for the API. Change the API URL in
-the popup when saving to a different self-hosted instance.
+The extension defaults to `http://localhost:3000` for the API. Change the API URL
+from the extension options page when saving to a different self-hosted instance.

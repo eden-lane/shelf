@@ -24,6 +24,9 @@ type ConnectionStatus = {
 
 type RuntimeMessage =
   | {
+      type: "shelf:open-options";
+    }
+  | {
       type: "shelf:connect";
       instanceUrl: string;
     }
@@ -50,8 +53,24 @@ const clientId = "browser-extension";
 const requestedScope = "read:saved_items write:saved_items";
 
 export default defineBackground(() => {
+  const toolbarAction = browser.action ?? browser.browserAction;
+
+  toolbarAction.onClicked.addListener((tab) => {
+    if (!tab.id || !tab.url || !/^https?:\/\//.test(tab.url)) {
+      void browser.runtime.openOptionsPage();
+      return;
+    }
+
+    void togglePanelInTab(tab.id, tab.windowId);
+  });
+
   browser.runtime.onMessage.addListener((message: RuntimeMessage) => {
     if (!isShelfMessage(message)) {
+      return undefined;
+    }
+
+    if (message.type === "shelf:open-options") {
+      void browser.runtime.openOptionsPage();
       return undefined;
     }
 
@@ -476,3 +495,18 @@ const base64Url = (bytes: Uint8Array) =>
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Shelf request failed.";
+
+const togglePanelInTab = async (tabId: number, windowId: number) => {
+  const previewImageUrl = await browser.tabs
+    .captureVisibleTab(windowId, { format: "jpeg", quality: 45 })
+    .catch(() => null);
+
+  await browser.tabs
+    .sendMessage(tabId, {
+      previewImageUrl,
+      type: "shelf:toggle-save-panel"
+    })
+    .catch(() => {
+      // Restricted pages can fail to receive content-script messages.
+    });
+};
