@@ -4,7 +4,7 @@ import { render } from "solid-js/web";
 import { browser } from "wxt/browser";
 import { DEFAULT_FOLDER_ICON_COLOR, TablerIcon } from "../../lib/folderIcons";
 import { rpcCall } from "../../lib/rpc";
-import { getApiBaseUrl } from "../../lib/settings";
+import { getApiBaseUrl, hasApiBaseUrlPermission } from "../../lib/settings";
 
 interface CurrentUserResponse {
   libraries: Array<{
@@ -131,6 +131,10 @@ const App = () => {
 
     try {
       const apiUrl = await getApiBaseUrl();
+
+      if (!(await hasApiBaseUrlPermission(apiUrl))) {
+        throw new Error("Open Settings and test the API URL to grant Shelf access.");
+      }
 
       const page = activePage();
       const [userResponse, folderResponse, tagResponse, locationResponse] = await Promise.all([
