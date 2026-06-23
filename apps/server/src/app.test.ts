@@ -148,6 +148,59 @@ describe("production web serving", () => {
   });
 });
 
+describe("browser extension OAuth callback", () => {
+  test("serves a callback page before the app shell fallback", async () => {
+    const staticDir = await mkdtemp(join(tmpdir(), "shelf-static-"));
+
+    try {
+      await writeFile(join(staticDir, "index.html"), "<div id=\"root\"></div>");
+
+      const app = createApp({
+        dependencies: dependencies(),
+        staticDir
+      });
+
+      const response = await app.request("/oauth/browser-extension/callback?code=abc&state=state-token");
+      const body = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(body).toContain("Finishing Shelf connection");
+      expect(body).not.toBe("<div id=\"root\"></div>");
+    } finally {
+      await rm(staticDir, { force: true, recursive: true });
+    }
+  });
+
+  test("accepts the same-origin extension callback redirect in production", async () => {
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: "browser-extension",
+      redirect_uri: "https://shelf.example/oauth/browser-extension/callback",
+      scope: "read:saved_items write:saved_items",
+      state: "state-token",
+      code_challenge: "challenge-token",
+      code_challenge_method: "S256"
+    });
+    const app = createApp({
+      authMode: "none",
+      dependencies: {
+        ...dependencies(),
+        db: {} as never
+      },
+      oauth: {
+        developmentRedirects: false
+      }
+    });
+
+    const response = await app.request(
+      new Request(`https://shelf.example/oauth/authorize?${params.toString()}`)
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")?.startsWith("https://shelf.example/?oauth_return=")).toBe(true);
+  });
+});
+
 describe("origin checks", () => {
   test("allows same-origin mutating requests without an explicit allow-list entry", async () => {
     const app = createApp({

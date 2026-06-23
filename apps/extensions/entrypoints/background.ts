@@ -138,7 +138,7 @@ const connect = async (instanceUrl: string) => {
     return undefined;
   }
 
-  const redirectUri = browser.runtime.getURL("/options.html");
+  const redirectUri = `${discoveredInstanceUrl}/oauth/browser-extension/callback`;
   const { authorizeUrl, pendingAuthorization } = await createAuthorizationRequest({
     discovery,
     instanceUrl: discoveredInstanceUrl,

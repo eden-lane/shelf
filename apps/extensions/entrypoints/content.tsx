@@ -11,6 +11,11 @@ export default defineContentScript({
   runAt: "document_idle",
   noScriptStartedPostMessage: true,
   main() {
+    if (isOAuthCallbackPage()) {
+      finishOAuthCallbackFromPage();
+      return;
+    }
+
     browser.runtime.onMessage.addListener((message) => {
       if (isToggleMessage(message)) {
         toggleSavePanel(message.previewImageUrl);
@@ -52,6 +57,39 @@ const closeSavePanel = () => {
   host = null;
 };
 
+const isOAuthCallbackPage = () =>
+  location.pathname === "/oauth/browser-extension/callback" &&
+  (new URL(location.href).searchParams.has("code") || new URL(location.href).searchParams.has("error"));
+
+const finishOAuthCallbackFromPage = () => {
+  const root = document.createElement("main");
+
+  root.style.cssText =
+    "min-height:100vh;display:grid;place-items:center;margin:0;background:#f8fafc;color:#20242d;font:14px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
+  root.textContent = "Finishing Shelf connection...";
+  document.documentElement.replaceChildren(document.createElement("head"), document.createElement("body"));
+  document.body.append(root);
+
+  browser.runtime
+    .sendMessage({
+      callbackUrl: location.href,
+      type: "shelf:oauthCallback"
+    })
+    .then((response) => {
+      if (isRuntimeResponse(response) && response.ok) {
+        root.textContent = "Shelf is connected. You can close this tab.";
+        return;
+      }
+
+      const error =
+        isRuntimeResponse(response) && !response.ok ? response.error : "Unable to connect Shelf.";
+      root.textContent = error;
+    })
+    .catch((error: unknown) => {
+      root.textContent = error instanceof Error ? error.message : "Unable to connect Shelf.";
+    });
+};
+
 const isToggleMessage = (
   message: unknown
 ): message is { previewImageUrl: string | null; type: "shelf:toggle-save-panel" } =>
@@ -59,6 +97,11 @@ const isToggleMessage = (
   message !== null &&
   "type" in message &&
   message.type === "shelf:toggle-save-panel";
+
+const isRuntimeResponse = (
+  value: unknown
+): value is { ok: true; value: unknown } | { ok: false; error: string } =>
+  typeof value === "object" && value !== null && "ok" in value;
 
 const readActivePage = (previewImageUrl: string | null): ActivePage => {
   const title = readMeta(["meta[property='og:title']", "meta[name='twitter:title']"]) || document.title;

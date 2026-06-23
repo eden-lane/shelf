@@ -257,6 +257,10 @@ export const createApp = (options: AppOptions) => {
     return context.body(null, 200);
   });
 
+  app.get("/oauth/browser-extension/callback", (context) =>
+    context.html(browserExtensionCallbackPageHtml(), 200)
+  );
+
   app.get("/auth/session", async (context) => {
     const { currentUser } = await resolveAuthContext(context);
     const registration = options.dependencies.db
@@ -532,13 +536,27 @@ const oauthOptionsForRequest = (
   context: Parameters<typeof getCookie>[0],
   configuredOptions: OAuthServerOptions | undefined
 ): OAuthServerOptions => {
-  if (typeof configuredOptions?.developmentRedirects === "boolean") {
-    return configuredOptions;
-  }
+  const origin = requestOrigin(context);
+  const browserExtensionRedirectUri = `${origin}/oauth/browser-extension/callback`;
+  const configuredBrowserExtensionRedirectUris =
+    configuredOptions?.clients?.["browser-extension"]?.redirectUris ?? [];
+  const browserExtensionRedirectUris = [
+    ...new Set([...configuredBrowserExtensionRedirectUris, browserExtensionRedirectUri])
+  ];
 
   return {
     ...configuredOptions,
-    developmentRedirects: isLocalDevelopmentOrigin(requestOrigin(context))
+    clients: {
+      ...configuredOptions?.clients,
+      "browser-extension": {
+        ...configuredOptions?.clients?.["browser-extension"],
+        redirectUris: browserExtensionRedirectUris
+      }
+    },
+    developmentRedirects:
+      typeof configuredOptions?.developmentRedirects === "boolean"
+        ? configuredOptions.developmentRedirects
+        : isLocalDevelopmentOrigin(origin)
   };
 };
 
@@ -659,6 +677,27 @@ const consentPageHtml = (request: ReturnType<typeof parseOAuthAuthorizationReque
   </body>
 </html>`;
 };
+
+const browserExtensionCallbackPageHtml = () => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connect Shelf</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; color: #20242d; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: min(420px, calc(100vw - 32px)); text-align: center; }
+      h1 { margin: 0 0 8px; font-size: 18px; font-weight: 500; line-height: 1.4; }
+      p { margin: 0; color: #697080; font-size: 14px; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Finishing Shelf connection</h1>
+      <p>You can close this tab after the extension confirms the connection.</p>
+    </main>
+  </body>
+</html>`;
 
 const clientLabel = (clientId: string) =>
   clientId === "browser-extension"
