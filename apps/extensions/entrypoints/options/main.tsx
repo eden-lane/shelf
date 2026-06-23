@@ -1,35 +1,32 @@
 import "./style.css";
 import { createSignal, onMount } from "solid-js";
 import { render } from "solid-js/web";
-import { rpcCall } from "../../lib/rpc";
-import { defaultApiUrl, getApiBaseUrl, saveApiBaseUrl } from "../../lib/settings";
-
-interface CurrentUserResponse {
-  libraries: Array<{
-    id: string;
-    kind: "personal" | "organization";
-    name: string;
-  }>;
-}
+import { browser } from "wxt/browser";
+import {
+  defaultShelfInstanceUrl,
+  getShelfInstanceUrl,
+  saveShelfInstanceUrl
+} from "../../lib/settings";
 
 type MessageTone = "error" | "neutral" | "success";
 
 const App = () => {
-  const [apiUrl, setApiUrl] = createSignal("");
+  const [instanceUrl, setInstanceUrl] = createSignal("");
+  const [isConnected, setIsConnected] = createSignal(false);
   const [isBusy, setIsBusy] = createSignal(false);
   const [message, setMessage] = createSignal("");
   const [messageTone, setMessageTone] = createSignal<MessageTone>("neutral");
 
   onMount(async () => {
-    setApiUrl(await getApiBaseUrl());
+    await loadConnection();
   });
 
   const saveSettings = async () => {
     setIsBusy(true);
 
     try {
-      const normalizedApiUrl = await saveApiBaseUrl(apiUrl());
-      setApiUrl(normalizedApiUrl);
+      const normalizedInstanceUrl = await saveShelfInstanceUrl(instanceUrl());
+      setInstanceUrl(normalizedInstanceUrl);
       writeMessage("Saved", "success");
     } catch (error) {
       writeMessage(errorMessage(error), "error");
@@ -38,14 +35,19 @@ const App = () => {
     }
   };
 
-  const testConnection = async () => {
+  const connect = async () => {
     setIsBusy(true);
-    writeMessage("Testing", "neutral");
+    writeMessage("Connecting", "neutral");
 
     try {
-      const normalizedApiUrl = await saveApiBaseUrl(apiUrl());
-      setApiUrl(normalizedApiUrl);
-      await rpcCall<CurrentUserResponse>(normalizedApiUrl, "currentUser", undefined);
+      const normalizedInstanceUrl = await saveShelfInstanceUrl(instanceUrl());
+      setInstanceUrl(normalizedInstanceUrl);
+      const response = await sendRuntimeMessage<{ instanceUrl: string; connected: boolean }>({
+        type: "shelf:connect",
+        instanceUrl: normalizedInstanceUrl
+      });
+      setInstanceUrl(response.instanceUrl);
+      setIsConnected(response.connected);
       writeMessage("Connected", "success");
     } catch (error) {
       writeMessage(errorMessage(error), "error");
@@ -54,19 +56,48 @@ const App = () => {
     }
   };
 
-  const resetSettings = async () => {
-    setApiUrl(defaultApiUrl);
+  const disconnect = async () => {
     setIsBusy(true);
 
     try {
-      const normalizedApiUrl = await saveApiBaseUrl(defaultApiUrl);
-      setApiUrl(normalizedApiUrl);
+      const response = await sendRuntimeMessage<{ instanceUrl: string; connected: boolean }>({
+        type: "shelf:disconnect"
+      });
+      setInstanceUrl(response.instanceUrl);
+      setIsConnected(response.connected);
+      writeMessage("Disconnected", "success");
+    } catch (error) {
+      writeMessage(errorMessage(error), "error");
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const resetSettings = async () => {
+    setInstanceUrl(defaultShelfInstanceUrl);
+    setIsBusy(true);
+
+    try {
+      const normalizedInstanceUrl = await saveShelfInstanceUrl(defaultShelfInstanceUrl);
+      setInstanceUrl(normalizedInstanceUrl);
       writeMessage("Saved", "success");
     } catch (error) {
       writeMessage(errorMessage(error), "error");
     } finally {
       setIsBusy(false);
     }
+  };
+
+  const loadConnection = async () => {
+    const response = await sendRuntimeMessage<{ instanceUrl: string; connected: boolean }>({
+      type: "shelf:getConnection"
+    }).catch(async () => ({
+      instanceUrl: await getShelfInstanceUrl(),
+      connected: false
+    }));
+
+    setInstanceUrl(response.instanceUrl);
+    setIsConnected(response.connected);
   };
 
   const writeMessage = (text: string, tone: MessageTone) => {
@@ -89,16 +120,16 @@ const App = () => {
         }}
       >
         <label class="field">
-          <span>API URL</span>
+          <span>Shelf instance</span>
           <input
-            name="apiUrl"
+            name="instanceUrl"
             type="url"
             autocomplete="url"
             spellcheck={false}
             required
-            value={apiUrl()}
+            value={instanceUrl()}
             disabled={isBusy()}
-            onInput={(event) => setApiUrl(event.currentTarget.value)}
+            onInput={(event) => setInstanceUrl(event.currentTarget.value)}
           />
         </label>
 
@@ -110,8 +141,11 @@ const App = () => {
           <button class="primary-button" type="submit" disabled={isBusy()}>
             Save
           </button>
-          <button class="secondary-button" type="button" disabled={isBusy()} onClick={() => void testConnection()}>
-            Test
+          <button class="secondary-button" type="button" disabled={isBusy()} onClick={() => void connect()}>
+            {isConnected() ? "Reconnect" : "Connect"}
+          </button>
+          <button class="secondary-button" type="button" disabled={isBusy() || !isConnected()} onClick={() => void disconnect()}>
+            Disconnect
           </button>
           <button class="secondary-button" type="button" disabled={isBusy()} onClick={() => void resetSettings()}>
             Reset
@@ -124,6 +158,27 @@ const App = () => {
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to connect to Shelf";
+
+const sendRuntimeMessage = async <T,>(message: Record<string, unknown>): Promise<T> => {
+  const response = await browser.runtime.sendMessage(message);
+
+  if (
+    !response ||
+    typeof response !== "object" ||
+    !("ok" in response) ||
+    typeof response.ok !== "boolean"
+  ) {
+    throw new Error("Shelf extension background is not available.");
+  }
+
+  if (!response.ok) {
+    const error = "error" in response && typeof response.error === "string" ? response.error : null;
+
+    throw new Error(error ?? "Shelf request failed.");
+  }
+
+  return response.value as T;
+};
 
 const root = document.querySelector("#root");
 

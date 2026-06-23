@@ -8,6 +8,7 @@ import type {
   CreateSavedItemInput,
   CreateFolderInput,
   CreateTagInput,
+  ConnectedApp,
   DeleteSavedItemInput,
   CurrentUserResponse,
   DeleteFolderInput,
@@ -127,6 +128,24 @@ export const login = async (
 
 export const logout = async (): Promise<void> => {
   const response = await fetch(new URL("/auth/logout", apiBaseUrl), {
+    credentials: "include",
+    method: "POST"
+  });
+
+  await readJsonResponse(response);
+};
+
+export const getConnectedApps = async (): Promise<ConnectedApp[]> => {
+  const response = await fetch(new URL("/auth/connected-apps", apiBaseUrl), {
+    credentials: "include"
+  });
+  const body = await readJsonResponse<{ apps: ConnectedApp[] }>(response);
+
+  return body.apps;
+};
+
+export const revokeConnectedApp = async (grantId: string): Promise<void> => {
+  const response = await fetch(new URL(`/auth/connected-apps/${grantId}/revoke`, apiBaseUrl), {
     credentials: "include",
     method: "POST"
   });

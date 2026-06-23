@@ -1,9 +1,22 @@
 import {
+  authorizationRequiresConsent,
+  createOAuthAuthorizationCode,
+  exchangeOAuthAuthorizationCode,
+  getOAuthAuthorizationServerMetadata,
+  getShelfDiscovery,
   getRegistrationStatus,
+  listConnectedApps,
   login,
+  parseOAuthAuthorizationRequest,
+  refreshOAuthTokens,
+  resolveOAuthBearerToken,
+  revokeConnectedApp,
+  revokeOAuthToken,
   revokeSessionToken,
   resolveSessionToken,
   signup,
+  type OAuthServerOptions,
+  type OAuthScope,
   type RegistrationMode
 } from "@shelf/api/auth";
 import {
@@ -33,6 +46,7 @@ export interface AppOptions {
   authMode?: "session" | "none";
   registrationMode?: RegistrationMode;
   allowedOrigins?: string[];
+  oauth?: OAuthServerOptions;
   sessionCookieSecure?: boolean;
   staticDir?: string | null;
 }
@@ -75,8 +89,173 @@ export const createApp = (options: AppOptions) => {
     return context.json(health, health.status === "ok" ? 200 : 503);
   });
 
+  app.get("/.well-known/shelf", (context) =>
+    context.json(getShelfDiscovery({ issuer: requestOrigin(context), options: options.oauth }))
+  );
+
+  app.get("/.well-known/oauth-authorization-server", (context) =>
+    context.json(getOAuthAuthorizationServerMetadata({ issuer: requestOrigin(context) }))
+  );
+
+  app.get("/oauth/authorize", async (context) => {
+    if (!options.dependencies.db) {
+      return oauthErrorResponse(context, "invalid_request", 404);
+    }
+
+    let authorizationRequest: ReturnType<typeof parseOAuthAuthorizationRequest>;
+
+    try {
+      authorizationRequest = parseOAuthAuthorizationRequest(
+        new URL(context.req.url).searchParams,
+        options.oauth
+      );
+    } catch (error) {
+      return oauthErrorResponse(context, oauthErrorCode(error), 400);
+    }
+
+    const authContext = await resolveAuthContext(context);
+
+    if (!authContext.currentUser) {
+      const loginUrl = new URL("/", requestOrigin(context));
+      loginUrl.searchParams.set("oauth_return", `${context.req.path}?${new URL(context.req.url).searchParams}`);
+
+      return context.redirect(loginUrl.toString(), 302);
+    }
+
+    try {
+      if (
+        await authorizationRequiresConsent(
+          options.dependencies.db,
+          authContext.currentUser.user.id,
+          authorizationRequest
+        )
+      ) {
+        return context.html(consentPageHtml(authorizationRequest), 200);
+      }
+
+      const redirectUrl = await createOAuthAuthorizationCode(
+        options.dependencies.db,
+        authContext.currentUser,
+        authorizationRequest,
+        { approved: false }
+      );
+
+      return context.redirect(redirectUrl, 302);
+    } catch (error) {
+      return oauthErrorResponse(context, oauthErrorCode(error), 400);
+    }
+  });
+
+  app.post("/oauth/authorize/consent", async (context) => {
+    const originError = rejectDisallowedOrigin(context);
+
+    if (originError) {
+      return originError;
+    }
+
+    if (!options.dependencies.db) {
+      return oauthErrorResponse(context, "invalid_request", 404);
+    }
+
+    const authContext = await resolveAuthContext(context);
+
+    if (!authContext.currentUser) {
+      return context.json({ error: "Authentication is required" }, 401);
+    }
+
+    const body = await readRequestBody(context.req.raw);
+    const authorizationParams = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(body)) {
+      authorizationParams.set(key, value);
+    }
+
+    let authorizationRequest: ReturnType<typeof parseOAuthAuthorizationRequest>;
+
+    try {
+      authorizationRequest = parseOAuthAuthorizationRequest(authorizationParams, options.oauth);
+    } catch (error) {
+      return oauthErrorResponse(context, oauthErrorCode(error), 400);
+    }
+
+    if (body.decision !== "approve") {
+      const redirectUrl = new URL(authorizationRequest.redirectUri);
+      redirectUrl.searchParams.set("error", "access_denied");
+      redirectUrl.searchParams.set("state", authorizationRequest.state);
+
+      return context.redirect(redirectUrl.toString(), 302);
+    }
+
+    try {
+      const redirectUrl = await createOAuthAuthorizationCode(
+        options.dependencies.db,
+        authContext.currentUser,
+        authorizationRequest,
+        { approved: true }
+      );
+
+      return context.redirect(redirectUrl, 302);
+    } catch (error) {
+      return oauthErrorResponse(context, oauthErrorCode(error), 400);
+    }
+  });
+
+  app.post("/oauth/token", async (context) => {
+    if (!options.dependencies.db) {
+      return oauthErrorResponse(context, "invalid_request", 404);
+    }
+
+    const body = await readRequestBody(context.req.raw);
+
+    try {
+      const grantType = body.grant_type;
+      const response =
+        grantType === "authorization_code"
+          ? await exchangeOAuthAuthorizationCode(options.dependencies.db, {
+              clientId: body.client_id,
+              code: body.code,
+              redirectUri: body.redirect_uri,
+              codeVerifier: body.code_verifier
+            })
+          : grantType === "refresh_token"
+            ? await refreshOAuthTokens(options.dependencies.db, {
+                clientId: body.client_id,
+                refreshToken: body.refresh_token
+              })
+            : null;
+
+      if (!response) {
+        return oauthErrorResponse(context, "unsupported_grant_type", 400);
+      }
+
+      context.header("cache-control", "no-store");
+      context.header("pragma", "no-cache");
+
+      return context.json(response);
+    } catch (error) {
+      return oauthErrorResponse(context, oauthErrorCode(error), 400);
+    }
+  });
+
+  app.post("/oauth/revoke", async (context) => {
+    if (!options.dependencies.db) {
+      return context.body(null, 200);
+    }
+
+    const body = await readRequestBody(context.req.raw);
+
+    if (body.token) {
+      await revokeOAuthToken(options.dependencies.db, {
+        clientId: body.client_id || null,
+        token: body.token
+      });
+    }
+
+    return context.body(null, 200);
+  });
+
   app.get("/auth/session", async (context) => {
-    const currentUser = await resolveCurrentUser(context);
+    const { currentUser } = await resolveAuthContext(context);
     const registration = options.dependencies.db
       ? await getRegistrationStatus(options.dependencies.db, registrationMode)
       : { available: false, mode: registrationMode };
@@ -85,6 +264,34 @@ export const createApp = (options: AppOptions) => {
       registration,
       user: currentUser ? getCurrentUserResponse(currentUser) : null
     });
+  });
+
+  app.get("/auth/connected-apps", async (context) => {
+    const { currentUser } = await resolveAuthContext(context);
+
+    if (!currentUser || !options.dependencies.db) {
+      return context.json({ error: "Authentication is required" }, 401);
+    }
+
+    return context.json({ apps: await listConnectedApps(options.dependencies.db, currentUser) });
+  });
+
+  app.post("/auth/connected-apps/:grantId/revoke", async (context) => {
+    const originError = rejectDisallowedOrigin(context);
+
+    if (originError) {
+      return originError;
+    }
+
+    const { currentUser } = await resolveAuthContext(context);
+
+    if (!currentUser || !options.dependencies.db) {
+      return context.json({ error: "Authentication is required" }, 401);
+    }
+
+    await revokeConnectedApp(options.dependencies.db, currentUser, context.req.param("grantId"));
+
+    return context.json({ ok: true });
   });
 
   app.post("/auth/signup", authLimiter, async (context) => {
@@ -167,7 +374,7 @@ export const createApp = (options: AppOptions) => {
   });
 
   app.get("/me", async (context) => {
-    const currentUser = await resolveCurrentUser(context);
+    const { currentUser } = await resolveAuthContext(context);
 
     if (!currentUser) {
       return context.json({ error: "No current user is configured" }, 401);
@@ -205,12 +412,13 @@ export const createApp = (options: AppOptions) => {
       return originError;
     }
 
-    const currentUser = await resolveCurrentUser(context);
+    const { currentUser, oauthScopes } = await resolveAuthContext(context);
     const rpcHandler = new RPCHandler(
       createRpcRouter({
         savedItemsStore,
         savedItemEnrichmentQueue: options.savedItemEnrichmentQueue,
         currentUser: currentUser ?? undefined,
+        oauthScopes,
         dependencies: options.dependencies,
         savedItemSearchIndex: options.savedItemSearchIndex
       })
@@ -238,16 +446,37 @@ export const createApp = (options: AppOptions) => {
 
   return app;
 
-  async function resolveCurrentUser(context: Parameters<typeof getCookie>[0]) {
+  async function resolveAuthContext(context: Parameters<typeof getCookie>[0]): Promise<{
+    currentUser: CurrentIdentity | null;
+    oauthScopes?: ReadonlySet<OAuthScope>;
+  }> {
     if (options.currentUser) {
-      return options.currentUser;
+      return { currentUser: options.currentUser };
     }
 
     if (authMode !== "session" || !options.dependencies.db) {
-      return null;
+      return { currentUser: null };
     }
 
-    return resolveSessionToken(options.dependencies.db, getCookie(context, SESSION_COOKIE_NAME));
+    const bearerToken = readBearerToken(context.req.header("authorization"));
+
+    if (bearerToken) {
+      const identity = await resolveOAuthBearerToken(options.dependencies.db, bearerToken);
+
+      if (identity) {
+        return {
+          currentUser: identity.currentUser,
+          oauthScopes: new Set(identity.scopes)
+        };
+      }
+    }
+
+    return {
+      currentUser: await resolveSessionToken(
+        options.dependencies.db,
+        getCookie(context, SESSION_COOKIE_NAME)
+      )
+    };
   }
 
   function rejectDisallowedOrigin(context: Parameters<typeof getCookie>[0]) {
@@ -287,7 +516,7 @@ const requestOrigin = (context: Parameters<typeof getCookie>[0]) => {
   const host = forwardedHost ?? context.req.header("host") ?? requestUrl.host;
 
   if (!host) {
-    return null;
+    return requestUrl.origin;
   }
 
   const forwardedProto = context.req.header("x-forwarded-proto");
@@ -295,6 +524,137 @@ const requestOrigin = (context: Parameters<typeof getCookie>[0]) => {
 
   return `${protocol}://${host}`;
 };
+
+const readBearerToken = (authorization: string | undefined) => {
+  if (!authorization) {
+    return null;
+  }
+
+  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+
+  return match?.[1] ?? null;
+};
+
+const readRequestBody = async (request: Request): Promise<Record<string, string>> => {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    const body = await request.json().catch(() => null);
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(body).flatMap(([key, value]) =>
+        typeof value === "string" ? [[key, value]] : []
+      )
+    );
+  }
+
+  const formData = await request.formData().catch(() => null);
+
+  if (!formData) {
+    return {};
+  }
+
+  const body: Record<string, string> = {};
+
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === "string") {
+      body[key] = value;
+    }
+  }
+
+  return body;
+};
+
+const consentPageHtml = (request: ReturnType<typeof parseOAuthAuthorizationRequest>) => {
+  const fields = {
+    response_type: request.responseType,
+    client_id: request.clientId,
+    redirect_uri: request.redirectUri,
+    scope: request.scopes.join(" "),
+    state: request.state,
+    code_challenge: request.codeChallenge,
+    code_challenge_method: request.codeChallengeMethod,
+    device_name: request.deviceName ?? "",
+    platform: request.platform ?? "",
+    browser: request.browser ?? "",
+    extension_version: request.extensionVersion ?? ""
+  };
+  const hiddenFields = Object.entries(fields)
+    .map(
+      ([key, value]) =>
+        `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`
+    )
+    .join("");
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Connect Shelf</title>
+    <style>
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; color: #0f172a; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      main { width: min(420px, calc(100vw - 32px)); border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; padding: 20px; box-shadow: 0 1px 2px rgb(15 23 42 / 8%); }
+      h1 { margin: 0 0 8px; font-size: 18px; line-height: 1.4; }
+      p { margin: 0 0 14px; color: #475569; font-size: 14px; line-height: 1.5; }
+      ul { margin: 0 0 18px; padding-left: 18px; color: #334155; font-size: 14px; line-height: 1.5; }
+      .actions { display: flex; gap: 10px; }
+      button { height: 40px; border-radius: 8px; border: 1px solid #d1d5db; padding: 0 14px; font: inherit; font-size: 14px; font-weight: 600; background: white; color: #111827; cursor: pointer; }
+      button.primary { border-color: #0f172a; background: #0f172a; color: white; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Connect ${escapeHtml(clientLabel(request.clientId))}</h1>
+      <p>This app wants access to your Shelf account.</p>
+      <ul>${request.scopes.map((scope) => `<li>${escapeHtml(scopeLabel(scope))}</li>`).join("")}</ul>
+      <form method="post" action="/oauth/authorize/consent">
+        ${hiddenFields}
+        <div class="actions">
+          <button class="primary" type="submit" name="decision" value="approve">Allow</button>
+          <button type="submit" name="decision" value="deny">Deny</button>
+        </div>
+      </form>
+    </main>
+  </body>
+</html>`;
+};
+
+const clientLabel = (clientId: string) =>
+  clientId === "browser-extension"
+    ? "Shelf Browser Extension"
+    : clientId === "raycast-extension"
+      ? "Raycast"
+      : "Shelf client";
+
+const scopeLabel = (scope: string) =>
+  scope === "read:saved_items"
+    ? "Read saved items, folders, and tags"
+    : scope === "write:saved_items"
+      ? "Create and change saved items, folders, and tags"
+      : scope;
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;");
+
+const oauthErrorCode = (error: unknown) =>
+  error instanceof Error && "code" in error && typeof error.code === "string"
+    ? error.code
+    : "invalid_request";
+
+const oauthErrorResponse = (
+  context: Parameters<typeof getCookie>[0],
+  error: string,
+  status: 400 | 404
+) => context.json({ error }, status);
 
 const readStaticResponse = async (staticRoot: string, requestPath: string) => {
   const pathname = safeDecodePath(requestPath);

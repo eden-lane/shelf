@@ -19,6 +19,7 @@ const AppContent = () => {
     queryKey: ["auth-session"],
     queryFn: getAuthSession
   });
+  const oauthReturnUrl = readOauthReturnUrl();
 
   if (authSession.isLoading) {
     return (
@@ -31,6 +32,7 @@ const AppContent = () => {
   if (!authSession.data?.user) {
     return (
       <AuthScreen
+        continueUrl={oauthReturnUrl}
         registration={authSession.data?.registration ?? { available: false, mode: "closed" }}
       />
     );
@@ -40,3 +42,17 @@ const AppContent = () => {
 };
 
 export default App;
+
+const readOauthReturnUrl = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const value = new URLSearchParams(window.location.search).get("oauth_return");
+
+  if (!value || !value.startsWith("/oauth/authorize")) {
+    return null;
+  }
+
+  return value;
+};

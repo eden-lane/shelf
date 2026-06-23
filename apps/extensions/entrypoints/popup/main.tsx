@@ -4,7 +4,6 @@ import { render } from "solid-js/web";
 import { browser } from "wxt/browser";
 import { DEFAULT_FOLDER_ICON_COLOR, TablerIcon } from "../../lib/folderIcons";
 import { rpcCall } from "../../lib/rpc";
-import { getApiBaseUrl, hasApiBaseUrlPermission } from "../../lib/settings";
 
 interface CurrentUserResponse {
   libraries: Array<{
@@ -130,19 +129,13 @@ const App = () => {
     writeMessage("Loading folders and tags", "neutral");
 
     try {
-      const apiUrl = await getApiBaseUrl();
-
-      if (!(await hasApiBaseUrlPermission(apiUrl))) {
-        throw new Error("Open Settings and test the API URL to grant Shelf access.");
-      }
-
       const page = activePage();
       const [userResponse, folderResponse, tagResponse, locationResponse] = await Promise.all([
-        rpcCall<CurrentUserResponse>(apiUrl, "currentUser", undefined),
-        rpcCall<FolderItem[]>(apiUrl, "folders/list", null),
-        rpcCall<TagItem[]>(apiUrl, "tags/list", null),
+        rpcCall<CurrentUserResponse>("currentUser", undefined),
+        rpcCall<FolderItem[]>("folders/list", null),
+        rpcCall<TagItem[]>("tags/list", null),
         page
-          ? rpcCall<SavedItemLocation[]>(apiUrl, "savedItems/locations", { url: page.url })
+          ? rpcCall<SavedItemLocation[]>("savedItems/locations", { url: page.url })
           : Promise.resolve([])
       ]);
 
@@ -185,9 +178,7 @@ const App = () => {
     writeMessage("Saving page", "neutral");
 
     try {
-      const apiUrl = await getApiBaseUrl();
-
-      await rpcCall(apiUrl, "savedItems/create", {
+      await rpcCall("savedItems/create", {
         folderId: selectedFolderId() || undefined,
         tagIds: selectedTagIds(),
         url: page.url

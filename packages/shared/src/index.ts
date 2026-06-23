@@ -54,6 +54,18 @@ export interface AuthCredentials {
   locale?: string | null;
 }
 
+export interface ConnectedApp {
+  id: string;
+  clientId: string;
+  clientName: string;
+  deviceName: string | null;
+  platform: string | null;
+  browser: string | null;
+  scopes: Array<"read:saved_items" | "write:saved_items">;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface SavedItem {
   id: string;
   libraryId: string;

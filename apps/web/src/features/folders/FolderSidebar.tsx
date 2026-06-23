@@ -14,6 +14,7 @@ import {
   IconLayoutSidebarLeftCollapse,
   IconLogout2,
   IconPlus,
+  IconPlugConnected,
   IconSearch,
   IconTag,
   IconTagPlus
@@ -56,6 +57,7 @@ export const FolderSidebar = ({
   isSigningOut,
   onAddSavedItem,
   onHideSidebar,
+  onOpenConnectedApps,
   onSignOut,
   onSearchQueryChange,
   onSelectFolder,
@@ -76,6 +78,7 @@ export const FolderSidebar = ({
   isSigningOut: boolean;
   onAddSavedItem: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
+  onOpenConnectedApps: () => void;
   onSignOut: () => void;
   onSearchQueryChange: (query: string) => void;
   onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
@@ -437,6 +440,15 @@ export const FolderSidebar = ({
         })}
       </div>
       <div className="mt-auto border-t border-gray-200/70 pt-4">
+        <button
+          className="mb-1 inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Connected apps"
+          type="button"
+          onClick={onOpenConnectedApps}
+        >
+          <IconPlugConnected size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+          <span>Connected apps</span>
+        </button>
         <button
           className="inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 disabled:cursor-not-allowed disabled:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
           aria-label="Sign out"

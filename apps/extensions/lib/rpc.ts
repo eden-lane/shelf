@@ -1,32 +1,24 @@
-export const rpcCall = async <T>(apiUrl: string, path: string, input: unknown): Promise<T> => {
-  const response = await fetch(`${apiUrl}/rpc/${path}`, {
-    body: JSON.stringify({ json: input }),
-    headers: {
-      "content-type": "application/json"
-    },
-    method: "POST"
+import { browser } from "wxt/browser";
+
+export const rpcCall = async <T>(path: string, input: unknown): Promise<T> => {
+  const response = await browser.runtime.sendMessage({
+    type: "shelf:rpc",
+    path,
+    input
   });
-  const body = await response.json().catch(() => null);
+
+  if (!isRuntimeResponse(response)) {
+    throw new Error("Shelf extension background is not available.");
+  }
 
   if (!response.ok) {
-    throw new Error(readRpcError(body) ?? `Request failed with ${response.status}`);
+    throw new Error(response.error ?? "Request failed");
   }
 
-  return body?.json as T;
+  return response.value as T;
 };
 
-const readRpcError = (body: unknown) => {
-  if (!body || typeof body !== "object") {
-    return null;
-  }
-
-  const error = "error" in body ? body.error : null;
-
-  if (!error || typeof error !== "object") {
-    return null;
-  }
-
-  const message = "message" in error ? error.message : null;
-
-  return typeof message === "string" ? message : null;
-};
+const isRuntimeResponse = (
+  value: unknown
+): value is { ok: true; value: unknown } | { ok: false; error: string } =>
+  typeof value === "object" && value !== null && "ok" in value;

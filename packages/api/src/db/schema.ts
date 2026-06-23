@@ -76,6 +76,99 @@ export const sessions = pgTable(
   ]
 );
 
+export const oauthGrants = pgTable(
+  "oauth_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    clientName: text("client_name").notNull(),
+    deviceName: text("device_name"),
+    platform: text("platform"),
+    browser: text("browser"),
+    scopes: text("scopes").notNull(),
+    compromisedAt: timestamp("compromised_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => [
+    index("oauth_grants_user_idx").on(table.userId),
+    index("oauth_grants_user_client_idx").on(table.userId, table.clientId)
+  ]
+);
+
+export const oauthAuthorizationCodes = pgTable(
+  "oauth_authorization_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    grantId: uuid("grant_id")
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    redirectUri: text("redirect_uri").notNull(),
+    codeHash: text("code_hash").notNull(),
+    codeChallenge: text("code_challenge").notNull(),
+    codeChallengeMethod: text("code_challenge_method").notNull(),
+    scopes: text("scopes").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => [
+    index("oauth_authorization_codes_grant_idx").on(table.grantId),
+    uniqueIndex("oauth_authorization_codes_hash_unique_idx").on(table.codeHash)
+  ]
+);
+
+export const oauthAccessTokens = pgTable(
+  "oauth_access_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    grantId: uuid("grant_id")
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    scopes: text("scopes").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => [
+    index("oauth_access_tokens_grant_idx").on(table.grantId),
+    uniqueIndex("oauth_access_tokens_hash_unique_idx").on(table.tokenHash)
+  ]
+);
+
+export const oauthRefreshTokens = pgTable(
+  "oauth_refresh_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    grantId: uuid("grant_id")
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    rotatedFromId: uuid("rotated_from_id"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    replacedAt: timestamp("replaced_at", { withTimezone: true }),
+    ...timestamps
+  },
+  (table) => [
+    index("oauth_refresh_tokens_grant_idx").on(table.grantId),
+    uniqueIndex("oauth_refresh_tokens_hash_unique_idx").on(table.tokenHash),
+    foreignKey({
+      columns: [table.rotatedFromId],
+      foreignColumns: [table.id],
+      name: "oauth_refresh_tokens_rotated_from_fk"
+    })
+  ]
+);
+
 export const organizations = pgTable(
   "organizations",
   {
@@ -325,6 +418,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   memberships: many(organizationMemberships),
   libraries: many(libraries),
   createdSavedItems: many(savedItems),
+  oauthGrants: many(oauthGrants),
   sessions: many(sessions)
 }));
 
@@ -332,6 +426,45 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, {
     fields: [sessions.userId],
     references: [users.id]
+  })
+}));
+
+export const oauthGrantsRelations = relations(oauthGrants, ({ many, one }) => ({
+  user: one(users, {
+    fields: [oauthGrants.userId],
+    references: [users.id]
+  }),
+  authorizationCodes: many(oauthAuthorizationCodes),
+  accessTokens: many(oauthAccessTokens),
+  refreshTokens: many(oauthRefreshTokens)
+}));
+
+export const oauthAuthorizationCodesRelations = relations(
+  oauthAuthorizationCodes,
+  ({ one }) => ({
+    grant: one(oauthGrants, {
+      fields: [oauthAuthorizationCodes.grantId],
+      references: [oauthGrants.id]
+    })
+  })
+);
+
+export const oauthAccessTokensRelations = relations(oauthAccessTokens, ({ one }) => ({
+  grant: one(oauthGrants, {
+    fields: [oauthAccessTokens.grantId],
+    references: [oauthGrants.id]
+  })
+}));
+
+export const oauthRefreshTokensRelations = relations(oauthRefreshTokens, ({ one }) => ({
+  grant: one(oauthGrants, {
+    fields: [oauthRefreshTokens.grantId],
+    references: [oauthGrants.id]
+  }),
+  rotatedFrom: one(oauthRefreshTokens, {
+    fields: [oauthRefreshTokens.rotatedFromId],
+    references: [oauthRefreshTokens.id],
+    relationName: "oauthRefreshTokenRotation"
   })
 }));
 
@@ -455,6 +588,14 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type OauthGrant = typeof oauthGrants.$inferSelect;
+export type NewOauthGrant = typeof oauthGrants.$inferInsert;
+export type OauthAuthorizationCode = typeof oauthAuthorizationCodes.$inferSelect;
+export type NewOauthAuthorizationCode = typeof oauthAuthorizationCodes.$inferInsert;
+export type OauthAccessToken = typeof oauthAccessTokens.$inferSelect;
+export type NewOauthAccessToken = typeof oauthAccessTokens.$inferInsert;
+export type OauthRefreshToken = typeof oauthRefreshTokens.$inferSelect;
+export type NewOauthRefreshToken = typeof oauthRefreshTokens.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 export type OrganizationMembership = typeof organizationMemberships.$inferSelect;

@@ -18,6 +18,7 @@ const app = createApp({
   authMode: config.authMode,
   registrationMode: config.registrationMode,
   allowedOrigins: config.allowedOrigins,
+  oauth: config.oauth,
   sessionCookieSecure: config.sessionCookieSecure,
   staticDir: config.staticDir
 });

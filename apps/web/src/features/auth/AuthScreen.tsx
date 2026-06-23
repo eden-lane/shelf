@@ -5,12 +5,13 @@ import { IconLock, IconLogin2, IconUserPlus } from "@tabler/icons-react";
 import { login, signup } from "../../api";
 
 interface AuthScreenProps {
+  continueUrl?: string | null;
   registration: RegistrationStatus;
 }
 
 type AuthMode = "login" | "signup";
 
-export const AuthScreen = ({ registration }: AuthScreenProps) => {
+export const AuthScreen = ({ continueUrl, registration }: AuthScreenProps) => {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<AuthMode>(registration.available ? "signup" : "login");
   const [email, setEmail] = useState("");
@@ -46,6 +47,10 @@ export const AuthScreen = ({ registration }: AuthScreenProps) => {
         queryClient.invalidateQueries({ queryKey: ["auth-session"] }),
         queryClient.invalidateQueries({ queryKey: ["current-user"] })
       ]);
+
+      if (continueUrl) {
+        window.location.assign(continueUrl);
+      }
     }
   });
   const canSubmit = useMemo(() => {

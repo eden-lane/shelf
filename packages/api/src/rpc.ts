@@ -28,10 +28,12 @@ import {
 import { getCurrentUserResponse, type CurrentIdentity } from "./currentUser";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
+import { hasOAuthScope, type OAuthScope } from "./auth";
 
 export interface RpcRouterOptions {
   dependencies: HealthDependencies;
   currentUser?: CurrentIdentity;
+  oauthScopes?: ReadonlySet<OAuthScope>;
   savedItemsStore?: SavedItemsStore;
   savedItemEnrichmentQueue?: SavedItemEnrichmentQueue;
   savedItemSearchIndex?: SavedItemSearchIndex;
@@ -46,6 +48,8 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       });
     }
 
+    assertOAuthScope(options.oauthScopes, "read:saved_items");
+
     return getCurrentUserResponse(options.currentUser);
   }),
   savedItems: {
@@ -55,6 +59,8 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
           message: "No current user is configured"
         });
       }
+
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
 
       const previewInput = parseSavedItemPreviewInput(input);
 
@@ -82,6 +88,8 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
           message: "No current user is configured"
         });
       }
+
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
 
       if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -171,6 +179,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const savedItem = parseDeleteSavedItemInput(input);
@@ -198,6 +207,8 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
           message: "No current user is configured"
         });
       }
+
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
 
       if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -228,6 +239,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     locations: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const lookup = parseSavedItemLocationsInput(input);
@@ -245,6 +257,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     move: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const move = parseMoveSavedItemsInput(input);
@@ -269,6 +282,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     search: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
       assertSavedItemSearchIndex(options.savedItemSearchIndex);
 
       const search = parseSearchSavedItemsInput(input);
@@ -312,6 +326,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
   tags: {
     create: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseCreateTagInput(input);
@@ -329,6 +344,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseDeleteTagInput(input);
@@ -346,6 +362,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     list: os.handler(() => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       return options.savedItemsStore.listTags({
@@ -354,6 +371,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     move: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseMoveTagInput(input);
@@ -371,6 +389,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     update: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const tag = parseUpdateTagInput(input);
@@ -390,6 +409,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
   folders: {
     create: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseCreateFolderInput(input);
@@ -407,6 +427,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     delete: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseDeleteFolderInput(input);
@@ -424,6 +445,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     list: os.handler(() => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       return options.savedItemsStore.listFolders({
@@ -432,6 +454,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     move: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseMoveFolderInput(input);
@@ -449,6 +472,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     }),
     update: os.handler(async ({ input }) => {
       assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
       assertSavedItemsStore(options.savedItemsStore);
 
       const folder = parseUpdateFolderInput(input);
@@ -879,6 +903,17 @@ function assertSavedItemSearchIndex(
   if (!savedItemSearchIndex) {
     throw new ORPCError("INTERNAL_SERVER_ERROR", {
       message: "Search index is not configured"
+    });
+  }
+}
+
+function assertOAuthScope(
+  availableScopes: ReadonlySet<OAuthScope> | undefined,
+  requiredScope: OAuthScope
+) {
+  if (!hasOAuthScope(availableScopes, requiredScope)) {
+    throw new ORPCError("FORBIDDEN", {
+      message: `Missing OAuth scope: ${requiredScope}`
     });
   }
 }

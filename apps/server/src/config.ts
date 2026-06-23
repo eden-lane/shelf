@@ -1,4 +1,4 @@
-import type { RegistrationMode } from "@shelf/api/auth";
+import type { OAuthServerOptions, RegistrationMode } from "@shelf/api/auth";
 
 export type AuthMode = "session" | "none";
 
@@ -11,6 +11,7 @@ export interface ServerConfig {
   authMode: AuthMode;
   registrationMode: RegistrationMode;
   allowedOrigins: string[];
+  oauth: OAuthServerOptions;
   sessionCookieSecure: boolean;
   staticDir: string | null;
 }
@@ -98,6 +99,42 @@ const sessionCookieSecureFromEnv = () => {
   throw new Error("SESSION_COOKIE_SECURE must be true or false");
 };
 
+const booleanFromEnv = (name: string, fallback: boolean) => {
+  const value = Bun.env[name];
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`${name} must be true or false`);
+};
+
+const listFromEnv = (name: string) =>
+  (Bun.env[name] ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+const oauthFromEnv = (): OAuthServerOptions => ({
+  clients: {
+    "browser-extension": {
+      redirectUris: listFromEnv("OAUTH_BROWSER_EXTENSION_REDIRECT_URIS")
+    },
+    "raycast-extension": {
+      redirectUris: listFromEnv("OAUTH_RAYCAST_EXTENSION_REDIRECT_URIS")
+    }
+  },
+  developmentRedirects: booleanFromEnv("OAUTH_DEV_REDIRECTS", Bun.env.NODE_ENV !== "production")
+});
+
 const staticDirFromEnv = () => {
   if (Bun.env.SHELF_STATIC_DIR) {
     return Bun.env.SHELF_STATIC_DIR;
@@ -130,6 +167,7 @@ export const getConfig = (): ServerConfig => {
     authMode,
     registrationMode: registrationModeFromEnv(),
     allowedOrigins: allowedOriginsFromEnv(port),
+    oauth: oauthFromEnv(),
     sessionCookieSecure: sessionCookieSecureFromEnv(),
     staticDir: staticDirFromEnv()
   };

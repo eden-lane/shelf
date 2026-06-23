@@ -71,6 +71,13 @@
       "when": 1782144443305,
       "tag": "0009_glamorous_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782240000000,
+      "tag": "0010_oauth_foundation",
+      "breakpoints": true
     }
   ]
 }
