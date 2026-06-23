@@ -58,38 +58,38 @@ describe("OAuth authorization request parsing", () => {
     expect(request.scopes).toEqual(["read:saved_items", "write:saved_items"]);
   });
 
-  test("accepts the browser identity redirect pattern only in development mode", () => {
+  test("accepts the browser identity redirect pattern for the browser extension client", () => {
     const params = validParams();
     params.set("redirect_uri", "https://abcdefghijklmnopqrstuvwxyzabcdef.chromiumapp.org/oauth");
 
-    expect(() =>
-      parseOAuthAuthorizationRequest(params, {
-        developmentRedirects: false
-      })
-    ).toThrow("invalid_redirect_uri");
-
     expect(
       parseOAuthAuthorizationRequest(params, {
-        developmentRedirects: true
+        developmentRedirects: false
       }).redirectUri
     ).toBe("https://abcdefghijklmnopqrstuvwxyzabcdef.chromiumapp.org/oauth");
   });
 
-  test("accepts the Safari extension options redirect only in development mode", () => {
+  test("accepts the Safari extension options redirect for the browser extension client", () => {
     const params = validParams();
-    params.set("redirect_uri", "safari-web-extension://12345678-1234-1234-1234-123456789abc/options.html");
+    params.set("redirect_uri", "safari-web-extension://7ABA92F-7CEC-453B-9B64-DE5A37922EA7/options.html");
+
+    expect(
+      parseOAuthAuthorizationRequest(params, {
+        developmentRedirects: false
+      }).redirectUri
+    ).toBe("safari-web-extension://7ABA92F-7CEC-453B-9B64-DE5A37922EA7/options.html");
+  });
+
+  test("keeps browser extension redirects scoped to the browser extension client", () => {
+    const params = validParams();
+    params.set("client_id", "raycast-extension");
+    params.set("redirect_uri", "safari-web-extension://7ABA92F-7CEC-453B-9B64-DE5A37922EA7/options.html");
 
     expect(() =>
       parseOAuthAuthorizationRequest(params, {
         developmentRedirects: false
       })
     ).toThrow("invalid_redirect_uri");
-
-    expect(
-      parseOAuthAuthorizationRequest(params, {
-        developmentRedirects: true
-      }).redirectUri
-    ).toBe("safari-web-extension://12345678-1234-1234-1234-123456789abc/options.html");
   });
 
   test("rejects redirect URIs outside the allowlist", () => {

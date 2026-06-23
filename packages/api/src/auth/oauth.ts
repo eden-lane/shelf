@@ -741,10 +741,14 @@ const isAllowedRedirectUri = (
     return true;
   }
 
+  if (client.id === "browser-extension" && isBrowserExtensionRedirectUri(redirectUri)) {
+    return true;
+  }
+
   return options.developmentRedirects === true && isLocalDevelopmentRedirectUri(redirectUri);
 };
 
-const isLocalDevelopmentRedirectUri = (value: string) => {
+const isBrowserExtensionRedirectUri = (value: string) => {
   try {
     const url = new URL(value);
 
@@ -753,6 +757,20 @@ const isLocalDevelopmentRedirectUri = (value: string) => {
     }
 
     if (url.protocol === "safari-web-extension:" && url.pathname === "/options.html") {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const isLocalDevelopmentRedirectUri = (value: string) => {
+  try {
+    const url = new URL(value);
+
+    if (isBrowserExtensionRedirectUri(value)) {
       return true;
     }
 
