@@ -8,6 +8,20 @@ type OAuthTokens = {
   scope: string;
 };
 
+type OAuthPendingAuthorization = {
+  instanceUrl: string;
+  redirectUri: string;
+  state: string;
+  tokenEndpoint: string;
+  verifier: string;
+};
+
+type ConnectionStatus = {
+  authorizationUrl?: string;
+  connected: boolean;
+  instanceUrl: string;
+};
+
 type RuntimeMessage =
   | {
       type: "shelf:connect";
@@ -20,12 +34,18 @@ type RuntimeMessage =
       type: "shelf:getConnection";
     }
   | {
+      type: "shelf:oauthCallback";
+      callbackUrl: string;
+    }
+  | {
       type: "shelf:rpc";
       path: string;
       input: unknown;
     };
 
+const instanceUrlStorageKey = "shelfInstanceUrl";
 const tokensStorageKey = "oauthTokens";
+const pendingAuthorizationStorageKey = "oauthPendingAuthorization";
 const clientId = "browser-extension";
 const requestedScope = "read:saved_items write:saved_items";
 
@@ -43,9 +63,9 @@ const handleMessage = async (message: RuntimeMessage) => {
   try {
     if (message.type === "shelf:connect") {
       const instanceUrl = normalizeShelfInstanceUrl(message.instanceUrl);
-      await connect(instanceUrl);
+      const authorizationUrl = await connect(instanceUrl);
 
-      return ok(await connectionStatus());
+      return ok({ ...(await connectionStatus()), authorizationUrl });
     }
 
     if (message.type === "shelf:disconnect") {
@@ -55,6 +75,12 @@ const handleMessage = async (message: RuntimeMessage) => {
     }
 
     if (message.type === "shelf:getConnection") {
+      return ok(await connectionStatus());
+    }
+
+    if (message.type === "shelf:oauthCallback") {
+      await completeOAuthCallback(message.callbackUrl);
+
       return ok(await connectionStatus());
     }
 
@@ -69,8 +95,51 @@ const handleMessage = async (message: RuntimeMessage) => {
 };
 
 const connect = async (instanceUrl: string) => {
-  const discovery = await fetchDiscovery(instanceUrl);
-  const redirectUri = browser.identity.getRedirectURL("oauth");
+  const { discovery, instanceUrl: discoveredInstanceUrl } = await fetchDiscovery(instanceUrl);
+  const identity = browser.identity;
+
+  if (identity?.getRedirectURL && identity.launchWebAuthFlow) {
+    const redirectUri = identity.getRedirectURL("oauth");
+    const { authorizeUrl, pendingAuthorization } = await createAuthorizationRequest({
+      discovery,
+      instanceUrl: discoveredInstanceUrl,
+      redirectUri
+    });
+    const responseUrl = await identity.launchWebAuthFlow({
+      interactive: true,
+      url: authorizeUrl
+    });
+
+    if (!responseUrl) {
+      throw new Error("Shelf connection was cancelled.");
+    }
+
+    await completeOAuthCallback(responseUrl, pendingAuthorization);
+
+    return undefined;
+  }
+
+  const redirectUri = browser.runtime.getURL("/options.html");
+  const { authorizeUrl, pendingAuthorization } = await createAuthorizationRequest({
+    discovery,
+    instanceUrl: discoveredInstanceUrl,
+    redirectUri
+  });
+
+  await storePendingAuthorization(pendingAuthorization);
+
+  return authorizeUrl;
+};
+
+const createAuthorizationRequest = async ({
+  discovery,
+  instanceUrl,
+  redirectUri
+}: {
+  discovery: ShelfDiscovery;
+  instanceUrl: string;
+  redirectUri: string;
+}) => {
   const verifier = randomVerifier();
   const state = randomVerifier();
   const authorizeUrl = new URL(discovery.auth.authorization_endpoint);
@@ -78,24 +147,37 @@ const connect = async (instanceUrl: string) => {
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", clientId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-  authorizeUrl.searchParams.set("scope", requestedScope);
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("code_challenge", await pkceChallenge(verifier));
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
+  authorizeUrl.searchParams.set("scope", requestedScope);
   authorizeUrl.searchParams.set("platform", browser.runtime.getManifest().name);
 
-  const responseUrl = await browser.identity.launchWebAuthFlow({
-    interactive: true,
-    url: authorizeUrl.toString()
-  });
+  return {
+    authorizeUrl: authorizeUrl.toString(),
+    pendingAuthorization: {
+      instanceUrl,
+      redirectUri,
+      state,
+      tokenEndpoint: discovery.auth.token_endpoint,
+      verifier
+    } satisfies OAuthPendingAuthorization
+  };
+};
 
-  if (!responseUrl) {
-    throw new Error("Shelf connection was cancelled.");
+const completeOAuthCallback = async (
+  responseUrl: string,
+  providedPendingAuthorization?: OAuthPendingAuthorization
+) => {
+  const pendingAuthorization = providedPendingAuthorization ?? (await readPendingAuthorization());
+
+  if (!pendingAuthorization) {
+    throw new Error("Shelf connection was not started from this extension.");
   }
 
   const callbackUrl = new URL(responseUrl);
 
-  if (callbackUrl.searchParams.get("state") !== state) {
+  if (callbackUrl.searchParams.get("state") !== pendingAuthorization.state) {
     throw new Error("Shelf returned an invalid OAuth state.");
   }
 
@@ -105,13 +187,15 @@ const connect = async (instanceUrl: string) => {
     throw new Error(callbackUrl.searchParams.get("error") ?? "Shelf did not return an authorization code.");
   }
 
-  const tokens = await exchangeAuthorizationCode(discovery.auth.token_endpoint, {
+  const tokens = await exchangeAuthorizationCode(pendingAuthorization.tokenEndpoint, {
     code,
-    redirectUri,
-    verifier
+    redirectUri: pendingAuthorization.redirectUri,
+    verifier: pendingAuthorization.verifier
   });
 
+  await storeInstanceUrl(pendingAuthorization.instanceUrl);
   await storeTokens(tokens);
+  await clearPendingAuthorization();
 };
 
 const rpcCall = async (path: string, input: unknown) => {
@@ -146,7 +230,7 @@ const getValidAccessToken = async (instanceUrl: string) => {
   }
 
   try {
-    const discovery = await fetchDiscovery(instanceUrl);
+    const { discovery } = await fetchDiscovery(instanceUrl);
     const refreshed = await refreshTokens(discovery.auth.token_endpoint, tokens.refreshToken);
 
     await storeTokens(refreshed);
@@ -158,27 +242,49 @@ const getValidAccessToken = async (instanceUrl: string) => {
   }
 };
 
-const fetchDiscovery = async (instanceUrl: string): Promise<{
+type ShelfDiscovery = {
   auth: {
     authorization_endpoint: string;
     token_endpoint: string;
     revocation_endpoint: string;
   };
-}> => {
-  const response = await fetch(`${normalizeShelfInstanceUrl(instanceUrl)}/.well-known/shelf`);
-  const body = await response.json().catch(() => null);
+};
 
-  if (!response.ok || !body || typeof body !== "object" || !("auth" in body)) {
-    throw new Error("Shelf discovery failed.");
+const fetchDiscovery = async (
+  instanceUrl: string
+): Promise<{ discovery: ShelfDiscovery; instanceUrl: string }> => {
+  const candidateUrls = discoveryInstanceUrlCandidates(instanceUrl);
+
+  for (const candidateUrl of candidateUrls) {
+    const response = await fetch(`${candidateUrl}/.well-known/shelf`).catch(() => null);
+    const body = await response?.json().catch(() => null);
+
+    if (response?.ok && body && typeof body === "object" && "auth" in body) {
+      return {
+        discovery: body as ShelfDiscovery,
+        instanceUrl: candidateUrl
+      };
+    }
   }
 
-  return body as {
-    auth: {
-      authorization_endpoint: string;
-      token_endpoint: string;
-      revocation_endpoint: string;
-    };
-  };
+  throw new Error("Shelf discovery failed.");
+};
+
+const discoveryInstanceUrlCandidates = (instanceUrl: string) => {
+  const normalizedInstanceUrl = normalizeShelfInstanceUrl(instanceUrl);
+  const url = new URL(normalizedInstanceUrl);
+
+  if (
+    url.protocol === "http:" &&
+    url.port === "5173" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+  ) {
+    url.port = "3000";
+
+    return [normalizedInstanceUrl, normalizeShelfInstanceUrl(url.toString())];
+  }
+
+  return [normalizedInstanceUrl];
 };
 
 const exchangeAuthorizationCode = async (
@@ -217,10 +323,27 @@ const tokenRequest = async (tokenEndpoint: string, body: Record<string, string>)
   return responseBody;
 };
 
-const connectionStatus = async () => ({
+const connectionStatus = async (): Promise<ConnectionStatus> => ({
   instanceUrl: await getShelfInstanceUrl(),
   connected: Boolean(await readTokens())
 });
+
+const readPendingAuthorization = async (): Promise<OAuthPendingAuthorization | null> => {
+  const stored = await browser.storage.local.get(pendingAuthorizationStorageKey);
+  const value = stored[pendingAuthorizationStorageKey];
+
+  return isPendingAuthorization(value) ? value : null;
+};
+
+const storePendingAuthorization = async (pendingAuthorization: OAuthPendingAuthorization) => {
+  await browser.storage.local.set({
+    [pendingAuthorizationStorageKey]: pendingAuthorization
+  });
+};
+
+const clearPendingAuthorization = async () => {
+  await browser.storage.local.remove(pendingAuthorizationStorageKey);
+};
 
 const readTokens = async (): Promise<OAuthTokens | null> => {
   const stored = await browser.storage.local.get(tokensStorageKey);
@@ -248,6 +371,24 @@ const storeTokens = async (tokens: {
 const clearTokens = async () => {
   await browser.storage.local.remove(tokensStorageKey);
 };
+
+const storeInstanceUrl = async (instanceUrl: string) => {
+  await browser.storage.local.set({ [instanceUrlStorageKey]: instanceUrl });
+};
+
+const isPendingAuthorization = (value: unknown): value is OAuthPendingAuthorization =>
+  typeof value === "object" &&
+  value !== null &&
+  "instanceUrl" in value &&
+  "redirectUri" in value &&
+  "state" in value &&
+  "tokenEndpoint" in value &&
+  "verifier" in value &&
+  typeof value.instanceUrl === "string" &&
+  typeof value.redirectUri === "string" &&
+  typeof value.state === "string" &&
+  typeof value.tokenEndpoint === "string" &&
+  typeof value.verifier === "string";
 
 const isStoredTokens = (value: unknown): value is OAuthTokens =>
   typeof value === "object" &&

@@ -752,6 +752,10 @@ const isLocalDevelopmentRedirectUri = (value: string) => {
       return url.protocol === "https:";
     }
 
+    if (url.protocol === "safari-web-extension:" && url.pathname === "/options.html") {
+      return true;
+    }
+
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return false;
     }

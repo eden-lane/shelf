@@ -107,7 +107,7 @@ export const createApp = (options: AppOptions) => {
     try {
       authorizationRequest = parseOAuthAuthorizationRequest(
         new URL(context.req.url).searchParams,
-        options.oauth
+        oauthOptionsForRequest(context, options.oauth)
       );
     } catch (error) {
       return oauthErrorResponse(context, oauthErrorCode(error), 400);
@@ -173,7 +173,10 @@ export const createApp = (options: AppOptions) => {
     let authorizationRequest: ReturnType<typeof parseOAuthAuthorizationRequest>;
 
     try {
-      authorizationRequest = parseOAuthAuthorizationRequest(authorizationParams, options.oauth);
+      authorizationRequest = parseOAuthAuthorizationRequest(
+        authorizationParams,
+        oauthOptionsForRequest(context, options.oauth)
+      );
     } catch (error) {
       return oauthErrorResponse(context, oauthErrorCode(error), 400);
     }
@@ -523,6 +526,39 @@ const requestOrigin = (context: Parameters<typeof getCookie>[0]) => {
   const protocol = forwardedProto ?? requestUrl.protocol.replace(/:$/, "");
 
   return `${protocol}://${host}`;
+};
+
+const oauthOptionsForRequest = (
+  context: Parameters<typeof getCookie>[0],
+  configuredOptions: OAuthServerOptions | undefined
+): OAuthServerOptions => {
+  if (typeof configuredOptions?.developmentRedirects === "boolean") {
+    return configuredOptions;
+  }
+
+  return {
+    ...configuredOptions,
+    developmentRedirects: isLocalDevelopmentOrigin(requestOrigin(context))
+  };
+};
+
+const isLocalDevelopmentOrigin = (origin: string) => {
+  try {
+    const url = new URL(origin);
+
+    if (url.protocol !== "http:") {
+      return false;
+    }
+
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "[::1]" ||
+      url.hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
 };
 
 const readBearerToken = (authorization: string | undefined) => {

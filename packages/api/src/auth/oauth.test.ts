@@ -75,6 +75,23 @@ describe("OAuth authorization request parsing", () => {
     ).toBe("https://abcdefghijklmnopqrstuvwxyzabcdef.chromiumapp.org/oauth");
   });
 
+  test("accepts the Safari extension options redirect only in development mode", () => {
+    const params = validParams();
+    params.set("redirect_uri", "safari-web-extension://12345678-1234-1234-1234-123456789abc/options.html");
+
+    expect(() =>
+      parseOAuthAuthorizationRequest(params, {
+        developmentRedirects: false
+      })
+    ).toThrow("invalid_redirect_uri");
+
+    expect(
+      parseOAuthAuthorizationRequest(params, {
+        developmentRedirects: true
+      }).redirectUri
+    ).toBe("safari-web-extension://12345678-1234-1234-1234-123456789abc/options.html");
+  });
+
   test("rejects redirect URIs outside the allowlist", () => {
     expect(() =>
       parseOAuthAuthorizationRequest(validParams(), {

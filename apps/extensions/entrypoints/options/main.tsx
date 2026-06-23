@@ -18,6 +18,10 @@ const App = () => {
   const [messageTone, setMessageTone] = createSignal<MessageTone>("neutral");
 
   onMount(async () => {
+    if (await finishOAuthCallbackIfNeeded()) {
+      return;
+    }
+
     await loadConnection();
   });
 
@@ -42,12 +46,22 @@ const App = () => {
     try {
       const normalizedInstanceUrl = await saveShelfInstanceUrl(instanceUrl());
       setInstanceUrl(normalizedInstanceUrl);
-      const response = await sendRuntimeMessage<{ instanceUrl: string; connected: boolean }>({
+      const response = await sendRuntimeMessage<{
+        authorizationUrl?: string;
+        instanceUrl: string;
+        connected: boolean;
+      }>({
         type: "shelf:connect",
         instanceUrl: normalizedInstanceUrl
       });
       setInstanceUrl(response.instanceUrl);
       setIsConnected(response.connected);
+
+      if (response.authorizationUrl) {
+        window.location.assign(response.authorizationUrl);
+        return;
+      }
+
       writeMessage("Connected", "success");
     } catch (error) {
       writeMessage(errorMessage(error), "error");
@@ -98,6 +112,37 @@ const App = () => {
 
     setInstanceUrl(response.instanceUrl);
     setIsConnected(response.connected);
+  };
+
+  const finishOAuthCallbackIfNeeded = async () => {
+    const callbackUrl = new URL(window.location.href);
+
+    if (!callbackUrl.searchParams.has("code") && !callbackUrl.searchParams.has("error")) {
+      return false;
+    }
+
+    setIsBusy(true);
+    writeMessage("Finishing connection", "neutral");
+
+    try {
+      const response = await sendRuntimeMessage<{
+        instanceUrl: string;
+        connected: boolean;
+      }>({
+        type: "shelf:oauthCallback",
+        callbackUrl: callbackUrl.toString()
+      });
+      setInstanceUrl(response.instanceUrl);
+      setIsConnected(response.connected);
+      window.history.replaceState(null, "", window.location.pathname);
+      writeMessage("Connected", "success");
+    } catch (error) {
+      writeMessage(errorMessage(error), "error");
+    } finally {
+      setIsBusy(false);
+    }
+
+    return true;
   };
 
   const writeMessage = (text: string, tone: MessageTone) => {

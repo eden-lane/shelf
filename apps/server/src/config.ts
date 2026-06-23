@@ -117,6 +117,24 @@ const booleanFromEnv = (name: string, fallback: boolean) => {
   throw new Error(`${name} must be true or false`);
 };
 
+const optionalBooleanFromEnv = (name: string) => {
+  const value = Bun.env[name];
+
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`${name} must be true or false`);
+};
+
 const listFromEnv = (name: string) =>
   (Bun.env[name] ?? "")
     .split(",")
@@ -132,7 +150,7 @@ const oauthFromEnv = (): OAuthServerOptions => ({
       redirectUris: listFromEnv("OAUTH_RAYCAST_EXTENSION_REDIRECT_URIS")
     }
   },
-  developmentRedirects: booleanFromEnv("OAUTH_DEV_REDIRECTS", Bun.env.NODE_ENV !== "production")
+  developmentRedirects: optionalBooleanFromEnv("OAUTH_DEV_REDIRECTS")
 });
 
 const staticDirFromEnv = () => {

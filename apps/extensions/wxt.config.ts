@@ -21,7 +21,8 @@ export default defineConfig({
     name: "Shelf",
     description: "Save the current page to Shelf.",
     icons,
-    permissions: ["activeTab", "identity", "storage"],
+    permissions:
+      browser === "safari" ? ["activeTab", "storage"] : ["activeTab", "identity", "storage"],
     ...(browser === "chrome"
       ? { optional_host_permissions: optionalApiOrigins }
       : { optional_permissions: optionalApiOrigins }),
