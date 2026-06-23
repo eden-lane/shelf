@@ -500,13 +500,39 @@ const togglePanelInTab = async (tabId: number, windowId: number) => {
   const previewImageUrl = await browser.tabs
     .captureVisibleTab(windowId, { format: "jpeg", quality: 45 })
     .catch(() => null);
+  const message = {
+    previewImageUrl,
+    type: "shelf:toggle-save-panel"
+  } as const;
 
-  await browser.tabs
-    .sendMessage(tabId, {
-      previewImageUrl,
-      type: "shelf:toggle-save-panel"
-    })
-    .catch(() => {
-      // Restricted pages can fail to receive content-script messages.
-    });
+  if (await sendTogglePanelMessage(tabId, message)) {
+    return;
+  }
+
+  await injectContentScript(tabId);
+  await sendTogglePanelMessage(tabId, message);
+};
+
+const sendTogglePanelMessage = async (
+  tabId: number,
+  message: { previewImageUrl: string | null; type: "shelf:toggle-save-panel" }
+) => {
+  try {
+    await browser.tabs.sendMessage(tabId, message);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const injectContentScript = async (tabId: number) => {
+  const tabs = browser.tabs as typeof browser.tabs & {
+    executeScript?: (tabId: number, details: { file: string }) => Promise<unknown[]>;
+  };
+
+  if (!tabs.executeScript) {
+    return;
+  }
+
+  await tabs.executeScript(tabId, { file: "content-scripts/content.js" }).catch(() => undefined);
 };
