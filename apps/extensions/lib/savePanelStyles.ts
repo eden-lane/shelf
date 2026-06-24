@@ -23,6 +23,12 @@ input {
   pointer-events: auto;
 }
 
+.shelf-panel-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: auto;
+}
+
 .shelf-panel {
   overflow: visible;
   display: grid;

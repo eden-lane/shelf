@@ -77,9 +77,6 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
 
   const folderById = createMemo(() => new Map(folders().map((folder) => [folder.id, folder])));
   const selectedFolder = createMemo(() => folderById().get(selectedFolderId()) ?? null);
-  const libraryById = createMemo(
-    () => new Map(currentUser()?.libraries.map((library) => [library.id, library]) ?? [])
-  );
   const selectedLibraryId = createMemo(() => {
     const folder = selectedFolder();
 
@@ -98,12 +95,10 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
     const folder = selectedFolder();
 
     if (folder) {
-      return folderPath(folder, folders());
+      return folder.name;
     }
 
-    const libraryName = selectedLibraryId() ? libraryById().get(selectedLibraryId()!)?.name : null;
-
-    return libraryName && currentUser()?.libraries.length !== 1 ? `${libraryName} / Inbox` : "Inbox";
+    return "Inbox";
   });
   const folderTree = createMemo(() => buildFolderTree(folders()));
   const isFolderSelectionDisabled = createMemo(() => !currentUser());
@@ -141,14 +136,9 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
   const savedLocationLabels = createMemo(() =>
     savedLocations()
       .map((location) => {
-        const library = libraryById().get(location.libraryId);
         const folder = location.folderId ? folderById().get(location.folderId) : null;
 
-        if (!library) {
-          return null;
-        }
-
-        return `${library.name} / ${folder ? folderPath(folder, folders()) : "Inbox"}`;
+        return folder ? folder.name : "Inbox";
       })
       .filter((label): label is string => Boolean(label))
       .sort((left, right) => left.localeCompare(right))
@@ -199,7 +189,7 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
       setTagInputValue("");
       setIsFolderPickerOpen(false);
       setIsTagPickerOpen(false);
-      setExpandedFolderIds(new Set<string>());
+      setExpandedFolderIds(defaultExpandedFolderIds(folderResponse));
       writeMessage("", "neutral");
       setStatus("Ready");
     } catch (error) {
@@ -346,7 +336,15 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
 
     const folder = selectedFolder();
 
-    setExpandedFolderIds(expandedAncestorIds(folders(), folder?.id ?? selectedFolderId()));
+    setExpandedFolderIds((current) => {
+      const next = new Set(current);
+
+      for (const id of expandedAncestorIds(folders(), folder?.id ?? selectedFolderId())) {
+        next.add(id);
+      }
+
+      return next;
+    });
     setIsTagPickerOpen(false);
     setIsFolderPickerOpen((current) => !current);
   };
@@ -390,7 +388,23 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
 
   return (
     <div
-      class="shelf-overlay-frame"
+      class="shelf-panel-layer"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) {
+          props.onClose();
+          return;
+        }
+
+        const path = event.composedPath();
+
+        if (isFolderPickerOpen() && !path.some((target) => isElementWithClass(target, "shelf-folder-combobox"))) {
+          setIsFolderPickerOpen(false);
+        }
+
+        if (isTagPickerOpen() && !path.some((target) => isElementWithClass(target, "shelf-tag-combobox"))) {
+          setIsTagPickerOpen(false);
+        }
+      }}
       onKeyDown={(event) => {
         if (event.key !== "Escape") {
           return;
@@ -406,7 +420,8 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
         props.onClose();
       }}
     >
-      <section class="shelf-panel" aria-label="Save page to Shelf">
+      <div class="shelf-overlay-frame">
+        <section class="shelf-panel" aria-label="Save page to Shelf">
           <header class="shelf-panel-header">
             <div class="shelf-brand">
               <span class="shelf-brand-mark">S</span>
@@ -508,19 +523,7 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
             </div>
 
             <section class="shelf-field">
-              <div class="shelf-field-row">
-                <span>Tags</span>
-                <button
-                  aria-label="Refresh folders and tags"
-                  class="shelf-icon-button"
-                  title="Refresh folders and tags"
-                  type="button"
-                  disabled={isBusy()}
-                  onClick={() => void loadAppData()}
-                >
-                  <TablerIcon name="IconRefresh" size={16} />
-                </button>
-              </div>
+              <span>Tags</span>
               <div class="shelf-tag-combobox">
                 <div
                   class="shelf-tag-input-wrap"
@@ -621,6 +624,7 @@ export const SavePanel = (props: { initialPage: ActivePage; onClose: () => void 
             </button>
           </form>
         </section>
+      </div>
     </div>
   );
 
@@ -741,22 +745,12 @@ const expandedAncestorIds = (folders: FolderItem[], folderId: string) => {
   return ids;
 };
 
-const folderPath = (folder: FolderItem, allFolders: FolderItem[]) => {
-  const path = [folder.name];
-  let parentId = folder.parentId;
+const defaultExpandedFolderIds = (folders: FolderItem[]) => {
+  const folderIdsWithChildren = new Set(
+    folders.flatMap((folder) => (folder.parentId ? [folder.parentId] : []))
+  );
 
-  while (parentId) {
-    const parent = allFolders.find((candidate) => candidate.id === parentId);
-
-    if (!parent) {
-      break;
-    }
-
-    path.unshift(parent.name);
-    parentId = parent.parentId;
-  }
-
-  return path.join(" / ");
+  return folderIdsWithChildren;
 };
 
 const normalizeTagName = (name: string) => name.trim().replace(/\s+/g, " ");
@@ -784,3 +778,6 @@ const mergeTagOptions = (
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "Unable to connect to Shelf";
+
+const isElementWithClass = (value: EventTarget, className: string) =>
+  value instanceof HTMLElement && value.classList.contains(className);

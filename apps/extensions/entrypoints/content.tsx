@@ -34,7 +34,7 @@ const toggleSavePanel = (previewImageUrl: string | null) => {
   nextHost.style.position = "fixed";
   nextHost.style.inset = "0";
   nextHost.style.zIndex = "2147483647";
-  nextHost.style.pointerEvents = "none";
+  nextHost.style.pointerEvents = "auto";
 
   const shadow = nextHost.attachShadow({ mode: "open" });
   const style = document.createElement("style");
