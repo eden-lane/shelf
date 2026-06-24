@@ -242,7 +242,7 @@ export const SavedItemsWorkspace = ({
   return (
     <>
       <section
-        className="grid w-full min-w-0 max-w-full gap-3 overflow-hidden"
+        className="grid w-full min-w-0 max-w-full shrink-0 gap-3 overflow-hidden"
         aria-label={
           tagName ? `${tagName} tagged items` : folderName ? `${folderName} items` : "Inbox items"
         }

@@ -1598,15 +1598,15 @@ const SavedItemDragPreview = ({ item }: { item: SavedItem }) => {
   const title = item.title || host || item.url;
 
   return (
-    <article className="w-[min(620px,calc(100vw-24px))] overflow-hidden rounded-lg border border-[#3b8df5] bg-white p-4 opacity-95 shadow-[0_24px_80px_rgb(22_28_43_/_0.24)]">
-      <div className="grid min-w-0 grid-cols-[1.25rem_72px_minmax(0,1fr)] gap-3">
-        <div className="flex h-full min-h-10 items-center justify-center text-[#9aa1ad]">
+    <article className="w-[min(760px,calc(100vw-24px))] overflow-hidden rounded-lg border border-[#3b8df5] bg-white p-4 opacity-95 shadow-[0_24px_80px_rgb(22_28_43_/_0.24)]">
+      <div className="grid min-w-0 grid-cols-[1.25rem_144px_minmax(0,1fr)] items-start gap-3">
+        <div className="flex h-8 w-8 -translate-x-1 -translate-y-1 items-center justify-center rounded-lg text-[#9aa1ad]">
           <IconGripVertical size={17} stroke={1.5} aria-hidden="true" focusable="false" />
         </div>
-        <div className="aspect-[4/3] overflow-hidden rounded-lg border border-[#e7eaf1] bg-[#f3f5f9]">
+        <div className="h-24 w-36 overflow-hidden rounded-lg border border-[#e7eaf1] bg-[#f3f5f9]">
           {item.imageUrl ? (
             <img
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
               src={item.imageUrl}
               alt=""
               referrerPolicy="no-referrer"

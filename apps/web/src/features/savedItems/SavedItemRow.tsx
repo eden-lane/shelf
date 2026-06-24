@@ -77,15 +77,15 @@ export const SavedItemRow = ({
     <article
       ref={setNodeRef}
       className={[
-        "relative z-0 w-full min-w-0 max-w-full touch-manipulation overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-4 shadow-[0_14px_40px_rgb(46_54_77_/_0.045)] transition-[border-color,opacity,box-shadow]",
+        "relative z-0 w-full min-w-0 max-w-full shrink-0 touch-manipulation overflow-hidden rounded-lg border border-[#e4e7ef] bg-white p-4 shadow-[0_14px_40px_rgb(46_54_77_/_0.045)] transition-[border-color,opacity,box-shadow]",
         isDragging
           ? "border-[#3b8df5] opacity-35 shadow-[0_18px_48px_rgb(59_141_245_/_0.14)]"
           : ""
       ].join(" ")}
     >
-      <div className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-3">
+      <div className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] items-start gap-3">
         <button
-          className="flex h-full min-h-10 cursor-grab items-center justify-center self-stretch border-0 bg-transparent p-0 text-[#9aa1ad] outline-none hover:text-[#697080] active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+          className="flex h-8 w-8 -translate-x-1 -translate-y-1 cursor-grab items-center justify-center rounded-lg border-0 bg-transparent p-0 text-[#9aa1ad] outline-none hover:bg-[#f7f8fc] hover:text-[#697080] active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
           aria-label={`Drag saved item ${title}`}
           type="button"
           ref={setActivatorNodeRef}
@@ -94,11 +94,11 @@ export const SavedItemRow = ({
         >
           <IconGripVertical size={17} stroke={1.5} aria-hidden="true" focusable="false" />
         </button>
-        <div className="grid min-w-0 grid-cols-[88px_minmax(0,1fr)] gap-4 sm:grid-cols-[144px_minmax(0,1fr)]">
-          <div className="aspect-[4/3] overflow-hidden rounded-lg border border-[#e7eaf1] bg-[#f3f5f9] sm:aspect-[3/2]">
+        <div className="grid min-w-0 grid-cols-[144px_minmax(0,1fr)] gap-4">
+          <div className="h-24 w-36 overflow-hidden rounded-lg border border-[#e7eaf1] bg-[#f3f5f9]">
             {item.imageUrl ? (
               <img
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
                 src={item.imageUrl}
                 alt=""
                 loading="lazy"
