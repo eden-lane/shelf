@@ -1,4 +1,5 @@
 import type {
+  AddSavedItemTagInput,
   CreateSavedItemInput,
   CreateFolderInput,
   SavedItemPreviewInput,
@@ -53,6 +54,31 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     return getCurrentUserResponse(options.currentUser);
   }),
   savedItems: {
+    addTag: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertSavedItemsStore(options.savedItemsStore);
+
+      const savedItemTag = parseAddSavedItemTagInput(input);
+
+      if (!savedItemTag) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose a saved item and tag"
+        });
+      }
+
+      const savedItem = await options.savedItemsStore.addSavedItemTag({
+        ...savedItemTag,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+      });
+
+      await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
+        libraryIds: currentUserLibraryIds(options.currentUser),
+        savedItemIds: [savedItem.id]
+      });
+
+      return savedItem;
+    }),
     preview: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
@@ -687,6 +713,23 @@ const parseMoveSavedItemsInput = (input: unknown): MoveSavedItemsInput | null =>
       typeof input.destinationFolderId === "string" && input.destinationFolderId
         ? input.destinationFolderId
         : null
+  };
+};
+
+const parseAddSavedItemTagInput = (input: unknown): AddSavedItemTagInput | null => {
+  if (
+    !isRecord(input) ||
+    typeof input.savedItemId !== "string" ||
+    !input.savedItemId ||
+    typeof input.tagId !== "string" ||
+    !input.tagId
+  ) {
+    return null;
+  }
+
+  return {
+    savedItemId: input.savedItemId,
+    tagId: input.tagId
   };
 };
 

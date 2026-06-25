@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import type { CurrentUserResponse, FolderItem, TagItem } from "@shelf/shared";
+import type { CurrentUserResponse, FolderItem, SavedItem, TagItem } from "@shelf/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   IconLink,
@@ -44,6 +44,7 @@ const COLLAPSED_FOLDERS_STORAGE_KEY = "savedItems.collapsedFolders";
 export const FolderSidebar = ({
   activeFolderId,
   activeFolderDragId,
+  activeSavedItemDragItem,
   activeTagDragId,
   activeTagId,
   currentUser,
@@ -65,6 +66,7 @@ export const FolderSidebar = ({
 }: {
   activeFolderId: string | null;
   activeFolderDragId: string | null;
+  activeSavedItemDragItem: SavedItem | null;
   activeTagDragId: string | null;
   activeTagId: string | null;
   currentUser?: CurrentUserResponse;
@@ -410,6 +412,7 @@ export const FolderSidebar = ({
                     </section>
                     <TagSection
                       activeTagId={activeTagId}
+                      activeSavedItemDragItem={activeSavedItemDragItem}
                       activeTagDragId={activeTagDragId}
                       creatingTagLibraryId={creatingTagLibraryId}
                       createError={createTagMutation.isError}
@@ -578,6 +581,7 @@ const WorkspaceInboxRow = ({
 
 const TagSection = ({
   activeTagId,
+  activeSavedItemDragItem,
   activeTagDragId,
   creatingTagLibraryId,
   createError,
@@ -599,6 +603,7 @@ const TagSection = ({
   onStartCreate
 }: {
   activeTagId: string | null;
+  activeSavedItemDragItem: SavedItem | null;
   activeTagDragId: string | null;
   creatingTagLibraryId: string | null;
   createError: boolean;
@@ -660,6 +665,7 @@ const TagSection = ({
       ) : null}
       {tags.map((tag) => (
         <TagRow
+          activeSavedItemDragItem={activeSavedItemDragItem}
           activeTagDragId={activeTagDragId}
           activeTagId={activeTagId}
           editError={editError}
@@ -679,6 +685,7 @@ const TagSection = ({
 };
 
 const TagRow = ({
+  activeSavedItemDragItem,
   activeTagDragId,
   activeTagId,
   editError,
@@ -691,6 +698,7 @@ const TagRow = ({
   onOpenMenu,
   onSelectTag
 }: {
+  activeSavedItemDragItem: SavedItem | null;
   activeTagDragId: string | null;
   activeTagId: string | null;
   editError: boolean;
@@ -705,6 +713,18 @@ const TagRow = ({
 }) => {
   const isEditing = editingTagId === tag.id;
   const isActive = activeTagId === tag.id;
+  const canAcceptSavedItem =
+    activeSavedItemDragItem !== null &&
+    activeSavedItemDragItem.libraryId === tag.libraryId &&
+    !(activeSavedItemDragItem.tags ?? []).some((itemTag) => itemTag.id === tag.id);
+  const { isOver: isSavedItemOver, setNodeRef: setSavedItemDropNodeRef } = useDroppable({
+    id: `tag:${tag.id}`,
+    data: {
+      tag,
+      type: "tag"
+    },
+    disabled: isEditing || !canAcceptSavedItem
+  });
   const {
     attributes,
     listeners,
@@ -727,16 +747,23 @@ const TagRow = ({
           transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`
         }
       : undefined;
+  const setRowRefs = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setSavedItemDropNodeRef(node);
+  };
 
   return (
     <div
       className={[
         "group relative grid min-h-8 grid-cols-[minmax(0,1fr)_1.5rem_1.75rem] items-center rounded-xl text-[13px] font-medium transition-[background-color,box-shadow,opacity]",
         isActive ? "bg-gray-100/90 text-slate-950" : "text-gray-700 hover:bg-white/70",
+        canAcceptSavedItem ? "ring-1 ring-transparent" : "",
+        isSavedItemOver ? "bg-blue-50 ring-2 ring-blue-500 ring-inset" : "",
         isDragging ? "z-20 opacity-80 shadow-[0_12px_34px_rgb(15_23_42_/_0.14)]" : ""
       ].join(" ")}
       key={tag.id}
-      ref={setNodeRef}
+      ref={setRowRefs}
+      data-tag-drop-target={tag.id}
       style={{ ...rowStyle, ...dragStyle }}
       onContextMenu={(event) => {
         event.preventDefault();

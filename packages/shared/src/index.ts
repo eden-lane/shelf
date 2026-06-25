@@ -162,6 +162,11 @@ export interface MoveSavedItemsInput {
   destinationFolderId?: string | null;
 }
 
+export interface AddSavedItemTagInput {
+  savedItemId: string;
+  tagId: string;
+}
+
 export interface ListSavedItemsInput {
   cursor?: string | null;
   folderId?: string | null;

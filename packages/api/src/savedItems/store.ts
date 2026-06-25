@@ -1,4 +1,5 @@
 import type { Database } from "../db";
+import { addSavedItemTag } from "./addSavedItemTag";
 import { createSavedItem } from "./createSavedItem";
 import { createFolder } from "./createFolder";
 import { createTag } from "./createTag";
@@ -31,6 +32,7 @@ export const createDatabaseSavedItemsStore = (db: Database): SavedItemsStore => 
   listFolders: (input) => listFolders(db, input),
   listSavedItemSearchDocuments: (input) => listSavedItemSearchDocuments(db, input),
   listTags: (input) => listTags(db, input),
+  addSavedItemTag: (input) => addSavedItemTag(db, input),
   moveFolder: (input) => moveFolder(db, input),
   moveSavedItems: (input) => moveSavedItems(db, input),
   moveTag: (input) => moveTag(db, input),

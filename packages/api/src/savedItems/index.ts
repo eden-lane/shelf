@@ -1,3 +1,4 @@
+export * from "./addSavedItemTag";
 export * from "./createSavedItem";
 export * from "./createFolder";
 export * from "./createTag";

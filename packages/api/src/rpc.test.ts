@@ -101,6 +101,9 @@ const savedItemsStore = (calls: unknown[]): SavedItemsStore => ({
   async moveSavedItems() {
     throw new Error("not used");
   },
+  async addSavedItemTag() {
+    throw new Error("not used");
+  },
   async moveTag() {
     throw new Error("not used");
   },

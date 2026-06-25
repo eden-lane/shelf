@@ -42,6 +42,7 @@ import {
   IconTag
 } from "@tabler/icons-react";
 import {
+  addTagToSavedItem,
   apiAssetUrl,
   getConnectedApps,
   getCurrentUser,
@@ -325,6 +326,14 @@ export const ProductShell = () => {
       }
     }
 
+    if (isSavedItemDragData(activeData)) {
+      const collisions = pointerWithin(args);
+
+      if (collisions.length > 0) {
+        return collisions;
+      }
+    }
+
     return rectIntersection(args);
   }, []);
   const currentUser = useQuery({
@@ -584,6 +593,92 @@ export const ProductShell = () => {
       void queryClient.invalidateQueries({ queryKey: ["tags"] });
     }
   });
+  const addSavedItemTagMutation = useMutation({
+    mutationFn: ({ savedItem, tag }: AddSavedItemTagMutationInput) =>
+      addTagToSavedItem({
+        savedItemId: savedItem.id,
+        tagId: tag.id
+      }),
+    onMutate: async (input) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["savedItems"] }),
+        queryClient.cancelQueries({ queryKey: ["tags"] })
+      ]);
+
+      const previousSavedItems =
+        queryClient.getQueriesData<InfiniteData<SavedItemsPageResponse, string | null>>({
+          queryKey: ["savedItems"]
+        });
+      const previousTags = queryClient.getQueryData<TagItem[]>(["tags"]);
+      const tag = {
+        id: input.tag.id,
+        name: input.tag.name,
+        color: input.tag.color
+      };
+      const now = new Date().toISOString();
+
+      for (const [queryKey] of previousSavedItems) {
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
+          queryKey,
+          (data) => addTagToSavedItemsPages(data, input.savedItem.id, tag, now)
+        );
+      }
+
+      queryClient.setQueryData<TagItem[]>(["tags"], (currentTags = []) =>
+        currentTags.map((currentTag) =>
+          currentTag.id === input.tag.id
+            ? {
+                ...currentTag,
+                savedItemCount: currentTag.savedItemCount + 1,
+                updatedAt: now
+              }
+            : currentTag
+        )
+      );
+
+      return { previousSavedItems, previousTags };
+    },
+    onError: (_error, _input, context) => {
+      for (const [queryKey, data] of context?.previousSavedItems ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+
+      if (context?.previousTags) {
+        queryClient.setQueryData(["tags"], context.previousTags);
+      }
+
+      setMoveNotification("Tag could not be added");
+    },
+    onSuccess: (savedItem, input) => {
+      const tagName =
+        savedItem.tags?.find((tag) => tag.id === input.tag.id)?.name ?? input.tag.name;
+
+      for (const [queryKey] of queryClient.getQueriesData<
+        InfiniteData<SavedItemsPageResponse, string | null>
+      >({
+        queryKey: ["savedItems"]
+      })) {
+        queryClient.setQueryData<InfiniteData<SavedItemsPageResponse, string | null>>(
+          queryKey,
+          (data) => replaceSavedItemInPages(data, savedItem)
+        );
+      }
+
+      setMoveNotification(`Added ${tagName}`);
+    },
+    onSettled: (_savedItem, _error, input) => {
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
+      void queryClient.invalidateQueries({
+        exact: true,
+        queryKey: savedItemQueryKey({
+          folderId: null,
+          libraryId: input.tag.libraryId,
+          tagId: input.tag.id
+        })
+      });
+    }
+  });
 
   useEffect(() => {
     const syncSidebarViewport = () => setIsStackedSidebar(isStackedSidebarViewport());
@@ -838,6 +933,20 @@ export const ProductShell = () => {
     });
   };
 
+  const addTagToDraggedSavedItem = (savedItem: SavedItem, tag: TagItem) => {
+    if (savedItem.libraryId !== tag.libraryId) {
+      setMoveNotification("Tags can only be added inside the same workspace");
+      return;
+    }
+
+    if ((savedItem.tags ?? []).some((itemTag) => itemTag.id === tag.id)) {
+      setMoveNotification("Tag already added");
+      return;
+    }
+
+    addSavedItemTagMutation.mutate({ savedItem, tag });
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const activeData = event.active.data.current;
 
@@ -863,6 +972,11 @@ export const ProductShell = () => {
       }
 
       moveSavedItemsToFolder(activeData.savedItemIds, destinationFolder);
+      return;
+    }
+
+    if (isSavedItemDragData(activeData) && isTagDropData(overData)) {
+      addTagToDraggedSavedItem(activeData.item, overData.tag);
       return;
     }
 
@@ -1010,6 +1124,7 @@ export const ProductShell = () => {
             tags={tags.data ?? []}
             activeFolderDragId={activeFolderDragId}
             activeTagDragId={activeTagDragId}
+            activeSavedItemDragItem={activeSavedItemDragItem}
             isSigningOut={logoutMutation.isPending}
             onAddSavedItem={openSavedItemDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
@@ -1245,6 +1360,11 @@ type MoveSavedItemsMutationInput = {
   destinationFolder: FolderItem | null;
 };
 
+type AddSavedItemTagMutationInput = {
+  savedItem: SavedItem;
+  tag: TagItem;
+};
+
 type SavedItemDragData = {
   savedItemIds: string[];
   item: SavedItem;
@@ -1288,6 +1408,11 @@ type TagPositionDropData = {
   position: "before" | "after";
   relativeTagId: string;
   type: "tag-position";
+};
+
+type TagDropData = {
+  tag: TagItem;
+  type: "tag";
 };
 
 const isSavedItemDragData = (value: unknown): value is SavedItemDragData => {
@@ -1346,6 +1471,32 @@ const isTagDragData = (value: unknown): value is TagDragData => {
     Boolean(data.tagId) &&
     typeof data.libraryId === "string" &&
     Boolean(data.libraryId)
+  );
+};
+
+const isTagDropData = (value: unknown): value is TagDropData => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const data = value as TagDropData;
+
+  return data.type === "tag" && isTag(data.tag);
+};
+
+const isTag = (value: unknown): value is TagItem => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const tag = value as TagItem;
+
+  return (
+    typeof tag.id === "string" &&
+    Boolean(tag.id) &&
+    typeof tag.libraryId === "string" &&
+    Boolean(tag.libraryId) &&
+    typeof tag.name === "string"
   );
 };
 
@@ -1453,6 +1604,55 @@ const buildFolderMoveInput = (
   }
 
   return null;
+};
+
+const addTagToSavedItemsPages = (
+  data: InfiniteData<SavedItemsPageResponse, string | null> | undefined,
+  savedItemId: string,
+  tag: NonNullable<SavedItem["tags"]>[number],
+  updatedAt: string
+) => {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) => {
+        if (
+          item.id !== savedItemId ||
+          (item.tags ?? []).some((itemTag) => itemTag.id === tag.id)
+        ) {
+          return item;
+        }
+
+        return {
+          ...item,
+          tags: [...(item.tags ?? []), tag],
+          updatedAt
+        };
+      })
+    }))
+  };
+};
+
+const replaceSavedItemInPages = (
+  data: InfiniteData<SavedItemsPageResponse, string | null> | undefined,
+  savedItem: SavedItem
+) => {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      items: page.items.map((item) => (item.id === savedItem.id ? savedItem : item))
+    }))
+  };
 };
 
 const appendFolderToSiblings = (

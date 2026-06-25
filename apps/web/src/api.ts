@@ -1,4 +1,5 @@
 import type {
+  AddSavedItemTagInput,
   AuthCredentials,
   AuthSessionResponse,
   SavedItem,
@@ -59,6 +60,7 @@ interface WebRpcClient extends Record<string, NestedClient<Record<never, never>>
 }
 
 interface SavedItemsRpcClient extends Record<string, NestedClient<Record<never, never>>> {
+  addTag: RpcProcedure<AddSavedItemTagInput, SavedItem>;
   create: RpcProcedure<CreateSavedItemInput, SavedItem>;
   delete: RpcProcedure<DeleteSavedItemInput, { deletedSavedItemId: string }>;
   list: RpcProcedure<ListSavedItemsInput, SavedItemsPageResponse>;
@@ -197,6 +199,9 @@ export const moveSavedItems = async (
   input: MoveSavedItemsInput
 ): Promise<{ destinationFolderId: string | null; movedSavedItemIds: string[] }> =>
   rpc.savedItems.move(input);
+
+export const addTagToSavedItem = async (input: AddSavedItemTagInput): Promise<SavedItem> =>
+  rpc.savedItems.addTag(input);
 
 export const getFolders = async (): Promise<FolderItem[]> => rpc.folders.list();
 

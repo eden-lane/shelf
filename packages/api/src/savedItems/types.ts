@@ -66,6 +66,12 @@ export interface MoveSavedItemsInput {
   destinationFolderId?: string | null;
 }
 
+export interface AddSavedItemTagInput {
+  allowedLibraryIds: string[];
+  savedItemId: string;
+  tagId: string;
+}
+
 export interface ListFoldersInput {
   libraryIds: string[];
 }
@@ -142,6 +148,7 @@ export interface SavedItemsStore {
     destinationFolderId: string | null;
     movedSavedItemIds: string[];
   }>;
+  addSavedItemTag(input: AddSavedItemTagInput): Promise<SavedItem>;
   getFavicon(id: string): Promise<{ contentType: string; imageBytes: Buffer } | null>;
   listFolders(input: ListFoldersInput): Promise<FolderItem[]>;
   listTags(input: ListTagsInput): Promise<TagItem[]>;
