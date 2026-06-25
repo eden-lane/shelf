@@ -1,4 +1,4 @@
-import type { SavedItem, SavedItemLocation, FolderItem, TagItem } from "@shelf/shared";
+import type { SavedItem, SavedItemLocation, FolderItem, TagItem, SavedItemTag } from "@shelf/shared";
 import type { Buffer } from "node:buffer";
 
 export interface SavedItemCursor {
@@ -22,6 +22,7 @@ export interface SavedItemSearchCursor {
 
 export interface SavedItemSearchDocument extends SavedItem {
   libraryName: string;
+  tags: SavedItemTag[];
   tagNames: string[];
 }
 

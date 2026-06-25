@@ -50,6 +50,7 @@ export class MeilisearchSavedItemSearchIndex implements SavedItemSearchIndex {
           "metadataFetchedAt",
           "faviconId",
           "faviconUrl",
+          "tags",
           "createdAt",
           "updatedAt"
         ],
@@ -291,7 +292,24 @@ const searchHitToSavedItem = (hit: Partial<SavedItemSearchDocument>): SavedItem 
     metadataFetchedAt: typeof hit.metadataFetchedAt === "string" ? hit.metadataFetchedAt : null,
     faviconId: typeof hit.faviconId === "string" ? hit.faviconId : null,
     faviconUrl: typeof hit.faviconUrl === "string" ? hit.faviconUrl : null,
+    tags: Array.isArray(hit.tags) ? hit.tags.filter(isSavedItemTagHit) : [],
     createdAt: hit.createdAt,
     updatedAt: hit.updatedAt
   };
+};
+
+const isSavedItemTagHit = (
+  value: unknown
+): value is NonNullable<SavedItem["tags"]>[number] => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const tag = value as Record<string, unknown>;
+
+  return (
+    typeof tag.id === "string" &&
+    typeof tag.name === "string" &&
+    (typeof tag.color === "string" || tag.color === null || tag.color === undefined)
+  );
 };

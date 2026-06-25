@@ -185,6 +185,27 @@ export const SavedItemRow = ({
                 {item.description}
               </p>
             ) : null}
+            {item.tags && item.tags.length > 0 ? (
+              <div className="flex min-w-0 max-w-full flex-wrap gap-1.5" aria-label="Saved item tags">
+                {item.tags.map((tag) => {
+                  const color = tag.color ?? DEFAULT_TAG_LABEL_COLOR;
+
+                  return (
+                    <span
+                      className="max-w-full truncate rounded-md px-2 py-1 text-xs leading-none font-semibold"
+                      key={tag.id}
+                      style={{
+                        backgroundColor: color,
+                        color: readableTextColor(color)
+                      }}
+                      title={tag.name}
+                    >
+                      {tag.name}
+                    </span>
+                  );
+                })}
+              </div>
+            ) : null}
             <time className="text-xs font-medium text-[#858b9a]" dateTime={item.createdAt}>
               Added {formatSavedItemDate(item.createdAt)}
             </time>
@@ -203,4 +224,28 @@ export const SavedItemRow = ({
       ) : null}
     </article>
   );
+};
+
+const DEFAULT_TAG_LABEL_COLOR = "#697080";
+
+const readableTextColor = (backgroundColor: string) => {
+  const hex = backgroundColor.trim().replace(/^#/, "");
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split("")
+          .map((character) => `${character}${character}`)
+          .join("")
+      : hex;
+
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
+    return "#ffffff";
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+
+  return luminance > 0.62 ? "#242833" : "#ffffff";
 };

@@ -66,6 +66,12 @@ export interface ConnectedApp {
   lastUsedAt: string | null;
 }
 
+export interface SavedItemTag {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 export interface SavedItem {
   id: string;
   libraryId: string;
@@ -81,6 +87,7 @@ export interface SavedItem {
   metadataFetchedAt: string | null;
   faviconId: string | null;
   faviconUrl: string | null;
+  tags?: SavedItemTag[];
   createdAt: string;
   updatedAt: string;
 }

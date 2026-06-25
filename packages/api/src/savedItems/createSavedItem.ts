@@ -77,6 +77,23 @@ export const createSavedItem = async (db: Database, input: CreateSavedItemInput)
       throw new Error("Unable to load saved item");
     }
 
-    return serializeSavedItem(row);
+    const tagRows = await tx
+      .select({
+        id: schema.tags.id,
+        name: schema.tags.name,
+        color: schema.tags.color
+      })
+      .from(schema.savedItemTags)
+      .innerJoin(
+        schema.tags,
+        and(
+          eq(schema.savedItemTags.tagId, schema.tags.id),
+          eq(schema.savedItemTags.libraryId, schema.tags.libraryId)
+        )
+      )
+      .where(eq(schema.savedItemTags.savedItemId, savedItem.id))
+      .orderBy(schema.tags.sortOrder, schema.tags.name, schema.tags.id);
+
+    return serializeSavedItem(row, tagRows);
   });
 };

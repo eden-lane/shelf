@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
 import { savedItemSelectFields, serializeSavedItem } from "./savedItemRows";
@@ -30,7 +30,9 @@ export const listSavedItemSearchDocuments = async (
     .select({
       ...savedItemSelectFields,
       libraryName: schema.libraries.name,
-      tagName: schema.tags.name
+      tagId: schema.tags.id,
+      tagName: schema.tags.name,
+      tagColor: schema.tags.color
     })
     .from(schema.savedItems)
     .innerJoin(schema.libraries, eq(schema.savedItems.libraryId, schema.libraries.id))
@@ -56,7 +58,13 @@ export const listSavedItemSearchDocuments = async (
       )
     )
     .where(filters.length > 0 ? and(...filters) : undefined)
-    .orderBy(desc(schema.savedItems.createdAt), desc(schema.savedItems.id));
+    .orderBy(
+      desc(schema.savedItems.createdAt),
+      desc(schema.savedItems.id),
+      asc(schema.tags.sortOrder),
+      asc(schema.tags.name),
+      asc(schema.tags.id)
+    );
 
   const documents = new Map<string, SavedItemSearchDocument>();
 
@@ -68,12 +76,30 @@ export const listSavedItemSearchDocuments = async (
         existing.tagNames.push(row.tagName);
       }
 
+      if (row.tagId && row.tagName && !existing.tags.some((tag) => tag.id === row.tagId)) {
+        existing.tags.push({
+          id: row.tagId,
+          name: row.tagName,
+          color: row.tagColor
+        });
+      }
+
       continue;
     }
 
     documents.set(row.id, {
       ...serializeSavedItem(row as Parameters<typeof serializeSavedItem>[0]),
       libraryName: row.libraryName,
+      tags:
+        row.tagId && row.tagName
+          ? [
+              {
+                id: row.tagId,
+                name: row.tagName,
+                color: row.tagColor
+              }
+            ]
+          : [],
       tagNames: row.tagName ? [row.tagName] : []
     });
   }

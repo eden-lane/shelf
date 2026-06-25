@@ -2,7 +2,7 @@ import type { SavedItemsPageResponse } from "@shelf/shared";
 import { and, desc, eq, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "../db";
 import { schema } from "../db";
-import { savedItemSelectFields, serializeSavedItem } from "./savedItemRows";
+import { savedItemSelectFields, serializeSavedItem, withSavedItemTags } from "./savedItemRows";
 import { encodeSavedItemCursor } from "./cursor";
 import type { SavedItemsStore, ListSavedItemsInput } from "./types";
 
@@ -62,7 +62,7 @@ export const listSavedItems = async (db: Database, input: ListSavedItemsInput) =
     .orderBy(desc(schema.savedItems.createdAt), desc(schema.savedItems.id))
     .limit(input.limit + 1);
 
-  return rows.map(serializeSavedItem);
+  return withSavedItemTags(db, rows.map((row) => serializeSavedItem(row)));
 };
 
 export const listSavedItemsPage = async (

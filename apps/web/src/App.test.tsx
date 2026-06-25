@@ -49,6 +49,13 @@ describe("App", () => {
         metadataFetchedAt: "2026-06-19T12:00:01.000Z",
         faviconId: "00000000-0000-4000-8000-000000000030",
         faviconUrl: "/favicons/00000000-0000-4000-8000-000000000030",
+        tags: [
+          {
+            id: "00000000-0000-4000-8000-000000000030",
+            name: "Important",
+            color: "#16a34a"
+          }
+        ],
         createdAt: "2026-06-19T12:00:00.000Z",
         updatedAt: "2026-06-19T12:00:00.000Z"
       },
@@ -821,6 +828,11 @@ describe("App", () => {
       expect(screen.getByLabelText("Personal tags")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Important" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Tag actions for Important" })).toBeTruthy();
+      const tagLabel = Array.from(
+        document.querySelectorAll('[aria-label="Saved item tags"] span')
+      ).find((element) => element.textContent === "Important") as HTMLElement | undefined;
+      expect(tagLabel).toBeTruthy();
+      expect(tagLabel?.style.backgroundColor).toBe("#16a34a");
       expect(screen.queryByLabelText("Saved item folder Inbox")).toBeNull();
       expect(screen.queryByText("Libraries")).toBeNull();
     });

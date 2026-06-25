@@ -541,6 +541,13 @@ describe("savedItems RPC", () => {
               metadataFetchedAt: "2026-06-20T12:00:00.000Z",
               faviconId: null,
               faviconUrl: null,
+              tags: [
+                {
+                  id: "00000000-0000-4000-8000-000000000030",
+                  name: "Research",
+                  color: "#16a34a"
+                }
+              ],
               tagNames: ["Research"],
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:00:00.000Z"
@@ -838,6 +845,7 @@ describe("savedItems RPC", () => {
               metadataFetchedAt: "2026-06-20T12:00:00.000Z",
               faviconId: null,
               faviconUrl: null,
+              tags: [],
               tagNames: [],
               createdAt: "2026-06-20T12:00:00.000Z",
               updatedAt: "2026-06-20T12:05:00.000Z"
