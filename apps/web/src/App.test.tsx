@@ -775,7 +775,7 @@ describe("App", () => {
     const workspaceHeader = screen.getByLabelText("Items workspace").querySelector("header");
     expect(workspaceHeader).toBeTruthy();
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)]"
+      "grid-cols-[2.5rem_minmax(0,1fr)_auto]"
     );
     expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeTruthy();
@@ -784,10 +784,10 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[minmax(0,1fr)]"
+      "grid-cols-[minmax(0,1fr)_auto]"
     );
     expect((workspaceHeader as HTMLElement).className).not.toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)]"
+      "grid-cols-[2.5rem_minmax(0,1fr)_auto]"
     );
     expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     const personalSection = screen.getByLabelText("Personal folders");
@@ -833,7 +833,7 @@ describe("App", () => {
       changedTouches: [{ clientX: 160, clientY: 88 }]
     });
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[2.5rem_minmax(0,1fr)]"
+      "grid-cols-[2.5rem_minmax(0,1fr)_auto]"
     );
     expect(screen.queryByRole("searchbox", { name: "Search saved items" })).toBeNull();
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
@@ -850,7 +850,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show sidebar" }));
     expect((sidebar as HTMLElement).className).toContain("md:w-[340px]");
     expect((workspaceHeader as HTMLElement).className).toContain(
-      "grid-cols-[minmax(0,1fr)]"
+      "grid-cols-[minmax(0,1fr)_auto]"
     );
     expect(screen.getByRole("searchbox", { name: "Search saved items" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Folders" })).toBeNull();
@@ -883,6 +883,26 @@ describe("App", () => {
       expect(screen.queryByLabelText("Saved item folder Inbox")).toBeNull();
       expect(screen.queryByText("Libraries")).toBeNull();
     });
+    expect(screen.getByRole("button", { name: "List view" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Card view" }).getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Card view" }));
+    expect(window.localStorage.getItem("savedItems.viewMode")).toBe("cards");
+    expect(screen.getByRole("button", { name: "Card view" }).getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+    expect(screen.getByLabelText("Inbox items").className).toContain(
+      "md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]"
+    );
+    const cardTagLabel = Array.from(
+      document.querySelectorAll('[aria-label="Saved item tags"] span')
+    ).find((element) => element.textContent === "Important") as HTMLElement | undefined;
+    expect(cardTagLabel?.style.backgroundColor).toBe("#16a34a");
+    fireEvent.click(screen.getByRole("button", { name: "List view" }));
+    expect(window.localStorage.getItem("savedItems.viewMode")).toBe("list");
     const savedItemSearchInput = screen.getByRole("searchbox", {
       name: "Search saved items"
     }) as HTMLInputElement;

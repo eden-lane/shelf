@@ -32,9 +32,11 @@ import type {
   TagItem
 } from "@shelf/shared";
 import {
+  IconCards,
   IconLink,
   IconDatabase,
   IconGripVertical,
+  IconLayoutList,
   IconLayoutSidebarLeftExpand,
   IconPhoto,
   IconPlugConnected,
@@ -56,6 +58,7 @@ import {
 } from "../api";
 import { AddSavedItemDialog } from "../features/savedItems/AddSavedItemDialog";
 import { SavedItemsWorkspace } from "../features/savedItems/SavedItemsWorkspace";
+import type { SavedItemsViewMode } from "../features/savedItems/SavedItemRow";
 import {
   savedItemQueryKey,
   savedItemQueryKeysForFolder,
@@ -77,6 +80,7 @@ import {
 
 const STACKED_SIDEBAR_BREAKPOINT = 768;
 const SIDEBAR_CLOSE_DRAG_THRESHOLD = 64;
+const SAVED_ITEMS_VIEW_MODE_STORAGE_KEY = "savedItems.viewMode";
 
 type ActiveRoute =
   | {
@@ -169,6 +173,16 @@ const searchStateFromLocation = (): SavedItemSearchState => {
     query: params.get("q") ?? "",
     scope
   };
+};
+
+const savedItemsViewModeFromStorage = (): SavedItemsViewMode => {
+  if (typeof window === "undefined") {
+    return "list";
+  }
+
+  return window.localStorage.getItem(SAVED_ITEMS_VIEW_MODE_STORAGE_KEY) === "cards"
+    ? "cards"
+    : "list";
 };
 
 const writeLocationToHistory = (
@@ -288,6 +302,9 @@ export const ProductShell = () => {
   const [activeRoute, setActiveRoute] = useState<ActiveRoute>(() => routeFromLocation());
   const [searchState, setSearchState] = useState<SavedItemSearchState>(() =>
     searchStateFromLocation()
+  );
+  const [savedItemsViewMode, setSavedItemsViewMode] = useState<SavedItemsViewMode>(() =>
+    savedItemsViewModeFromStorage()
   );
   const [savedItemDialogOpen, setSavedItemDialogOpen] = useState(false);
   const [savedItemTargetFolder, setSavedItemTargetFolder] = useState<FolderItem | null>(null);
@@ -700,6 +717,10 @@ export const ProductShell = () => {
 
     return () => window.removeEventListener("popstate", syncRouteFromLocation);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(SAVED_ITEMS_VIEW_MODE_STORAGE_KEY, savedItemsViewMode);
+  }, [savedItemsViewMode]);
 
   const navigateToRoute = useCallback((route: ActiveRoute, mode: "push" | "replace" = "push") => {
     setActiveRoute(route);
@@ -1160,8 +1181,8 @@ export const ProductShell = () => {
           className={[
             "grid items-center gap-3",
             isSidebarVisible
-              ? "grid-cols-[minmax(0,1fr)]"
-              : "grid-cols-[2.5rem_minmax(0,1fr)]"
+              ? "grid-cols-[minmax(0,1fr)_auto]"
+              : "grid-cols-[2.5rem_minmax(0,1fr)_auto]"
           ].join(" ")}
         >
           {!isSidebarVisible ? (
@@ -1197,6 +1218,10 @@ export const ProductShell = () => {
               />
             )}
           </div>
+          <SavedItemsViewModeToggle
+            viewMode={savedItemsViewMode}
+            onViewModeChange={setSavedItemsViewMode}
+          />
         </header>
 
         {isSearchRoute && searchState.query.trim().length > 0 ? (
@@ -1223,6 +1248,7 @@ export const ProductShell = () => {
           searchScope={searchState.scope}
           tagId={activeTagId}
           tagName={activeTag?.name ?? null}
+          viewMode={savedItemsViewMode}
           onEditSavedItem={openEditSavedItemDialog}
         />
       </section>
@@ -1805,6 +1831,49 @@ const compareTags = (left: TagItem, right: TagItem) =>
   left.sortOrder - right.sortOrder ||
   left.name.localeCompare(right.name) ||
   left.id.localeCompare(right.id);
+
+const SavedItemsViewModeToggle = ({
+  onViewModeChange,
+  viewMode
+}: {
+  onViewModeChange: (viewMode: SavedItemsViewMode) => void;
+  viewMode: SavedItemsViewMode;
+}) => (
+  <div
+    className="grid grid-cols-2 rounded-lg border border-[#cbccc9] bg-[#f2f3f0] p-1 text-[#666666]"
+    role="group"
+    aria-label="Saved items view"
+  >
+    <button
+      className={savedItemsViewModeButtonClass(viewMode === "cards")}
+      aria-label="Card view"
+      aria-pressed={viewMode === "cards"}
+      title="Card view"
+      type="button"
+      onClick={() => onViewModeChange("cards")}
+    >
+      <IconCards size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+    </button>
+    <button
+      className={savedItemsViewModeButtonClass(viewMode === "list")}
+      aria-label="List view"
+      aria-pressed={viewMode === "list"}
+      title="List view"
+      type="button"
+      onClick={() => onViewModeChange("list")}
+    >
+      <IconLayoutList size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+    </button>
+  </div>
+);
+
+const savedItemsViewModeButtonClass = (active: boolean) =>
+  [
+    "grid h-8 w-8 place-items-center rounded-md outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff8400]",
+    active
+      ? "bg-white text-[#111111] shadow-[0_6px_18px_rgb(0_0_0_/_0.08)]"
+      : "text-[#666666] hover:bg-white/70 hover:text-[#111111]"
+  ].join(" ");
 
 const SavedItemDragPreview = ({ item }: { item: SavedItem }) => {
   const host = hostFromUrl(item.url);

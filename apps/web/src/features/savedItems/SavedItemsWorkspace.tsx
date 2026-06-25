@@ -6,7 +6,7 @@ import { IconAlertTriangle, IconLink, IconRefresh } from "@tabler/icons-react";
 import { deleteSavedItem, getSavedItems, searchSavedItems } from "../../api";
 import { savedItemQueryKey } from "./savedItemUtils";
 import type { SavedItemSearchScope } from "./SearchScopeControl";
-import { SavedItemRow } from "./SavedItemRow";
+import { SavedItemRow, type SavedItemsViewMode } from "./SavedItemRow";
 
 export const SavedItemsWorkspace = ({
   folderId,
@@ -16,6 +16,7 @@ export const SavedItemsWorkspace = ({
   searchScope,
   tagId,
   tagName,
+  viewMode,
   onEditSavedItem
 }: {
   folderId: string | null;
@@ -25,6 +26,7 @@ export const SavedItemsWorkspace = ({
   searchScope: SavedItemSearchScope;
   tagId: string | null;
   tagName: string | null;
+  viewMode: SavedItemsViewMode;
   onEditSavedItem: (item: SavedItem) => void;
 }) => {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -244,7 +246,12 @@ export const SavedItemsWorkspace = ({
   return (
     <>
       <section
-        className="grid w-full min-w-0 max-w-full shrink-0 gap-3 overflow-hidden"
+        className={[
+          "grid w-full min-w-0 max-w-full shrink-0 gap-3 overflow-visible",
+          viewMode === "cards"
+            ? "grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]"
+            : "grid-cols-1"
+        ].join(" ")}
         aria-label={
           tagName ? `${tagName} tagged items` : folderName ? `${folderName} items` : "Inbox items"
         }
@@ -255,6 +262,7 @@ export const SavedItemsWorkspace = ({
             item={item}
             key={item.id}
             showFolderName={isSearching}
+            viewMode={viewMode}
             onDeleteSavedItem={(savedItemId) => deleteSavedItemMutation.mutate({ savedItemId })}
             onEditSavedItem={onEditSavedItem}
             onLinkCopied={() => setNotification("Link copied")}
