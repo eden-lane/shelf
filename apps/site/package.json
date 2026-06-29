@@ -1,0 +1,20 @@
+{
+  "name": "@shelf/site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1 --port 4321",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@fontsource/open-sans": "latest",
+    "@shelf/shared": "workspace:*",
+    "astro": "7.0.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "latest",
+    "typescript": "latest"
+  }
+}

@@ -1,0 +1,30 @@
+---
+import "../styles/global.css";
+import { Font } from "astro:assets";
+import Header from "../components/header.astro";
+---
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Shelf is a focused home for saved links, workspaces, folders, tags, and fast retrieval."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <Font cssVariable="--font-open-sans" preload />
+    <title>Shelf</title>
+
+</head>
+<body>
+<main class="page-shell">
+    <Header />
+    <slot />
+</main>
+</body>
+</html>
+
+
+

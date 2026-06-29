@@ -7,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "biome:check": "biome check .",
+    "biome:write": "biome check --write .",
     "build": "bun run --filter @shelf/web build",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/migrate.mjs",
@@ -14,12 +16,15 @@
     "db:studio": "drizzle-kit studio",
     "dev:api": "cd apps/server && bun run dev",
     "dev:server": "cd apps/server && bun run dev",
+    "dev:site": "cd apps/site && bun run dev",
     "dev:web": "cd apps/web && bun run dev",
+    "build:site": "cd apps/site && bun run build",
     "search:reindex": "cd apps/server && bun run search:reindex",
     "test": "bun test packages/api/src apps/server/src apps/web/src",
-    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/api/tsconfig.json && tsc --noEmit -p apps/server/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && bun run --filter @shelf/extensions typecheck"
+    "typecheck": "tsc --noEmit -p packages/shared/tsconfig.json && tsc --noEmit -p packages/api/tsconfig.json && tsc --noEmit -p apps/server/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && bun run --filter @shelf/site typecheck && bun run --filter @shelf/extensions typecheck"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.1",
     "@types/bun": "latest",
     "drizzle-kit": "latest",
     "typescript": "latest"
