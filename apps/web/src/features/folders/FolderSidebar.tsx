@@ -12,10 +12,9 @@ import {
   IconGripVertical,
   IconInbox,
   IconLayoutSidebarLeftCollapse,
-  IconLogout2,
   IconPlus,
-  IconPlugConnected,
   IconSearch,
+  IconSettings,
   IconTag,
   IconTagPlus
 } from "@tabler/icons-react";
@@ -55,11 +54,9 @@ export const FolderSidebar = ({
   isTagsLoading,
   searchQuery,
   tags,
-  isSigningOut,
   onAddSavedItem,
   onHideSidebar,
-  onOpenConnectedApps,
-  onSignOut,
+  onOpenSettings,
   onSearchQueryChange,
   onSelectFolder,
   onSelectTag
@@ -77,11 +74,9 @@ export const FolderSidebar = ({
   isTagsLoading: boolean;
   searchQuery: string;
   tags: TagItem[];
-  isSigningOut: boolean;
   onAddSavedItem: (target: { folder: FolderItem | null; tag: TagItem | null }) => void;
   onHideSidebar: () => void;
-  onOpenConnectedApps: () => void;
-  onSignOut: () => void;
+  onOpenSettings: () => void;
   onSearchQueryChange: (query: string) => void;
   onSelectFolder: (folderId: string | null, libraryId?: string | null) => void;
   onSelectTag: (tagId: string) => void;
@@ -444,23 +439,13 @@ export const FolderSidebar = ({
       </div>
       <div className="mt-auto border-t border-gray-200/70 pt-4">
         <button
-          className="mb-1 inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          aria-label="Connected apps"
+          className="inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          aria-label="Settings"
           type="button"
-          onClick={onOpenConnectedApps}
+          onClick={onOpenSettings}
         >
-          <IconPlugConnected size={17} stroke={1.5} aria-hidden="true" focusable="false" />
-          <span>Connected apps</span>
-        </button>
-        <button
-          className="inline-flex min-h-8 items-center gap-2 rounded-lg bg-transparent px-2 text-[13px] font-medium text-gray-600 outline-none hover:text-slate-950 disabled:cursor-not-allowed disabled:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          aria-label="Sign out"
-          disabled={isSigningOut}
-          type="button"
-          onClick={onSignOut}
-        >
-          <IconLogout2 size={17} stroke={1.5} aria-hidden="true" focusable="false" />
-          <span>Sign out</span>
+          <IconSettings size={17} stroke={1.5} aria-hidden="true" focusable="false" />
+          <span>Settings</span>
         </button>
       </div>
       {menu && menuFolder ? (

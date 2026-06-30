@@ -24,7 +24,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   SavedItem,
   SavedItemsPageResponse,
-  ConnectedApp,
   CurrentUserResponse,
   FolderItem,
   MoveFolderInput,
@@ -39,7 +38,6 @@ import {
   IconLayoutList,
   IconLayoutSidebarLeftExpand,
   IconPhoto,
-  IconPlugConnected,
   IconSearch,
   IconTag
 } from "@tabler/icons-react";
@@ -72,6 +70,7 @@ import {
   type SavedItemSearchScope
 } from "../features/savedItems/SearchScopeControl";
 import { FolderSidebar } from "../features/folders/FolderSidebar";
+import { SettingsModal } from "../features/settings/SettingsModal";
 import { folderPathSegments } from "../features/folders/folderTree";
 import {
   DEFAULT_FOLDER_ICON_COLOR,
@@ -317,7 +316,7 @@ export const ProductShell = () => {
   const [activeTagDragId, setActiveTagDragId] = useState<string | null>(null);
   const [moveNotification, setMoveNotification] = useState<string | null>(null);
   const [sidebarDragOffset, setSidebarDragOffset] = useState(0);
-  const [isConnectedAppsOpen, setIsConnectedAppsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -369,7 +368,7 @@ export const ProductShell = () => {
     queryFn: getTags
   });
   const connectedApps = useQuery({
-    enabled: currentUser.isSuccess && isConnectedAppsOpen,
+    enabled: currentUser.isSuccess && isSettingsOpen,
     queryKey: ["connected-apps"],
     queryFn: getConnectedApps
   });
@@ -1156,11 +1155,9 @@ export const ProductShell = () => {
             activeFolderDragId={activeFolderDragId}
             activeTagDragId={activeTagDragId}
             activeSavedItemDragItem={activeSavedItemDragItem}
-            isSigningOut={logoutMutation.isPending}
             onAddSavedItem={openSavedItemDialog}
             onHideSidebar={() => setIsSidebarVisible(false)}
-            onOpenConnectedApps={() => setIsConnectedAppsOpen(true)}
-            onSignOut={() => logoutMutation.mutate()}
+            onOpenSettings={() => setIsSettingsOpen(true)}
             onSearchQueryChange={(query) =>
               updateSearchState({
                 query,
@@ -1274,15 +1271,16 @@ export const ProductShell = () => {
           {moveNotification}
         </div>
       ) : null}
-      {isConnectedAppsOpen ? (
-        <ConnectedAppsModal
-          apps={connectedApps.data ?? []}
-          isLoading={connectedApps.isLoading}
-          isRevoking={revokeConnectedAppMutation.isPending}
-          onClose={() => setIsConnectedAppsOpen(false)}
-          onRevoke={(grantId) => revokeConnectedAppMutation.mutate(grantId)}
-        />
-      ) : null}
+      <SettingsModal
+        apps={connectedApps.data ?? []}
+        isLoading={connectedApps.isLoading}
+        isOpen={isSettingsOpen}
+        isRevoking={revokeConnectedAppMutation.isPending}
+        isSigningOut={logoutMutation.isPending}
+        onClose={() => setIsSettingsOpen(false)}
+        onRevoke={(grantId) => revokeConnectedAppMutation.mutate(grantId)}
+        onSignOut={() => logoutMutation.mutate()}
+      />
       </main>
       <DragOverlay zIndex={1000}>
         {activeSavedItemDragItem ? <SavedItemDragPreview item={activeSavedItemDragItem} /> : null}
@@ -1296,102 +1294,6 @@ export const ProductShell = () => {
     </DndContext>
   );
 };
-
-const ConnectedAppsModal = ({
-  apps,
-  isLoading,
-  isRevoking,
-  onClose,
-  onRevoke
-}: {
-  apps: ConnectedApp[];
-  isLoading: boolean;
-  isRevoking: boolean;
-  onClose: () => void;
-  onRevoke: (grantId: string) => void;
-}) => (
-  <div
-    className="fixed inset-0 z-50 grid place-items-center bg-slate-950/30 px-4"
-    role="presentation"
-    onMouseDown={(event) => {
-      if (event.target === event.currentTarget) {
-        onClose();
-      }
-    }}
-  >
-    <section
-      className="max-h-[min(680px,calc(100dvh-48px))] w-full max-w-[560px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 shadow-[0_24px_70px_rgb(15_23_42_/_0.22)]"
-      aria-label="Connected apps"
-      role="dialog"
-    >
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2 text-slate-950">
-            <IconPlugConnected size={19} stroke={1.6} aria-hidden="true" focusable="false" />
-            <h2 className="m-0 text-[17px] leading-6 font-medium">Connected apps</h2>
-          </div>
-          <p className="m-0 text-sm leading-5 text-gray-500">
-            Revoke clients without signing out of this browser.
-          </p>
-        </div>
-        <button
-          className="h-8 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 outline-none hover:bg-gray-50 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          type="button"
-          onClick={onClose}
-        >
-          Close
-        </button>
-      </div>
-      {isLoading ? (
-        <p className="m-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-          Loading connected apps
-        </p>
-      ) : apps.length === 0 ? (
-        <p className="m-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
-          No connected apps.
-        </p>
-      ) : (
-        <div className="grid gap-2">
-          {apps.map((app) => (
-            <article
-              className="grid gap-3 rounded-lg border border-gray-200 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              key={app.id}
-            >
-              <div className="min-w-0">
-                <h3 className="m-0 truncate text-sm font-medium text-slate-950">
-                  {connectedAppTitle(app)}
-                </h3>
-                <p className="m-0 mt-1 text-xs leading-5 text-gray-500">
-                  {app.scopes.join(", ")} · Connected {formatDate(app.createdAt)}
-                  {app.lastUsedAt ? ` · Last used ${formatDate(app.lastUsedAt)}` : ""}
-                </p>
-              </div>
-              <button
-                className="h-8 rounded-lg border border-red-200 bg-white px-3 text-sm font-medium text-red-600 outline-none hover:bg-red-50 disabled:cursor-not-allowed disabled:text-red-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                disabled={isRevoking}
-                type="button"
-                onClick={() => onRevoke(app.id)}
-              >
-                Revoke
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  </div>
-);
-
-const connectedAppTitle = (app: ConnectedApp) => {
-  const details = [app.browser, app.platform, app.deviceName].filter(Boolean);
-
-  return details.length > 0 ? `${app.clientName} on ${details.join(" / ")}` : app.clientName;
-};
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium"
-  }).format(new Date(value));
 
 type MoveSavedItemsMutationInput = {
   savedItemIds: string[];
