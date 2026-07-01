@@ -15,9 +15,10 @@ const clients = createRuntimeClients({
   meilisearchUrl: config.meilisearchUrl,
   meilisearchMasterKey: config.meilisearchMasterKey,
 });
+const savedItemEnrichmentQueue = new RedisSavedItemEnrichmentQueue(clients.redis);
 
 const app = createApp({
-  savedItemEnrichmentQueue: new RedisSavedItemEnrichmentQueue(clients.redis),
+  savedItemEnrichmentQueue,
   dependencies: clients,
   savedItemSearchIndex: clients.savedItemSearchIndex,
   authMode: config.authMode,
@@ -45,6 +46,11 @@ const integrationsSyncInterval = setInterval(
         const savedItemIds = results.flatMap((result) => result.savedItemIds);
 
         if (savedItemIds.length > 0) {
+          await Promise.allSettled(
+            savedItemIds.map((savedItemId) =>
+              savedItemEnrichmentQueue.enqueueSavedItem(savedItemId),
+            ),
+          );
           const documents = await savedItemsStore.listSavedItemSearchDocuments({ savedItemIds });
           await clients.savedItemSearchIndex.upsert(documents);
         }

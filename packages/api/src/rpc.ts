@@ -561,6 +561,8 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
 
+      await enqueueSavedItemEnrichment(options.savedItemEnrichmentQueue, result.savedItemIds);
+
       await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: currentUserLibraryIds(options.currentUser),
         savedItemIds: result.savedItemIds,
@@ -1700,4 +1702,19 @@ async function upsertSavedItemSearchDocuments(
   await savedItemSearchIndex.upsert(documents).catch((error: unknown) => {
     console.error("Unable to upsert saved items into search index", error);
   });
+}
+
+async function enqueueSavedItemEnrichment(
+  savedItemEnrichmentQueue: SavedItemEnrichmentQueue | undefined,
+  savedItemIds: string[],
+) {
+  if (!savedItemEnrichmentQueue) {
+    return;
+  }
+
+  for (const savedItemId of savedItemIds) {
+    await savedItemEnrichmentQueue.enqueueSavedItem(savedItemId).catch((error: unknown) => {
+      console.error("Unable to enqueue imported saved item enrichment", error);
+    });
+  }
 }
