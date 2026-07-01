@@ -372,6 +372,20 @@ export const ProductShell = () => {
     queryKey: ["connected-apps"],
     queryFn: getConnectedApps
   });
+  const refreshLibraryItems = useCallback(() => {
+    if (!currentUser.isSuccess) {
+      return;
+    }
+
+    void queryClient.refetchQueries({ queryKey: ["folders"] });
+    void queryClient.refetchQueries({ queryKey: ["tags"] });
+  }, [currentUser.isSuccess, queryClient]);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      refreshLibraryItems();
+    }
+  }, [isSettingsOpen, refreshLibraryItems]);
   const activeFolderId = activeRoute.type === "folder" ? activeRoute.id : null;
   const activeTagId = activeRoute.type === "tag" ? activeRoute.id : null;
   const isSearchRoute = activeRoute.type === "search";
@@ -1273,11 +1287,14 @@ export const ProductShell = () => {
       ) : null}
       <SettingsModal
         apps={connectedApps.data ?? []}
+        folders={folders.data ?? []}
         isLoading={connectedApps.isLoading}
         isOpen={isSettingsOpen}
         isRevoking={revokeConnectedAppMutation.isPending}
         isSigningOut={logoutMutation.isPending}
+        tags={tags.data ?? []}
         onClose={() => setIsSettingsOpen(false)}
+        onRefreshLibraryItems={refreshLibraryItems}
         onRevoke={(grantId) => revokeConnectedAppMutation.mutate(grantId)}
         onSignOut={() => logoutMutation.mutate()}
       />

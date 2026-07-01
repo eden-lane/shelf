@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { SavedItem, FolderItem, TagItem } from "@shelf/shared";
+import type { FolderItem, SavedItem, TagItem } from "@shelf/shared";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { Window } from "happy-dom";
 
@@ -1393,4 +1393,208 @@ describe("App", () => {
     expect(savedItemCreateRequests.at(-1)?.tagIds).toContain("00000000-0000-4000-8000-000000000031");
     expect(savedItemCreateRequests.at(-1)?.description).toBe("User edited description");
   }, 35000);
+
+  test("refreshes folders and tags when settings integrations are opened", async () => {
+    window.history.pushState(null, "", "/");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+
+    let folderListRequests = 0;
+    let tagListRequests = 0;
+    let backendFolders: FolderItem[] = [];
+    let backendTags: TagItem[] = [];
+
+    const user = {
+      user: {
+        id: "00000000-0000-4000-8000-000000000001",
+        email: "dev@localhost",
+        emailVerifiedAt: null,
+        name: "Dev User",
+        username: null,
+        avatarUrl: null,
+        billingCustomerId: null,
+        locale: null
+      },
+      organizations: [],
+      libraries: [
+        {
+          id: "00000000-0000-4000-8000-000000000003",
+          kind: "personal",
+          name: "Personal"
+        }
+      ]
+    };
+    const automationFolder: FolderItem = {
+      id: "00000000-0000-4000-8000-000000000105",
+      libraryId: "00000000-0000-4000-8000-000000000003",
+      parentId: null,
+      name: "Automation",
+      iconName: "IconBook",
+      iconColor: "#3b82f6",
+      sortOrder: 0,
+      savedItemCount: 0,
+      createdAt: "2026-06-19T12:00:00.000Z",
+      updatedAt: "2026-06-19T12:00:00.000Z"
+    };
+    const productionTag: TagItem = {
+      id: "00000000-0000-4000-8000-000000000130",
+      libraryId: "00000000-0000-4000-8000-000000000003",
+      name: "Production",
+      color: "#16a34a",
+      sortOrder: 0,
+      savedItemCount: 0,
+      createdAt: "2026-06-19T12:00:00.000Z",
+      updatedAt: "2026-06-19T12:00:00.000Z"
+    };
+
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+
+      if (url.pathname === "/auth/session") {
+        return new Response(
+          JSON.stringify({
+            user,
+            registration: {
+              mode: "first-user-only",
+              available: false
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/currentUser") {
+        return new Response(JSON.stringify({ json: user }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.pathname === "/rpc/savedItems/list") {
+        return new Response(
+          JSON.stringify({
+            json: {
+              items: [],
+              nextCursor: null
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/folders/list") {
+        folderListRequests += 1;
+        return new Response(
+          JSON.stringify({
+            json: backendFolders.map((folder) => ({ ...folder }))
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/tags/list") {
+        tagListRequests += 1;
+        return new Response(
+          JSON.stringify({
+            json: backendTags.map((tag) => ({ ...tag }))
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/auth/connected-apps") {
+        return new Response(JSON.stringify({ apps: [] }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      throw new Error(`Unhandled request: ${url.pathname}`);
+    }) as unknown as typeof fetch;
+
+    const { App } = await import("./App");
+    const screen = render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+      expect(folderListRequests).toBe(1);
+      expect(tagListRequests).toBe(1);
+    });
+
+    backendFolders = [automationFolder];
+    backendTags = [productionTag];
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    await waitFor(() => {
+      expect(folderListRequests).toBeGreaterThan(1);
+      expect(tagListRequests).toBeGreaterThan(1);
+    });
+    const requestsAfterSettingsOpen = {
+      folders: folderListRequests,
+      tags: tagListRequests
+    };
+    fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Enable GitHub integration" }));
+    const integrationsPanel = screen.getByRole("tabpanel", { name: "Integrations" });
+    const ruleRows = Array.from(
+      integrationsPanel.querySelectorAll("[data-settings-rule-row]")
+    ) as HTMLElement[];
+    expect(ruleRows[0]?.getAttribute("data-settings-rule-row")).toBe("default");
+    expect(ruleRows[0]?.textContent).toContain("Save bookmarks to");
+    expect(ruleRows[0]?.textContent).not.toContain("IF");
+    expect(ruleRows[1]?.textContent).toContain("IF");
+    expect(ruleRows[1]?.textContent).toContain("THEN");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add rule" }));
+    const orderedRuleChildren = Array.from(
+      integrationsPanel.querySelectorAll("form, [data-settings-rule-row]")
+    );
+    expect(orderedRuleChildren[0]?.tagName).toBe("FORM");
+    expect((orderedRuleChildren[1] as HTMLElement | undefined)?.getAttribute("data-settings-rule-row")).toBe(
+      "default"
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Select tag…" }));
+    await waitFor(() => {
+      expect(tagListRequests).toBeGreaterThan(requestsAfterSettingsOpen.tags);
+      expect(screen.getByRole("button", { name: "Production" })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Production" }));
+
+    const integrationRuleSelects = Array.from(
+      screen.getByRole("tabpanel", { name: "Integrations" }).querySelectorAll("select")
+    ) as HTMLSelectElement[];
+    const thenTypeSelect = integrationRuleSelects.find((select) => select.value === "addTag");
+    expect(thenTypeSelect).toBeTruthy();
+    fireEvent.change(thenTypeSelect as HTMLSelectElement, {
+      target: { value: "moveToFolder" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Select folder…" }));
+    await waitFor(() => {
+      expect(folderListRequests).toBeGreaterThan(requestsAfterSettingsOpen.folders);
+      expect(screen.getByRole("button", { name: "Automation" })).toBeTruthy();
+    });
+    expect(
+      document
+        .querySelector('[data-settings-folder-picker-icon="00000000-0000-4000-8000-000000000105"]')
+        ?.getAttribute("data-settings-folder-picker-icon-color")
+    ).toBe("#3b82f6");
+  });
 });
