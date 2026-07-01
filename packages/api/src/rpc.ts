@@ -1,36 +1,46 @@
+import { ORPCError, os } from "@orpc/server";
 import type {
   AddSavedItemTagInput,
-  CreateSavedItemInput,
   CreateFolderInput,
-  SavedItemPreviewInput,
+  CreateImportRuleInput,
+  CreateSavedItemInput,
   CreateTagInput,
-  DeleteSavedItemInput,
   DeleteFolderInput,
+  DeleteImportRuleInput,
+  DeleteSavedItemInput,
   DeleteTagInput,
+  IntegrationProvider,
   MoveFolderInput,
   MoveSavedItemsInput,
   MoveTagInput,
+  ReorderImportRulesInput,
+  SavedItemPreviewInput,
   SearchSavedItemsInput,
+  SetIntegrationEnabledInput,
+  StartGithubConnectionInput,
   UpdateFolderInput,
+  UpdateImportRuleInput,
+  UpdateProviderSettingsInput,
   UpdateSavedItemInput,
-  UpdateTagInput
+  UpdateTagInput,
 } from "@shelf/shared";
-import { ORPCError, os } from "@orpc/server";
-import {
-  decodeSavedItemCursor,
-  type SavedItemEnrichmentQueue,
-  listSavedItemsPage,
-  parseSavedItemsLimit,
-  searchSavedItemsPage,
-  type SavedItemCursor,
-  fetchLinkPreviewMetadata,
-  type SavedItemsStore,
-  type SavedItemSearchIndex
-} from "./savedItems";
-import { getCurrentUserResponse, type CurrentIdentity } from "./currentUser";
+import { hasOAuthScope, type OAuthScope } from "./auth";
+import { type CurrentIdentity, getCurrentUserResponse } from "./currentUser";
 import type { HealthDependencies } from "./health";
 import { checkHealth } from "./health";
-import { hasOAuthScope, type OAuthScope } from "./auth";
+import type { GitHubClient, IntegrationsStore } from "./integrations";
+import { GitHubConfigurationError } from "./integrations";
+import {
+  decodeSavedItemCursor,
+  fetchLinkPreviewMetadata,
+  listSavedItemsPage,
+  parseSavedItemsLimit,
+  type SavedItemCursor,
+  type SavedItemEnrichmentQueue,
+  type SavedItemSearchIndex,
+  type SavedItemsStore,
+  searchSavedItemsPage,
+} from "./savedItems";
 
 export interface RpcRouterOptions {
   dependencies: HealthDependencies;
@@ -39,6 +49,8 @@ export interface RpcRouterOptions {
   savedItemsStore?: SavedItemsStore;
   savedItemEnrichmentQueue?: SavedItemEnrichmentQueue;
   savedItemSearchIndex?: SavedItemSearchIndex;
+  integrationsStore?: IntegrationsStore;
+  githubClient?: GitHubClient;
 }
 
 export const createRpcRouter = (options: RpcRouterOptions) => ({
@@ -46,7 +58,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
   currentUser: os.handler(() => {
     if (!options.currentUser) {
       throw new ORPCError("UNAUTHORIZED", {
-        message: "No current user is configured"
+        message: "No current user is configured",
       });
     }
 
@@ -64,18 +76,18 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!savedItemTag) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose a saved item and tag"
+          message: "Choose a saved item and tag",
         });
       }
 
       const savedItem = await options.savedItemsStore.addSavedItemTag({
         ...savedItemTag,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
 
       await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: currentUserLibraryIds(options.currentUser),
-        savedItemIds: [savedItem.id]
+        savedItemIds: [savedItem.id],
       });
 
       return savedItem;
@@ -83,7 +95,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     preview: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
-          message: "No current user is configured"
+          message: "No current user is configured",
         });
       }
 
@@ -93,7 +105,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!previewInput) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a valid URL"
+          message: "Enter a valid URL",
         });
       }
 
@@ -105,18 +117,18 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
           faviconUrl: resolvePreviewAssetUrl(metadata.faviconCandidates[0], previewInput.url),
           imageUrl: resolvePreviewAssetUrl(metadata.imageUrl, previewInput.url),
           siteName: metadata.siteName,
-          title: metadata.title
+          title: metadata.title,
         };
       } catch {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Unable to fetch page preview"
+          message: "Unable to fetch page preview",
         });
       }
     }),
     create: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
-          message: "No current user is configured"
+          message: "No current user is configured",
         });
       }
 
@@ -124,7 +136,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Saved item storage is not configured"
+          message: "Saved item storage is not configured",
         });
       }
 
@@ -132,7 +144,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!savedItem) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a valid URL"
+          message: "Enter a valid URL",
         });
       }
 
@@ -144,18 +156,18 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         ? folders.find((folder) => folder.id === savedItem.folderId)
         : null;
       const personalLibrary = options.currentUser.libraries.find(
-        (library) => library.kind === "personal"
+        (library) => library.kind === "personal",
       );
 
       if (savedItem.folderId && !targetFolder) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose an available folder"
+          message: "Choose an available folder",
         });
       }
 
       if (!targetFolder && !personalLibrary) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Personal library is not configured"
+          message: "Personal library is not configured",
         });
       }
 
@@ -169,7 +181,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!targetLibraryId) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Target library is not configured"
+          message: "Target library is not configured",
         });
       }
 
@@ -179,7 +191,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
         if (selectedTagIds.some((tagId) => !availableTagIds.has(tagId))) {
           throw new ORPCError("BAD_REQUEST", {
-            message: "Choose available tags"
+            message: "Choose available tags",
           });
         }
       }
@@ -193,12 +205,12 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         siteName: savedItem.siteName ?? null,
         tagIds: selectedTagIds,
         title: savedItem.title ?? null,
-        url: savedItem.url
+        url: savedItem.url,
       });
 
       await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: allowedLibraryIds,
-        savedItemIds: [createdSavedItem.id]
+        savedItemIds: [createdSavedItem.id],
       });
 
       if (createdSavedItem.metadataStatus !== "fetched") {
@@ -220,18 +232,20 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!savedItem) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose a saved item to delete"
+          message: "Choose a saved item to delete",
         });
       }
 
       const result = await options.savedItemsStore.deleteSavedItem({
         ...savedItem,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
 
-      await options.savedItemSearchIndex?.delete([result.deletedSavedItemId]).catch((error: unknown) => {
-        console.error("Unable to delete saved item from search index", error);
-      });
+      await options.savedItemSearchIndex
+        ?.delete([result.deletedSavedItemId])
+        .catch((error: unknown) => {
+          console.error("Unable to delete saved item from search index", error);
+        });
 
       return result;
     }),
@@ -244,19 +258,19 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!savedItem) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a valid URL"
+          message: "Enter a valid URL",
         });
       }
 
       const updatedSavedItem = await options.savedItemsStore.updateSavedItem({
         ...savedItem,
         allowedLibraryIds: currentUserLibraryIds(options.currentUser),
-        description: savedItem.description ?? null
+        description: savedItem.description ?? null,
       });
 
       await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: currentUserLibraryIds(options.currentUser),
-        savedItemIds: [updatedSavedItem.id]
+        savedItemIds: [updatedSavedItem.id],
       });
 
       if (updatedSavedItem.metadataStatus !== "fetched") {
@@ -272,7 +286,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
     list: os.handler(async ({ input }) => {
       if (!options.currentUser) {
         throw new ORPCError("UNAUTHORIZED", {
-          message: "No current user is configured"
+          message: "No current user is configured",
         });
       }
 
@@ -280,7 +294,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!options.savedItemsStore) {
         throw new ORPCError("INTERNAL_SERVER_ERROR", {
-          message: "Saved item storage is not configured"
+          message: "Saved item storage is not configured",
         });
       }
 
@@ -288,7 +302,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!pagination) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Invalid saved item cursor"
+          message: "Invalid saved item cursor",
         });
       }
 
@@ -296,13 +310,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (pagination.libraryId && !allowedLibraryIds.includes(pagination.libraryId)) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose an available workspace"
+          message: "Choose an available workspace",
         });
       }
 
       return listSavedItemsPage(options.savedItemsStore, {
         ...pagination,
-        libraryIds: allowedLibraryIds
+        libraryIds: allowedLibraryIds,
       });
     }),
     locations: os.handler(async ({ input }) => {
@@ -314,13 +328,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!lookup) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a valid URL"
+          message: "Enter a valid URL",
         });
       }
 
       return options.savedItemsStore.listSavedItemLocations({
         libraryIds: currentUserLibraryIds(options.currentUser),
-        url: lookup.url
+        url: lookup.url,
       });
     }),
     move: os.handler(async ({ input }) => {
@@ -332,18 +346,18 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!move) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose saved items to move"
+          message: "Choose saved items to move",
         });
       }
 
       const result = await options.savedItemsStore.moveSavedItems({
         ...move,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
 
       await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
         libraryIds: currentUserLibraryIds(options.currentUser),
-        savedItemIds: result.movedSavedItemIds
+        savedItemIds: result.movedSavedItemIds,
       });
 
       return result;
@@ -357,7 +371,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!search) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a search query"
+          message: "Enter a search query",
         });
       }
 
@@ -371,7 +385,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!libraryIds) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose an available workspace"
+          message: "Choose an available workspace",
         });
       }
 
@@ -379,17 +393,328 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
         cursor: search.cursor,
         libraryIds,
         limit: search.limit,
-        query: search.query
+        query: search.query,
       });
 
       if (!result) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Invalid search cursor"
+          message: "Invalid search cursor",
         });
       }
 
       return result;
-    })
+    }),
+  },
+  integrations: {
+    list: os.handler(async () => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const allowedLibraryIds = currentUserLibraryIds(options.currentUser);
+
+      return {
+        accounts: await options.integrationsStore.listAccounts({ allowedLibraryIds }),
+        latestSyncRuns: await options.integrationsStore.listLatestSyncRuns({ allowedLibraryIds }),
+      };
+    }),
+    connectGithub: {
+      start: os.handler(({ input }) => {
+        assertCurrentUser(options.currentUser);
+        assertOAuthScope(options.oauthScopes, "write:saved_items");
+        assertGitHubClient(options.githubClient);
+
+        const start = parseStartGithubConnectionInput(input);
+
+        if (!start || !currentUserLibraryIds(options.currentUser).includes(start.libraryId)) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Choose an available workspace",
+          });
+        }
+
+        try {
+          return {
+            authorizationUrl: options.githubClient.createAuthorizationUrl({
+              libraryId: start.libraryId,
+              redirectUri: start.redirectUri,
+              userId: options.currentUser.user.id,
+            }),
+          };
+        } catch (error) {
+          if (error instanceof GitHubConfigurationError) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "GitHub OAuth is not configured",
+            });
+          }
+
+          throw error;
+        }
+      }),
+      callback: os.handler(async ({ input }) => {
+        assertCurrentUser(options.currentUser);
+        assertOAuthScope(options.oauthScopes, "write:saved_items");
+        assertGitHubClient(options.githubClient);
+        assertIntegrationsStore(options.integrationsStore);
+
+        const callback = parseGithubConnectionCallbackInput(input);
+
+        if (!callback) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "Complete the GitHub connection",
+          });
+        }
+
+        let exchanged: Awaited<ReturnType<GitHubClient["exchangeCode"]>>;
+
+        try {
+          exchanged = await options.githubClient.exchangeCode(callback);
+        } catch (error) {
+          if (error instanceof GitHubConfigurationError) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "GitHub OAuth is not configured",
+            });
+          }
+
+          throw error;
+        }
+
+        if (
+          exchanged.userId !== options.currentUser.user.id ||
+          !currentUserLibraryIds(options.currentUser).includes(exchanged.libraryId)
+        ) {
+          throw new ORPCError("BAD_REQUEST", {
+            message: "GitHub connection state is invalid",
+          });
+        }
+
+        return options.integrationsStore.createOrUpdateAccount({
+          accessToken: exchanged.accessToken,
+          connectedByUserId: options.currentUser.user.id,
+          externalAccountId: String(exchanged.externalAccount.id),
+          externalAccountName: exchanged.externalAccount.login,
+          libraryId: exchanged.libraryId,
+          provider: "github",
+          providerSurface: "github_stars",
+        });
+      }),
+    },
+    disconnect: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const account = parseIntegrationAccountInput(input);
+
+      if (!account) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration account",
+        });
+      }
+
+      try {
+        return await options.integrationsStore.disconnectAccount({
+          ...account,
+          allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+        });
+      } catch (error) {
+        throw integrationMutationError(error);
+      }
+    }),
+    setEnabled: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const account = parseSetIntegrationEnabledInput(input);
+
+      if (!account) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration account",
+        });
+      }
+
+      try {
+        return await options.integrationsStore.setAccountEnabled({
+          ...account,
+          allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+        });
+      } catch (error) {
+        throw integrationMutationError(error);
+      }
+    }),
+    syncNow: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertSavedItemsStore(options.savedItemsStore);
+      assertIntegrationsStore(options.integrationsStore);
+
+      const account = parseIntegrationAccountInput(input);
+
+      if (!account) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration account",
+        });
+      }
+
+      const result = await options.integrationsStore.syncGitHubStars({
+        ...account,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+
+      await upsertSavedItemSearchDocuments(options.savedItemsStore, options.savedItemSearchIndex, {
+        libraryIds: currentUserLibraryIds(options.currentUser),
+        savedItemIds: result.savedItemIds,
+      });
+
+      return result.run;
+    }),
+    listSyncRuns: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const account = parseIntegrationAccountInput(input);
+
+      if (!account) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration account",
+        });
+      }
+
+      return options.integrationsStore.listSyncRuns({
+        ...account,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
+    getProviderSettings: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const provider = parseProviderInput(input);
+
+      if (!provider) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration provider",
+        });
+      }
+
+      return options.integrationsStore.getProviderSettings({
+        ...provider,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
+    updateProviderSettings: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const provider = parseUpdateProviderSettingsInput(input);
+
+      if (!provider) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration provider",
+        });
+      }
+
+      return options.integrationsStore.updateProviderSettings({
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+        defaultFolderId: provider.defaultFolderId ?? null,
+        libraryId: provider.libraryId,
+        provider: provider.provider,
+      });
+    }),
+    listImportRules: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "read:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const provider = parseProviderInput(input);
+
+      if (!provider) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an integration provider",
+        });
+      }
+
+      return options.integrationsStore.listImportRules({
+        ...provider,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
+    createImportRule: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const rule = parseCreateImportRuleInput(input);
+
+      if (!rule) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Complete the import rule",
+        });
+      }
+
+      return options.integrationsStore.createImportRule({
+        ...rule,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+        enabled: rule.enabled ?? true,
+      });
+    }),
+    updateImportRule: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const rule = parseUpdateImportRuleInput(input);
+
+      if (!rule) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Complete the import rule",
+        });
+      }
+
+      return options.integrationsStore.updateImportRule({
+        ...rule,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
+    reorderImportRules: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const order = parseReorderImportRulesInput(input);
+
+      if (!order) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose import rules to reorder",
+        });
+      }
+
+      return options.integrationsStore.reorderImportRules({
+        ...order,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
+    deleteImportRule: os.handler(async ({ input }) => {
+      assertCurrentUser(options.currentUser);
+      assertOAuthScope(options.oauthScopes, "write:saved_items");
+      assertIntegrationsStore(options.integrationsStore);
+
+      const rule = parseDeleteImportRuleInput(input);
+
+      if (!rule) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Choose an import rule",
+        });
+      }
+
+      return options.integrationsStore.deleteImportRule({
+        ...rule,
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
+      });
+    }),
   },
   tags: {
     create: os.handler(async ({ input }) => {
@@ -401,13 +726,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!tag) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a tag name"
+          message: "Enter a tag name",
         });
       }
 
       return options.savedItemsStore.createTag({
         ...tag,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     delete: os.handler(async ({ input }) => {
@@ -419,13 +744,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!tag) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose a tag to delete"
+          message: "Choose a tag to delete",
         });
       }
 
       return options.savedItemsStore.deleteTag({
         ...tag,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     list: os.handler(() => {
@@ -434,7 +759,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       assertSavedItemsStore(options.savedItemsStore);
 
       return options.savedItemsStore.listTags({
-        libraryIds: currentUserLibraryIds(options.currentUser)
+        libraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     move: os.handler(async ({ input }) => {
@@ -446,13 +771,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!tag) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose where to move this tag"
+          message: "Choose where to move this tag",
         });
       }
 
       return options.savedItemsStore.moveTag({
         ...tag,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     update: os.handler(async ({ input }) => {
@@ -464,15 +789,15 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!tag) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a tag name"
+          message: "Enter a tag name",
         });
       }
 
       return options.savedItemsStore.updateTag({
         ...tag,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
-    })
+    }),
   },
   folders: {
     create: os.handler(async ({ input }) => {
@@ -484,13 +809,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!folder) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a folder title"
+          message: "Enter a folder title",
         });
       }
 
       return options.savedItemsStore.createFolder({
         ...folder,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     delete: os.handler(async ({ input }) => {
@@ -502,13 +827,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!folder) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose how to delete this folder"
+          message: "Choose how to delete this folder",
         });
       }
 
       return options.savedItemsStore.deleteFolder({
         ...folder,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     list: os.handler(() => {
@@ -517,7 +842,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       assertSavedItemsStore(options.savedItemsStore);
 
       return options.savedItemsStore.listFolders({
-        libraryIds: currentUserLibraryIds(options.currentUser)
+        libraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     move: os.handler(async ({ input }) => {
@@ -529,13 +854,13 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!folder) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Choose where to move this folder"
+          message: "Choose where to move this folder",
         });
       }
 
       return options.savedItemsStore.moveFolder({
         ...folder,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
     }),
     update: os.handler(async ({ input }) => {
@@ -547,22 +872,22 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
 
       if (!folder) {
         throw new ORPCError("BAD_REQUEST", {
-          message: "Enter a folder title"
+          message: "Enter a folder title",
         });
       }
 
       return options.savedItemsStore.updateFolder({
         ...folder,
-        allowedLibraryIds: currentUserLibraryIds(options.currentUser)
+        allowedLibraryIds: currentUserLibraryIds(options.currentUser),
       });
-    })
-  }
+    }),
+  },
 });
 
 export type RpcRouter = ReturnType<typeof createRpcRouter>;
 
 const parseSavedItemsInput = (
-  input: unknown
+  input: unknown,
 ): {
   limit: number;
   cursor?: SavedItemCursor;
@@ -573,7 +898,7 @@ const parseSavedItemsInput = (
 } | null => {
   if (!isRecord(input)) {
     return {
-      limit: parseSavedItemsLimit(null)
+      limit: parseSavedItemsLimit(null),
     };
   }
 
@@ -590,12 +915,12 @@ const parseSavedItemsInput = (
     inbox: input.inbox === true,
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     limit: parseSavedItemsLimit(typeof input.limit === "number" ? String(input.limit) : null),
-    tagId: typeof input.tagId === "string" && input.tagId ? input.tagId : undefined
+    tagId: typeof input.tagId === "string" && input.tagId ? input.tagId : undefined,
   };
 };
 
 const parseSearchSavedItemsInput = (
-  input: unknown
+  input: unknown,
 ): {
   cursor?: string;
   libraryId?: string;
@@ -622,7 +947,7 @@ const parseSearchSavedItemsInput = (
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     limit: parseSavedItemsLimit(typeof input.limit === "number" ? String(input.limit) : null),
     query,
-    scope: input.scope
+    scope: input.scope,
   };
 };
 
@@ -645,13 +970,13 @@ const parseCreateSavedItemInput = (input: unknown): CreateSavedItemInput | null 
     folderId: typeof input.folderId === "string" && input.folderId ? input.folderId : undefined,
     imageUrl: resolvePreviewAssetUrl(
       typeof input.imageUrl === "string" ? input.imageUrl : null,
-      url
+      url,
     ),
     libraryId: typeof input.libraryId === "string" && input.libraryId ? input.libraryId : undefined,
     siteName: normalizeOptionalText(input.siteName),
     tagIds: parseSelectedTagIds(input.tagIds),
     title: normalizeOptionalText(input.title),
-    url
+    url,
   };
 };
 
@@ -665,7 +990,10 @@ const parseSavedItemPreviewInput = (input: unknown): SavedItemPreviewInput | nul
   return url ? { url } : null;
 };
 
-const resolvePreviewAssetUrl = (value: string | null | undefined, pageUrl: string): string | null => {
+const resolvePreviewAssetUrl = (
+  value: string | null | undefined,
+  pageUrl: string,
+): string | null => {
   if (!value) {
     return null;
   }
@@ -719,7 +1047,7 @@ const parseDeleteSavedItemInput = (input: unknown): DeleteSavedItemInput | null 
   }
 
   return {
-    savedItemId: input.savedItemId
+    savedItemId: input.savedItemId,
   };
 };
 
@@ -749,7 +1077,7 @@ const parseUpdateSavedItemInput = (input: unknown): UpdateSavedItemInput | null 
           : undefined,
     savedItemId: input.savedItemId,
     tagIds: parseSelectedTagIds(input.tagIds),
-    url
+    url,
   };
 };
 
@@ -777,7 +1105,7 @@ const parseMoveSavedItemsInput = (input: unknown): MoveSavedItemsInput | null =>
     destinationFolderId:
       typeof input.destinationFolderId === "string" && input.destinationFolderId
         ? input.destinationFolderId
-        : null
+        : null,
   };
 };
 
@@ -794,7 +1122,7 @@ const parseAddSavedItemTagInput = (input: unknown): AddSavedItemTagInput | null 
 
   return {
     savedItemId: input.savedItemId,
-    tagId: input.tagId
+    tagId: input.tagId,
   };
 };
 
@@ -814,7 +1142,7 @@ const parseCreateFolderInput = (input: unknown): CreateFolderInput | null => {
     iconName: parseFolderIconName(input.iconName),
     libraryId: input.libraryId,
     name,
-    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null
+    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null,
   };
 };
 
@@ -833,7 +1161,7 @@ const parseUpdateFolderInput = (input: unknown): UpdateFolderInput | null => {
     folderId: input.folderId,
     iconColor: parseFolderIconColor(input.iconColor),
     iconName: parseFolderIconName(input.iconName),
-    name
+    name,
   };
 };
 
@@ -851,7 +1179,7 @@ const parseCreateTagInput = (input: unknown): CreateTagInput | null => {
   return {
     color: parseFolderIconColor(input.color),
     libraryId: input.libraryId,
-    name
+    name,
   };
 };
 
@@ -869,7 +1197,7 @@ const parseUpdateTagInput = (input: unknown): UpdateTagInput | null => {
   return {
     color: parseFolderIconColor(input.color),
     name,
-    tagId: input.tagId
+    tagId: input.tagId,
   };
 };
 
@@ -898,7 +1226,7 @@ const parseMoveTagInput = (input: unknown): MoveTagInput | null => {
 
   return {
     orderedTagIds: [...orderedTagIds].slice(0, 200),
-    tagId: input.tagId
+    tagId: input.tagId,
   };
 };
 
@@ -908,7 +1236,7 @@ const parseDeleteTagInput = (input: unknown): DeleteTagInput | null => {
   }
 
   return {
-    tagId: input.tagId
+    tagId: input.tagId,
   };
 };
 
@@ -938,7 +1266,7 @@ const parseMoveFolderInput = (input: unknown): MoveFolderInput | null => {
   return {
     folderId: input.folderId,
     orderedSiblingIds: [...orderedSiblingIds].slice(0, 200),
-    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null
+    parentId: typeof input.parentId === "string" && input.parentId ? input.parentId : null,
   };
 };
 
@@ -957,8 +1285,271 @@ const parseDeleteFolderInput = (input: unknown): DeleteFolderInput | null => {
         ? input.destinationFolderId
         : null,
     folderId: input.folderId,
-    mode: input.mode
+    mode: input.mode,
   };
+};
+
+const parseStartGithubConnectionInput = (input: unknown): StartGithubConnectionInput | null => {
+  if (!isRecord(input) || typeof input.libraryId !== "string" || !input.libraryId) {
+    return null;
+  }
+
+  return {
+    libraryId: input.libraryId,
+    redirectUri:
+      typeof input.redirectUri === "string" && input.redirectUri ? input.redirectUri : null,
+  };
+};
+
+const parseGithubConnectionCallbackInput = (
+  input: unknown,
+): { code: string; state: string } | null => {
+  if (
+    !isRecord(input) ||
+    typeof input.code !== "string" ||
+    !input.code ||
+    typeof input.state !== "string" ||
+    !input.state
+  ) {
+    return null;
+  }
+
+  return {
+    code: input.code,
+    state: input.state,
+  };
+};
+
+const parseIntegrationAccountInput = (input: unknown): { integrationAccountId: string } | null => {
+  if (
+    !isRecord(input) ||
+    typeof input.integrationAccountId !== "string" ||
+    !input.integrationAccountId
+  ) {
+    return null;
+  }
+
+  return {
+    integrationAccountId: input.integrationAccountId,
+  };
+};
+
+const parseSetIntegrationEnabledInput = (input: unknown): SetIntegrationEnabledInput | null => {
+  const account = parseIntegrationAccountInput(input);
+
+  if (!account || !isRecord(input) || typeof input.enabled !== "boolean") {
+    return null;
+  }
+
+  return {
+    ...account,
+    enabled: input.enabled,
+  };
+};
+
+const parseProviderInput = (
+  input: unknown,
+): { libraryId: string; provider: IntegrationProvider } | null => {
+  if (
+    !isRecord(input) ||
+    typeof input.libraryId !== "string" ||
+    !input.libraryId ||
+    input.provider !== "github"
+  ) {
+    return null;
+  }
+
+  return {
+    libraryId: input.libraryId,
+    provider: input.provider,
+  };
+};
+
+const parseUpdateProviderSettingsInput = (input: unknown): UpdateProviderSettingsInput | null => {
+  const provider = parseProviderInput(input);
+
+  if (!provider || !isRecord(input)) {
+    return null;
+  }
+
+  return {
+    ...provider,
+    defaultFolderId:
+      typeof input.defaultFolderId === "string" && input.defaultFolderId
+        ? input.defaultFolderId
+        : null,
+  };
+};
+
+const parseCreateImportRuleInput = (input: unknown): CreateImportRuleInput | null => {
+  const provider = parseProviderInput(input);
+
+  if (!provider || !isRecord(input)) {
+    return null;
+  }
+
+  const conditionField = parseRuleField(input.conditionField);
+  const conditionOperator = parseRuleOperator(input.conditionOperator);
+  const actionType = parseRuleActionType(input.actionType);
+  const conditionValue = parseRuleValue(input.conditionValue);
+
+  if (
+    !conditionField ||
+    !conditionOperator ||
+    conditionValue === null ||
+    !actionType ||
+    typeof input.actionTargetId !== "string" ||
+    !input.actionTargetId
+  ) {
+    return null;
+  }
+
+  return {
+    ...provider,
+    actionTargetId: input.actionTargetId,
+    actionType,
+    conditionField,
+    conditionOperator,
+    conditionValue,
+    enabled: typeof input.enabled === "boolean" ? input.enabled : true,
+  };
+};
+
+const parseUpdateImportRuleInput = (input: unknown): UpdateImportRuleInput | null => {
+  if (!isRecord(input) || typeof input.importRuleId !== "string" || !input.importRuleId) {
+    return null;
+  }
+
+  const update: UpdateImportRuleInput = {
+    importRuleId: input.importRuleId,
+  };
+
+  if (input.conditionField !== undefined) {
+    const value = parseRuleField(input.conditionField);
+    if (!value) return null;
+    update.conditionField = value;
+  }
+
+  if (input.conditionOperator !== undefined) {
+    const value = parseRuleOperator(input.conditionOperator);
+    if (!value) return null;
+    update.conditionOperator = value;
+  }
+
+  if (input.conditionValue !== undefined) {
+    const value = parseRuleValue(input.conditionValue);
+    if (value === null) return null;
+    update.conditionValue = value;
+  }
+
+  if (input.actionType !== undefined) {
+    const value = parseRuleActionType(input.actionType);
+    if (!value) return null;
+    update.actionType = value;
+  }
+
+  if (input.actionTargetId !== undefined) {
+    if (typeof input.actionTargetId !== "string" || !input.actionTargetId) return null;
+    update.actionTargetId = input.actionTargetId;
+  }
+
+  if (input.enabled !== undefined) {
+    if (typeof input.enabled !== "boolean") return null;
+    update.enabled = input.enabled;
+  }
+
+  return update;
+};
+
+const parseReorderImportRulesInput = (input: unknown): ReorderImportRulesInput | null => {
+  const provider = parseProviderInput(input);
+
+  if (!provider || !isRecord(input) || !Array.isArray(input.orderedImportRuleIds)) {
+    return null;
+  }
+
+  const orderedImportRuleIds = new Set<string>();
+
+  for (const id of input.orderedImportRuleIds) {
+    if (typeof id !== "string" || !id) {
+      return null;
+    }
+
+    orderedImportRuleIds.add(id);
+  }
+
+  return {
+    ...provider,
+    orderedImportRuleIds: [...orderedImportRuleIds],
+  };
+};
+
+const parseDeleteImportRuleInput = (input: unknown): DeleteImportRuleInput | null => {
+  if (!isRecord(input) || typeof input.importRuleId !== "string" || !input.importRuleId) {
+    return null;
+  }
+
+  return {
+    importRuleId: input.importRuleId,
+  };
+};
+
+const parseRuleField = (value: unknown): CreateImportRuleInput["conditionField"] | null => {
+  if (
+    value === "language" ||
+    value === "topics" ||
+    value === "name" ||
+    value === "stargazers_count" ||
+    value === "forks_count" ||
+    value === "private" ||
+    value === "archived"
+  ) {
+    return value;
+  }
+
+  return null;
+};
+
+const parseRuleOperator = (value: unknown): CreateImportRuleInput["conditionOperator"] | null => {
+  if (
+    value === "is" ||
+    value === "contains" ||
+    value === ">" ||
+    value === ">=" ||
+    value === "<" ||
+    value === "<=" ||
+    value === "=="
+  ) {
+    return value;
+  }
+
+  return null;
+};
+
+const parseRuleActionType = (value: unknown): CreateImportRuleInput["actionType"] | null => {
+  if (value === "add_tag" || value === "move_to_folder") {
+    return value;
+  }
+
+  return null;
+};
+
+const parseRuleValue = (value: unknown): string | number | boolean | null => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+
+    return trimmed ? trimmed : null;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return null;
 };
 
 const parseFolderName = (value: unknown) => {
@@ -1013,42 +1604,80 @@ const currentUserLibraryIds = (currentUser: CurrentIdentity) =>
   currentUser.libraries.map((library) => library.id);
 
 function assertCurrentUser(
-  currentUser: CurrentIdentity | undefined
+  currentUser: CurrentIdentity | undefined,
 ): asserts currentUser is CurrentIdentity {
   if (!currentUser) {
     throw new ORPCError("UNAUTHORIZED", {
-      message: "No current user is configured"
+      message: "No current user is configured",
     });
   }
 }
 
 function assertSavedItemsStore(
-  savedItemsStore: SavedItemsStore | undefined
+  savedItemsStore: SavedItemsStore | undefined,
 ): asserts savedItemsStore is SavedItemsStore {
   if (!savedItemsStore) {
     throw new ORPCError("INTERNAL_SERVER_ERROR", {
-      message: "Saved item storage is not configured"
+      message: "Saved item storage is not configured",
     });
   }
 }
 
 function assertSavedItemSearchIndex(
-  savedItemSearchIndex: SavedItemSearchIndex | undefined
+  savedItemSearchIndex: SavedItemSearchIndex | undefined,
 ): asserts savedItemSearchIndex is SavedItemSearchIndex {
   if (!savedItemSearchIndex) {
     throw new ORPCError("INTERNAL_SERVER_ERROR", {
-      message: "Search index is not configured"
+      message: "Search index is not configured",
     });
   }
 }
 
+function assertIntegrationsStore(
+  integrationsStore: IntegrationsStore | undefined,
+): asserts integrationsStore is IntegrationsStore {
+  if (!integrationsStore) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "Integration storage is not configured",
+    });
+  }
+}
+
+function assertGitHubClient(
+  githubClient: GitHubClient | undefined,
+): asserts githubClient is GitHubClient {
+  if (!githubClient) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", {
+      message: "GitHub integration is not configured",
+    });
+  }
+}
+
+function integrationMutationError(error: unknown) {
+  if (error instanceof Error && error.message.includes("does not exist")) {
+    return new ORPCError("NOT_FOUND", {
+      message: error.message,
+    });
+  }
+
+  if (error instanceof Error && error.message.includes("Choose an available")) {
+    return new ORPCError("BAD_REQUEST", {
+      message: error.message,
+    });
+  }
+
+  return new ORPCError("INTERNAL_SERVER_ERROR", {
+    message: error instanceof Error ? error.message : "Integration request failed",
+  });
+}
+
 function assertOAuthScope(
   availableScopes: ReadonlySet<OAuthScope> | undefined,
-  requiredScope: OAuthScope
+  requiredScope: OAuthScope,
 ) {
   if (!hasOAuthScope(availableScopes, requiredScope)) {
     throw new ORPCError("FORBIDDEN", {
-      message: `Missing OAuth scope: ${requiredScope}`
+      message: `Missing OAuth scope: ${requiredScope}`,
     });
   }
 }
@@ -1056,7 +1685,7 @@ function assertOAuthScope(
 async function upsertSavedItemSearchDocuments(
   savedItemsStore: SavedItemsStore,
   savedItemSearchIndex: SavedItemSearchIndex | undefined,
-  input: Parameters<SavedItemsStore["listSavedItemSearchDocuments"]>[0]
+  input: Parameters<SavedItemsStore["listSavedItemSearchDocuments"]>[0],
 ) {
   if (!savedItemSearchIndex) {
     return;

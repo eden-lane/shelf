@@ -1,41 +1,47 @@
+import { extname, resolve, sep } from "node:path";
+import { RPCHandler } from "@orpc/server/fetch";
 import {
   authorizationRequiresConsent,
   createOAuthAuthorizationCode,
   exchangeOAuthAuthorizationCode,
   getOAuthAuthorizationServerMetadata,
-  getShelfDiscovery,
   getRegistrationStatus,
+  getShelfDiscovery,
   listConnectedApps,
   login,
+  type OAuthScope,
+  type OAuthServerOptions,
   parseOAuthAuthorizationRequest,
+  type RegistrationMode,
   refreshOAuthTokens,
   resolveOAuthBearerToken,
+  resolveSessionToken,
   revokeConnectedApp,
   revokeOAuthToken,
   revokeSessionToken,
-  resolveSessionToken,
   signup,
-  type OAuthServerOptions,
-  type OAuthScope,
-  type RegistrationMode
 } from "@shelf/api/auth";
+import type { CurrentIdentity } from "@shelf/api/currentUser";
+import { getCurrentUserResponse } from "@shelf/api/currentUser";
+import type { Database } from "@shelf/api/db";
+import { checkHealth, type HealthDependencies } from "@shelf/api/health";
+import {
+  createDatabaseIntegrationsStore,
+  type GitHubOAuthOptions,
+  type IntegrationsStore,
+  OAuthGitHubClient,
+} from "@shelf/api/integrations";
+import { createRpcRouter } from "@shelf/api/rpc";
 import {
   createDatabaseSavedItemsStore,
   type SavedItemEnrichmentQueue,
+  type SavedItemSearchIndex,
   type SavedItemsStore,
-  type SavedItemSearchIndex
 } from "@shelf/api/savedItems";
-import { getCurrentUserResponse } from "@shelf/api/currentUser";
-import type { CurrentIdentity } from "@shelf/api/currentUser";
-import type { Database } from "@shelf/api/db";
-import { checkHealth, type HealthDependencies } from "@shelf/api/health";
-import { createRpcRouter } from "@shelf/api/rpc";
-import { RPCHandler } from "@orpc/server/fetch";
 import { Hono } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { rateLimiter } from "hono-rate-limiter";
-import { extname, resolve, sep } from "node:path";
 
 export interface AppOptions {
   dependencies: HealthDependencies & { db?: Database };
@@ -43,10 +49,13 @@ export interface AppOptions {
   savedItemsStore?: SavedItemsStore;
   savedItemEnrichmentQueue?: SavedItemEnrichmentQueue;
   savedItemSearchIndex?: SavedItemSearchIndex;
+  integrationsStore?: IntegrationsStore;
   authMode?: "session" | "none";
   registrationMode?: RegistrationMode;
+  appOrigin?: string;
   allowedOrigins?: string[];
   oauth?: OAuthServerOptions;
+  githubOAuth?: GitHubOAuthOptions;
   sessionCookieSecure?: boolean;
   staticDir?: string | null;
 }
@@ -57,19 +66,28 @@ export const createApp = (options: AppOptions) => {
   const app = new Hono();
   const authMode = options.authMode ?? "session";
   const registrationMode = options.registrationMode ?? "first-user-only";
+  const appOrigin = options.appOrigin ?? "http://localhost:5173";
   const allowedOrigins = options.allowedOrigins ?? [];
   const savedItemsStore =
     options.savedItemsStore ??
     (options.dependencies.db ? createDatabaseSavedItemsStore(options.dependencies.db) : undefined);
+  const githubClient = new OAuthGitHubClient(
+    options.githubOAuth ?? { clientId: null, clientSecret: null, redirectUri: null },
+  );
+  const integrationsStore =
+    options.integrationsStore ??
+    (options.dependencies.db
+      ? createDatabaseIntegrationsStore(options.dependencies.db, githubClient)
+      : undefined);
 
   app.use(
     "*",
     allowedOrigins.length > 0
       ? cors({
           credentials: true,
-          origin: allowedOrigins
+          origin: allowedOrigins,
         })
-      : cors()
+      : cors(),
   );
 
   const authLimiter = rateLimiter({
@@ -80,7 +98,7 @@ export const createApp = (options: AppOptions) => {
       "anonymous",
     limit: 10,
     standardHeaders: "draft-6",
-    windowMs: 60 * 1000
+    windowMs: 60 * 1000,
   });
 
   app.get("/health", async (context) => {
@@ -90,11 +108,11 @@ export const createApp = (options: AppOptions) => {
   });
 
   app.get("/.well-known/shelf", (context) =>
-    context.json(getShelfDiscovery({ issuer: requestOrigin(context), options: options.oauth }))
+    context.json(getShelfDiscovery({ issuer: requestOrigin(context), options: options.oauth })),
   );
 
   app.get("/.well-known/oauth-authorization-server", (context) =>
-    context.json(getOAuthAuthorizationServerMetadata({ issuer: requestOrigin(context) }))
+    context.json(getOAuthAuthorizationServerMetadata({ issuer: requestOrigin(context) })),
   );
 
   app.get("/oauth/authorize", async (context) => {
@@ -107,7 +125,7 @@ export const createApp = (options: AppOptions) => {
     try {
       authorizationRequest = parseOAuthAuthorizationRequest(
         new URL(context.req.url).searchParams,
-        oauthOptionsForRequest(context, options.oauth)
+        oauthOptionsForRequest(context, options.oauth),
       );
     } catch (error) {
       return oauthErrorResponse(context, oauthErrorCode(error), 400);
@@ -117,7 +135,10 @@ export const createApp = (options: AppOptions) => {
 
     if (!authContext.currentUser) {
       const loginUrl = new URL("/", requestOrigin(context));
-      loginUrl.searchParams.set("oauth_return", `${context.req.path}?${new URL(context.req.url).searchParams}`);
+      loginUrl.searchParams.set(
+        "oauth_return",
+        `${context.req.path}?${new URL(context.req.url).searchParams}`,
+      );
 
       return context.redirect(loginUrl.toString(), 302);
     }
@@ -127,7 +148,7 @@ export const createApp = (options: AppOptions) => {
         await authorizationRequiresConsent(
           options.dependencies.db,
           authContext.currentUser.user.id,
-          authorizationRequest
+          authorizationRequest,
         )
       ) {
         return context.html(consentPageHtml(authorizationRequest), 200);
@@ -137,7 +158,7 @@ export const createApp = (options: AppOptions) => {
         options.dependencies.db,
         authContext.currentUser,
         authorizationRequest,
-        { approved: false }
+        { approved: false },
       );
 
       return context.redirect(redirectUrl, 302);
@@ -175,7 +196,7 @@ export const createApp = (options: AppOptions) => {
     try {
       authorizationRequest = parseOAuthAuthorizationRequest(
         authorizationParams,
-        oauthOptionsForRequest(context, options.oauth)
+        oauthOptionsForRequest(context, options.oauth),
       );
     } catch (error) {
       return oauthErrorResponse(context, oauthErrorCode(error), 400);
@@ -194,7 +215,7 @@ export const createApp = (options: AppOptions) => {
         options.dependencies.db,
         authContext.currentUser,
         authorizationRequest,
-        { approved: true }
+        { approved: true },
       );
 
       return context.redirect(redirectUrl, 302);
@@ -218,12 +239,12 @@ export const createApp = (options: AppOptions) => {
               clientId: body.client_id,
               code: body.code,
               redirectUri: body.redirect_uri,
-              codeVerifier: body.code_verifier
+              codeVerifier: body.code_verifier,
             })
           : grantType === "refresh_token"
             ? await refreshOAuthTokens(options.dependencies.db, {
                 clientId: body.client_id,
-                refreshToken: body.refresh_token
+                refreshToken: body.refresh_token,
               })
             : null;
 
@@ -250,7 +271,7 @@ export const createApp = (options: AppOptions) => {
     if (body.token) {
       await revokeOAuthToken(options.dependencies.db, {
         clientId: body.client_id || null,
-        token: body.token
+        token: body.token,
       });
     }
 
@@ -258,8 +279,42 @@ export const createApp = (options: AppOptions) => {
   });
 
   app.get("/oauth/browser-extension/callback", (context) =>
-    context.html(browserExtensionCallbackPageHtml(), 200)
+    context.html(browserExtensionCallbackPageHtml(), 200),
   );
+
+  app.get("/integrations/github/callback", async (context) => {
+    const authContext = await resolveAuthContext(context);
+    const url = new URL(context.req.url);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+
+    if (!authContext.currentUser || !integrationsStore || !code || !state) {
+      return context.redirect(appRedirectUrl(appOrigin), 302);
+    }
+
+    try {
+      const exchanged = await githubClient.exchangeCode({ code, state });
+
+      if (
+        exchanged.userId === authContext.currentUser.user.id &&
+        authContext.currentUser.libraries.some((library) => library.id === exchanged.libraryId)
+      ) {
+        await integrationsStore.createOrUpdateAccount({
+          accessToken: exchanged.accessToken,
+          connectedByUserId: authContext.currentUser.user.id,
+          externalAccountId: String(exchanged.externalAccount.id),
+          externalAccountName: exchanged.externalAccount.login,
+          libraryId: exchanged.libraryId,
+          provider: "github",
+          providerSurface: "github_stars",
+        });
+      }
+    } catch (error) {
+      console.error("Unable to complete GitHub integration callback", error);
+    }
+
+    return context.redirect(appRedirectUrl(appOrigin), 302);
+  });
 
   app.get("/auth/session", async (context) => {
     const { currentUser } = await resolveAuthContext(context);
@@ -269,7 +324,7 @@ export const createApp = (options: AppOptions) => {
 
     return context.json({
       registration,
-      user: currentUser ? getCurrentUserResponse(currentUser) : null
+      user: currentUser ? getCurrentUserResponse(currentUser) : null,
     });
   });
 
@@ -320,13 +375,13 @@ export const createApp = (options: AppOptions) => {
         locale: readOptionalString(body, "locale"),
         name: readOptionalString(body, "name"),
         password: readString(body, "password"),
-        username: readOptionalString(body, "username")
+        username: readOptionalString(body, "username"),
       });
 
       writeSessionCookie(context, session.token, session.expiresAt);
 
       return context.json({
-        user: getCurrentUserResponse(session.currentUser)
+        user: getCurrentUserResponse(session.currentUser),
       });
     } catch (error) {
       return authErrorResponse(context, error);
@@ -349,13 +404,13 @@ export const createApp = (options: AppOptions) => {
     try {
       const session = await login(options.dependencies.db, {
         email: readString(body, "email"),
-        password: readString(body, "password")
+        password: readString(body, "password"),
       });
 
       writeSessionCookie(context, session.token, session.expiresAt);
 
       return context.json({
-        user: getCurrentUserResponse(session.currentUser)
+        user: getCurrentUserResponse(session.currentUser),
       });
     } catch (error) {
       return authErrorResponse(context, error);
@@ -374,7 +429,7 @@ export const createApp = (options: AppOptions) => {
     }
 
     deleteCookie(context, SESSION_COOKIE_NAME, {
-      path: "/"
+      path: "/",
     });
 
     return context.json({ ok: true });
@@ -405,8 +460,8 @@ export const createApp = (options: AppOptions) => {
       headers: {
         "cache-control": "public, max-age=604800, immutable",
         "content-length": String(favicon.imageBytes.byteLength),
-        "content-type": favicon.contentType
-      }
+        "content-type": favicon.contentType,
+      },
     });
   });
 
@@ -427,11 +482,13 @@ export const createApp = (options: AppOptions) => {
         currentUser: currentUser ?? undefined,
         oauthScopes,
         dependencies: options.dependencies,
-        savedItemSearchIndex: options.savedItemSearchIndex
-      })
+        savedItemSearchIndex: options.savedItemSearchIndex,
+        integrationsStore,
+        githubClient,
+      }),
     );
     const { matched, response } = await rpcHandler.handle(context.req.raw, {
-      prefix: "/rpc"
+      prefix: "/rpc",
     });
 
     if (matched) {
@@ -473,7 +530,7 @@ export const createApp = (options: AppOptions) => {
       if (identity) {
         return {
           currentUser: identity.currentUser,
-          oauthScopes: new Set(identity.scopes)
+          oauthScopes: new Set(identity.scopes),
         };
       }
     }
@@ -481,8 +538,8 @@ export const createApp = (options: AppOptions) => {
     return {
       currentUser: await resolveSessionToken(
         options.dependencies.db,
-        getCookie(context, SESSION_COOKIE_NAME)
-      )
+        getCookie(context, SESSION_COOKIE_NAME),
+      ),
     };
   }
 
@@ -505,14 +562,14 @@ export const createApp = (options: AppOptions) => {
   function writeSessionCookie(
     context: Parameters<typeof setCookie>[0],
     token: string,
-    expiresAt: Date
+    expiresAt: Date,
   ) {
     setCookie(context, SESSION_COOKIE_NAME, token, {
       expires: expiresAt,
       httpOnly: true,
       path: "/",
       sameSite: "Lax",
-      secure: options.sessionCookieSecure ?? false
+      secure: options.sessionCookieSecure ?? false,
     });
   }
 };
@@ -532,16 +589,18 @@ const requestOrigin = (context: Parameters<typeof getCookie>[0]) => {
   return `${protocol}://${host}`;
 };
 
+const appRedirectUrl = (appOrigin: string) => new URL("/", appOrigin).toString();
+
 const oauthOptionsForRequest = (
   context: Parameters<typeof getCookie>[0],
-  configuredOptions: OAuthServerOptions | undefined
+  configuredOptions: OAuthServerOptions | undefined,
 ): OAuthServerOptions => {
   const origin = requestOrigin(context);
   const browserExtensionRedirectUri = `${origin}/oauth/browser-extension/callback`;
   const configuredBrowserExtensionRedirectUris =
     configuredOptions?.clients?.["browser-extension"]?.redirectUris ?? [];
   const browserExtensionRedirectUris = [
-    ...new Set([...configuredBrowserExtensionRedirectUris, browserExtensionRedirectUri])
+    ...new Set([...configuredBrowserExtensionRedirectUris, browserExtensionRedirectUri]),
   ];
 
   return {
@@ -550,13 +609,13 @@ const oauthOptionsForRequest = (
       ...configuredOptions?.clients,
       "browser-extension": {
         ...configuredOptions?.clients?.["browser-extension"],
-        redirectUris: browserExtensionRedirectUris
-      }
+        redirectUris: browserExtensionRedirectUris,
+      },
     },
     developmentRedirects:
       typeof configuredOptions?.developmentRedirects === "boolean"
         ? configuredOptions.developmentRedirects
-        : isLocalDevelopmentOrigin(origin)
+        : isLocalDevelopmentOrigin(origin),
   };
 };
 
@@ -601,8 +660,8 @@ const readRequestBody = async (request: Request): Promise<Record<string, string>
 
     return Object.fromEntries(
       Object.entries(body).flatMap(([key, value]) =>
-        typeof value === "string" ? [[key, value]] : []
-      )
+        typeof value === "string" ? [[key, value]] : [],
+      ),
     );
   }
 
@@ -635,12 +694,12 @@ const consentPageHtml = (request: ReturnType<typeof parseOAuthAuthorizationReque
     device_name: request.deviceName ?? "",
     platform: request.platform ?? "",
     browser: request.browser ?? "",
-    extension_version: request.extensionVersion ?? ""
+    extension_version: request.extensionVersion ?? "",
   };
   const hiddenFields = Object.entries(fields)
     .map(
       ([key, value]) =>
-        `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`
+        `<input type="hidden" name="${escapeHtml(key)}" value="${escapeHtml(value)}">`,
     )
     .join("");
 
@@ -718,7 +777,7 @@ const escapeHtml = (value: string) =>
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;");
+    .replaceAll('"', "&quot;");
 
 const oauthErrorCode = (error: unknown) =>
   error instanceof Error && "code" in error && typeof error.code === "string"
@@ -728,7 +787,7 @@ const oauthErrorCode = (error: unknown) =>
 const oauthErrorResponse = (
   context: Parameters<typeof getCookie>[0],
   error: string,
-  status: 400 | 404
+  status: 400 | 404,
 ) => context.json({ error }, status);
 
 const readStaticResponse = async (staticRoot: string, requestPath: string) => {
@@ -780,9 +839,7 @@ const responseFromFile = async (staticRoot: string, filePath: string, requestPat
 
   headers.set(
     "cache-control",
-    requestPath.startsWith("/assets/")
-      ? "public, max-age=31536000, immutable"
-      : "no-cache"
+    requestPath.startsWith("/assets/") ? "public, max-age=31536000, immutable" : "no-cache",
   );
 
   return new Response(file, { headers });
@@ -809,9 +866,7 @@ const readOptionalString = (body: unknown, key: string) => {
 
 const authErrorResponse = (context: Parameters<typeof getCookie>[0], error: unknown) => {
   const code =
-    error instanceof Error && "code" in error && typeof error.code === "string"
-      ? error.code
-      : null;
+    error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : null;
 
   if (code === "registration_closed") {
     return context.json({ error: "Registration is closed for this instance" }, 403);

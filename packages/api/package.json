@@ -9,6 +9,7 @@
     "./currentUser": "./src/currentUser/index.ts",
     "./db": "./src/db/index.ts",
     "./health": "./src/health/index.ts",
+    "./integrations": "./src/integrations/index.ts",
     "./rpc": "./src/rpc.ts"
   },
   "scripts": {

@@ -239,3 +239,142 @@ export interface MoveTagInput {
 export interface DeleteTagInput {
   tagId: string;
 }
+
+export type IntegrationProvider = "github";
+export type ProviderSurface = "github_stars";
+export type IntegrationAccountStatus =
+  | "connected"
+  | "disabled"
+  | "needs_reconnect"
+  | "disconnected";
+export type SyncRunStatus = "queued" | "running" | "succeeded" | "failed";
+export type ImportRuleConditionField =
+  | "language"
+  | "topics"
+  | "name"
+  | "stargazers_count"
+  | "forks_count"
+  | "private"
+  | "archived";
+export type ImportRuleConditionOperator = "is" | "contains" | ">" | ">=" | "<" | "<=" | "==";
+export type ImportRuleActionType = "add_tag" | "move_to_folder";
+
+export interface IntegrationAccountItem {
+  id: string;
+  libraryId: string;
+  provider: IntegrationProvider;
+  providerSurface: ProviderSurface;
+  externalAccountId: string;
+  externalAccountName: string;
+  status: IntegrationAccountStatus;
+  lastSyncStartedAt: string | null;
+  lastSyncFinishedAt: string | null;
+  lastSyncStatus: SyncRunStatus | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SyncRunItem {
+  id: string;
+  integrationAccountId: string;
+  status: SyncRunStatus;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdCount: number;
+  attachedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  lastError: string | null;
+  checkpoint: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderImportSettingsItem {
+  id: string;
+  libraryId: string;
+  provider: IntegrationProvider;
+  defaultFolderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportRuleItem {
+  id: string;
+  libraryId: string;
+  provider: IntegrationProvider;
+  sortOrder: number;
+  conditionField: ImportRuleConditionField;
+  conditionOperator: ImportRuleConditionOperator;
+  conditionValue: string | number | boolean;
+  actionType: ImportRuleActionType;
+  actionTargetId: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntegrationsListResponse {
+  accounts: IntegrationAccountItem[];
+  latestSyncRuns: SyncRunItem[];
+}
+
+export interface StartGithubConnectionInput {
+  libraryId: string;
+  redirectUri?: string | null;
+}
+
+export interface StartGithubConnectionResponse {
+  authorizationUrl: string;
+}
+
+export interface CompleteGithubConnectionInput {
+  code: string;
+  state: string;
+}
+
+export interface IntegrationAccountInput {
+  integrationAccountId: string;
+}
+
+export interface SetIntegrationEnabledInput extends IntegrationAccountInput {
+  enabled: boolean;
+}
+
+export interface ProviderInput {
+  libraryId: string;
+  provider: IntegrationProvider;
+}
+
+export interface UpdateProviderSettingsInput extends ProviderInput {
+  defaultFolderId?: string | null;
+}
+
+export interface CreateImportRuleInput extends ProviderInput {
+  conditionField: ImportRuleConditionField;
+  conditionOperator: ImportRuleConditionOperator;
+  conditionValue: string | number | boolean;
+  actionType: ImportRuleActionType;
+  actionTargetId: string;
+  enabled?: boolean;
+}
+
+export interface UpdateImportRuleInput {
+  importRuleId: string;
+  conditionField?: ImportRuleConditionField;
+  conditionOperator?: ImportRuleConditionOperator;
+  conditionValue?: string | number | boolean;
+  actionType?: ImportRuleActionType;
+  actionTargetId?: string;
+  enabled?: boolean;
+}
+
+export interface ReorderImportRulesInput {
+  libraryId: string;
+  provider: IntegrationProvider;
+  orderedImportRuleIds: string[];
+}
+
+export interface DeleteImportRuleInput {
+  importRuleId: string;
+}

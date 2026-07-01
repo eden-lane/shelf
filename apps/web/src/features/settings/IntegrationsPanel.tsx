@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import type { FolderItem, TagItem } from "@shelf/shared";
+import type { FolderItem, ImportRuleItem, TagItem } from "@shelf/shared";
 import {
   IconBrandGithub,
   IconCheck,
@@ -12,9 +12,25 @@ import {
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
-import { getFolders, getTags } from "../../api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  completeGithubConnection,
+  createImportRule,
+  deleteImportRule,
+  disconnectIntegration,
+  getCurrentUser,
+  getFolders,
+  getImportRules,
+  getIntegrations,
+  getProviderImportSettings,
+  getTags,
+  setIntegrationEnabled,
+  startGithubConnection,
+  syncIntegrationNow,
+  updateImportRule,
+  updateProviderImportSettings,
+} from "../../api";
 import { DEFAULT_FOLDER_ICON_COLOR, getFolderIconComponent } from "../folders/folderIcons";
 import { buildFolderTree, folderPath } from "../folders/folderTree";
 import type { FolderNode } from "../folders/types";
@@ -39,6 +55,16 @@ interface GitHubDefaultRule {
 type GitHubRule = GitHubDefaultRule | GitHubConditionalRule;
 type GitHubRuleAction = Pick<GitHubRule, "thenType" | "thenValue">;
 
+const toPanelRule = (rule: ImportRuleItem): GitHubConditionalRule => ({
+  id: rule.id,
+  ifField: rule.conditionField,
+  ifOperator: rule.conditionOperator,
+  ifValue: String(rule.conditionValue),
+  kind: "conditional",
+  thenType: rule.actionType === "add_tag" ? "addTag" : "moveToFolder",
+  thenValue: rule.actionTargetId,
+});
+
 const GITHUB_IF_FIELDS = [
   { value: "language", label: "Language", type: "string" as const },
   { value: "topics", label: "Topic contains", type: "string" as const },
@@ -59,41 +85,14 @@ function getFieldLabel(field: string) {
   return GITHUB_IF_FIELDS.find((f) => f.value === field)?.label || field;
 }
 
-const initialRules: GitHubRule[] = [
-  {
-    id: "default",
-    kind: "default",
-    thenType: "moveToFolder",
-    thenValue: "inbox",
-  },
-  {
-    id: "r1",
-    kind: "conditional",
-    ifField: "language",
-    ifOperator: "is",
-    ifValue: "TypeScript",
-    thenType: "addTag",
-    thenValue: "typescript",
-  },
-  {
-    id: "r2",
-    kind: "conditional",
-    ifField: "private",
-    ifOperator: "is",
-    ifValue: "true",
-    thenType: "moveToFolder",
-    thenValue: "GitHub / Private",
-  },
-  {
-    id: "r3",
-    kind: "conditional",
-    ifField: "topics",
-    ifOperator: "contains",
-    ifValue: "cli",
-    thenType: "addTag",
-    thenValue: "cli",
-  },
-];
+const parsePanelRuleValue = (value: string): string | number | boolean => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+
+  const numberValue = Number(value);
+
+  return value.trim() !== "" && Number.isFinite(numberValue) ? numberValue : value;
+};
 
 type FolderOption =
   | { kind: "inbox"; libraryId: null }
@@ -400,12 +399,11 @@ const RuleForm = ({
               <Popover.Trigger className={pickerTriggerClassName} type="button">
                 {thenValue ? (
                   <>
-                    {tags.find((t) => t.name === thenValue) ? (
+                    {tags.find((t) => t.id === thenValue) ? (
                       <span
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{
-                          backgroundColor:
-                            tags.find((t) => t.name === thenValue)?.color ?? "#697080",
+                          backgroundColor: tags.find((t) => t.id === thenValue)?.color ?? "#697080",
                         }}
                         aria-hidden="true"
                       />
@@ -417,7 +415,9 @@ const RuleForm = ({
                         aria-hidden="true"
                       />
                     )}
-                    <span className="min-w-0 flex-1 truncate text-left">{thenValue}</span>
+                    <span className="min-w-0 flex-1 truncate text-left">
+                      {tags.find((t) => t.id === thenValue)?.name ?? "Missing tag"}
+                    </span>
                   </>
                 ) : (
                   <span className="text-[#9aa1ad]">Select tag…</span>
@@ -445,40 +445,19 @@ const RuleForm = ({
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
-                              const name = tagSearch.trim();
-                              if (name) {
-                                setThenValue(name);
-                                setTagPickerOpen(false);
-                              }
                             }
                           }}
                         />
                       </label>
                     </div>
                     <div className="max-h-[200px] overflow-y-auto py-1">
-                      {tagSearch.trim() &&
-                        !tags.some(
-                          (t) => t.name.toLowerCase() === tagSearch.trim().toLowerCase(),
-                        ) && (
-                          <button
-                            type="button"
-                            className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-[#3b8df5] outline-none hover:bg-[#f0f6ff]"
-                            onClick={() => {
-                              setThenValue(tagSearch.trim());
-                              setTagPickerOpen(false);
-                            }}
-                          >
-                            <IconPlus size={14} stroke={1.8} aria-hidden="true" />
-                            Create "{tagSearch.trim()}"
-                          </button>
-                        )}
                       {displayedTags.map((tag) => (
                         <button
                           key={tag.id}
                           type="button"
                           className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
                           onClick={() => {
-                            setThenValue(tag.name);
+                            setThenValue(tag.id);
                             setTagPickerOpen(false);
                           }}
                         >
@@ -488,7 +467,7 @@ const RuleForm = ({
                             aria-hidden="true"
                           />
                           <span className="min-w-0 flex-1 truncate">{tag.name}</span>
-                          {thenValue === tag.name && (
+                          {thenValue === tag.id && (
                             <IconCheck
                               size={14}
                               stroke={2}
@@ -641,19 +620,135 @@ const IntegrationsPanel = ({
     queryKey: ["tags"],
     refetchOnMount: "always",
   });
-  const [githubEnabled, setGithubEnabled] = useState(false);
+  const currentUserQuery = useQuery({
+    queryFn: getCurrentUser,
+    queryKey: ["currentUser"],
+  });
+  const integrationsQuery = useQuery({
+    queryFn: getIntegrations,
+    queryKey: ["integrations"],
+    refetchOnMount: "always",
+  });
+  const queryClient = useQueryClient();
+  const githubAccount = integrationsQuery.data?.accounts.find(
+    (account) => account.provider === "github" && account.providerSurface === "github_stars",
+  );
+  const targetLibraryId =
+    githubAccount?.libraryId ??
+    currentUserQuery.data?.libraries.find((library) => library.kind === "personal")?.id ??
+    currentUserQuery.data?.libraries[0]?.id ??
+    folders[0]?.libraryId ??
+    tags[0]?.libraryId ??
+    null;
+  const providerInput = targetLibraryId
+    ? { libraryId: targetLibraryId, provider: "github" as const }
+    : null;
+  const providerSettingsQuery = useQuery({
+    enabled: Boolean(providerInput),
+    queryFn: () =>
+      getProviderImportSettings(providerInput ?? { libraryId: "", provider: "github" }),
+    queryKey: ["providerImportSettings", providerInput],
+  });
+  const importRulesQuery = useQuery({
+    enabled: Boolean(providerInput),
+    queryFn: () => getImportRules(providerInput ?? { libraryId: "", provider: "github" }),
+    queryKey: ["importRules", providerInput],
+  });
   const [githubExpanded, setGithubExpanded] = useState(true);
-  const [rules, setRules] = useState<GitHubRule[]>(initialRules);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const handledGithubCallbackRef = useRef(false);
   const panelFolders = foldersQuery.data ?? folders;
   const panelTags = tagsQuery.data ?? tags;
+  const latestSyncRun = integrationsQuery.data?.latestSyncRuns.find(
+    (run) => run.integrationAccountId === githubAccount?.id,
+  );
+  const githubEnabled = githubAccount?.status === "connected";
+  const defaultRule: GitHubDefaultRule = {
+    id: "default",
+    kind: "default",
+    thenType: "moveToFolder",
+    thenValue: providerSettingsQuery.data?.defaultFolderId ?? "inbox",
+  };
   const orderedRules = useMemo(() => {
-    const defaultRule = rules.find((rule) => rule.kind === "default");
-    const conditionalRules = rules.filter((rule) => rule.kind === "conditional");
+    const conditionalRules = (importRulesQuery.data ?? []).map(toPanelRule);
 
-    return defaultRule ? [defaultRule, ...conditionalRules] : conditionalRules;
-  }, [rules]);
+    return [defaultRule, ...conditionalRules];
+  }, [defaultRule, importRulesQuery.data]);
+
+  const invalidateIntegrations = () => {
+    void queryClient.invalidateQueries({ queryKey: ["integrations"] });
+    void queryClient.invalidateQueries({ queryKey: ["providerImportSettings"] });
+    void queryClient.invalidateQueries({ queryKey: ["importRules"] });
+  };
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      if (!targetLibraryId) throw new Error("Choose a workspace before connecting GitHub");
+      const response = await startGithubConnection({
+        libraryId: targetLibraryId,
+      });
+      window.location.assign(response.authorizationUrl);
+    },
+  });
+  const completeConnectionMutation = useMutation({
+    mutationFn: completeGithubConnection,
+    onSuccess: () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("code");
+      url.searchParams.delete("state");
+      window.history.replaceState({}, "", url.toString());
+      invalidateIntegrations();
+    },
+  });
+  const disconnectMutation = useMutation({
+    mutationFn: disconnectIntegration,
+    onSuccess: invalidateIntegrations,
+  });
+  const enabledMutation = useMutation({
+    mutationFn: setIntegrationEnabled,
+    onSuccess: invalidateIntegrations,
+  });
+  const syncMutation = useMutation({
+    mutationFn: syncIntegrationNow,
+    onSuccess: () => {
+      invalidateIntegrations();
+      void queryClient.invalidateQueries({ queryKey: ["savedItems"] });
+      void queryClient.invalidateQueries({ queryKey: ["folders"] });
+      void queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+  });
+  const updateSettingsMutation = useMutation({
+    mutationFn: updateProviderImportSettings,
+    onSuccess: invalidateIntegrations,
+  });
+  const createRuleMutation = useMutation({
+    mutationFn: createImportRule,
+    onSuccess: invalidateIntegrations,
+  });
+  const updateRuleMutation = useMutation({
+    mutationFn: updateImportRule,
+    onSuccess: invalidateIntegrations,
+  });
+  const deleteRuleMutation = useMutation({
+    mutationFn: deleteImportRule,
+    onSuccess: invalidateIntegrations,
+  });
+
+  useEffect(() => {
+    if (handledGithubCallbackRef.current) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+
+    if (code && state) {
+      handledGithubCallbackRef.current = true;
+      completeConnectionMutation.mutate({ code, state });
+    }
+  }, [completeConnectionMutation]);
 
   const refreshLibraryItems = () => {
     onRefreshLibraryItems();
@@ -666,7 +761,11 @@ const IntegrationsPanel = ({
       setIsAdding(false);
       setEditingId(null);
     }
-    setGithubEnabled(enabled);
+    if (githubAccount) {
+      enabledMutation.mutate({ enabled, integrationAccountId: githubAccount.id });
+    } else if (enabled) {
+      connectMutation.mutate();
+    }
     setGithubExpanded(enabled);
   };
 
@@ -681,27 +780,22 @@ const IntegrationsPanel = ({
     id: string,
     data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction,
   ) => {
-    setRules((prev) =>
-      prev.map((rule) => {
-        if (rule.id !== id) {
-          return rule;
-        }
-
-        if (rule.kind === "default") {
-          return {
-            ...rule,
-            thenType: "moveToFolder",
-            thenValue: data.thenValue,
-          };
-        }
-
-        return {
-          id,
-          kind: "conditional",
-          ...(data as Omit<GitHubConditionalRule, "id" | "kind">),
-        };
-      }),
-    );
+    if (id === "default" && providerInput) {
+      updateSettingsMutation.mutate({
+        ...providerInput,
+        defaultFolderId: data.thenValue === "inbox" ? null : data.thenValue,
+      });
+    } else {
+      const ruleData = data as Omit<GitHubConditionalRule, "id" | "kind">;
+      updateRuleMutation.mutate({
+        actionTargetId: ruleData.thenValue,
+        actionType: ruleData.thenType === "addTag" ? "add_tag" : "move_to_folder",
+        conditionField: ruleData.ifField as ImportRuleItem["conditionField"],
+        conditionOperator: ruleData.ifOperator as ImportRuleItem["conditionOperator"],
+        conditionValue: parsePanelRuleValue(ruleData.ifValue),
+        importRuleId: id,
+      });
+    }
     setEditingId(null);
   };
 
@@ -709,7 +803,7 @@ const IntegrationsPanel = ({
     if (id === "default") {
       return;
     }
-    setRules((prev) => prev.filter((r) => r.id !== id));
+    deleteRuleMutation.mutate({ importRuleId: id });
     if (editingId === id) setEditingId(null);
   };
 
@@ -719,14 +813,16 @@ const IntegrationsPanel = ({
   };
 
   const saveAdd = (data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction) => {
-    setRules((prev) => [
-      ...prev,
-      {
-        id: `r${Date.now()}`,
-        kind: "conditional",
-        ...(data as Omit<GitHubConditionalRule, "id" | "kind">),
-      },
-    ]);
+    if (!providerInput) return;
+    const ruleData = data as Omit<GitHubConditionalRule, "id" | "kind">;
+    createRuleMutation.mutate({
+      ...providerInput,
+      actionTargetId: ruleData.thenValue,
+      actionType: ruleData.thenType === "addTag" ? "add_tag" : "move_to_folder",
+      conditionField: ruleData.ifField as ImportRuleItem["conditionField"],
+      conditionOperator: ruleData.ifOperator as ImportRuleItem["conditionOperator"],
+      conditionValue: parsePanelRuleValue(ruleData.ifValue),
+    });
     setIsAdding(false);
   };
 
@@ -754,7 +850,7 @@ const IntegrationsPanel = ({
               onChange={handleToggle}
               label="Enable GitHub integration"
             />
-            {githubEnabled && (
+            {githubAccount && (
               <button
                 type="button"
                 aria-expanded={githubExpanded}
@@ -773,15 +869,76 @@ const IntegrationsPanel = ({
           </div>
         </div>
 
-        {githubEnabled && githubExpanded && (
+        {(githubEnabled || githubAccount) && githubExpanded && (
           <div className="grid gap-5">
-            <button
-              type="button"
-              className="inline-flex h-8 items-center gap-2 self-start rounded-lg bg-[#f2f6fb] px-3 text-sm font-medium text-slate-950 outline-none hover:bg-[#eaf1fa] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
-              onClick={() => {}}
-            >
-              Connect an account
-            </button>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#f7f9fc] p-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="m-0 font-medium text-slate-950">
+                  {githubAccount
+                    ? `@${githubAccount.externalAccountName}`
+                    : completeConnectionMutation.isPending
+                      ? "Completing GitHub connection…"
+                      : "No GitHub account connected"}
+                </p>
+                <p className="m-0 mt-0.5 text-xs text-gray-500">
+                  {githubAccount
+                    ? `Status: ${githubAccount.status.replace("_", " ")}`
+                    : "Connect GitHub to import starred repositories."}
+                  {latestSyncRun
+                    ? ` · Last sync: ${latestSyncRun.status}, ${latestSyncRun.createdCount} created, ${latestSyncRun.attachedCount} attached`
+                    : ""}
+                </p>
+                {latestSyncRun?.lastError && (
+                  <p className="m-0 mt-1 text-xs text-red-600">{latestSyncRun.lastError}</p>
+                )}
+              </div>
+              {!githubAccount ? (
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center gap-2 self-start rounded-lg bg-[#242833] px-3 text-sm font-medium text-white outline-none hover:bg-[#111827] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                  disabled={connectMutation.isPending || !targetLibraryId}
+                  onClick={() => connectMutation.mutate()}
+                >
+                  Connect account
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm font-medium text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    disabled={
+                      syncMutation.isPending ||
+                      githubAccount.status !== "connected" ||
+                      latestSyncRun?.status === "queued" ||
+                      latestSyncRun?.status === "running"
+                    }
+                    onClick={() => syncMutation.mutate({ integrationAccountId: githubAccount.id })}
+                  >
+                    {syncMutation.isPending || latestSyncRun?.status === "running"
+                      ? "Syncing…"
+                      : "Sync now"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm font-medium text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    disabled={connectMutation.isPending}
+                    onClick={() => connectMutation.mutate()}
+                  >
+                    {githubAccount.status === "needs_reconnect" ? "Reconnect" : "Reconnect account"}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 outline-none hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    disabled={disconnectMutation.isPending}
+                    onClick={() =>
+                      disconnectMutation.mutate({ integrationAccountId: githubAccount.id })
+                    }
+                  >
+                    Disconnect
+                  </button>
+                </>
+              )}
+            </div>
 
             <div className="grid gap-3">
               <div className="flex items-center justify-between">
@@ -881,7 +1038,8 @@ const IntegrationsPanel = ({
                             "
                             {rule.thenType === "moveToFolder"
                               ? getFolderDisplayValue(rule.thenValue, panelFolders)
-                              : rule.thenValue}
+                              : (panelTags.find((tag) => tag.id === rule.thenValue)?.name ??
+                                "Missing tag")}
                             "
                           </span>
                         </div>

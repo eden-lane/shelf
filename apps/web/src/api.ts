@@ -1,33 +1,48 @@
+import { type Client, createORPCClient, type NestedClient } from "@orpc/client";
+import { RPCLink } from "@orpc/client/fetch";
 import type {
   AddSavedItemTagInput,
   AuthCredentials,
   AuthSessionResponse,
-  SavedItem,
-  SavedItemPreviewInput,
-  SavedItemPreviewResponse,
-  SavedItemsPageResponse,
-  CreateSavedItemInput,
-  CreateFolderInput,
-  CreateTagInput,
   ConnectedApp,
-  DeleteSavedItemInput,
+  CreateFolderInput,
+  CreateImportRuleInput,
+  CreateSavedItemInput,
+  CreateTagInput,
   CurrentUserResponse,
   DeleteFolderInput,
+  DeleteImportRuleInput,
+  DeleteSavedItemInput,
   DeleteTagInput,
   FolderItem,
   HealthResponse,
+  ImportRuleItem,
+  IntegrationAccountInput,
+  IntegrationAccountItem,
+  IntegrationsListResponse,
   ListSavedItemsInput,
   MoveFolderInput,
   MoveSavedItemsInput,
   MoveTagInput,
+  ProviderImportSettingsItem,
+  ProviderInput,
+  ReorderImportRulesInput,
+  SavedItem,
+  SavedItemPreviewInput,
+  SavedItemPreviewResponse,
+  SavedItemsPageResponse,
   SearchSavedItemsInput,
+  SetIntegrationEnabledInput,
+  StartGithubConnectionInput,
+  StartGithubConnectionResponse,
+  SyncRunItem,
   TagItem,
   UpdateFolderInput,
+  UpdateImportRuleInput,
+  UpdateProviderSettingsInput,
   UpdateSavedItemInput,
-  UpdateTagInput
+  UpdateTagInput,
 } from "@shelf/shared";
-import { createORPCClient, type Client, type NestedClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const apiBaseUrlFromWindow = () => {
@@ -41,12 +56,11 @@ const apiBaseUrlFromWindow = () => {
 
   return window.location.origin;
 };
-const runtimeApiBaseUrl =
-  apiBaseUrlFromWindow();
+const runtimeApiBaseUrl = apiBaseUrlFromWindow();
 const apiBaseUrl = configuredApiBaseUrl || runtimeApiBaseUrl;
 const rpcLink = new RPCLink({
   fetch: (request, init) => fetch(request, { ...init, credentials: "include" }),
-  url: new URL("/rpc", apiBaseUrl).toString()
+  url: new URL("/rpc", apiBaseUrl).toString(),
 });
 const rpc = createORPCClient<WebRpcClient>(rpcLink);
 
@@ -58,6 +72,7 @@ interface WebRpcClient extends Record<string, NestedClient<Record<never, never>>
   savedItems: SavedItemsRpcClient;
   folders: FoldersRpcClient;
   tags: TagsRpcClient;
+  integrations: IntegrationsRpcClient;
 }
 
 interface SavedItemsRpcClient extends Record<string, NestedClient<Record<never, never>>> {
@@ -90,13 +105,32 @@ interface TagsRpcClient extends Record<string, NestedClient<Record<never, never>
   update: RpcProcedure<UpdateTagInput, TagItem>;
 }
 
+interface IntegrationsRpcClient extends Record<string, NestedClient<Record<never, never>>> {
+  list: RpcProcedure<undefined, IntegrationsListResponse>;
+  connectGithub: {
+    start: RpcProcedure<StartGithubConnectionInput, StartGithubConnectionResponse>;
+    callback: RpcProcedure<{ code: string; state: string }, IntegrationAccountItem>;
+  } & NestedClient<Record<never, never>>;
+  disconnect: RpcProcedure<IntegrationAccountInput, IntegrationAccountItem>;
+  setEnabled: RpcProcedure<SetIntegrationEnabledInput, IntegrationAccountItem>;
+  syncNow: RpcProcedure<IntegrationAccountInput, SyncRunItem>;
+  listSyncRuns: RpcProcedure<IntegrationAccountInput, SyncRunItem[]>;
+  getProviderSettings: RpcProcedure<ProviderInput, ProviderImportSettingsItem>;
+  updateProviderSettings: RpcProcedure<UpdateProviderSettingsInput, ProviderImportSettingsItem>;
+  listImportRules: RpcProcedure<ProviderInput, ImportRuleItem[]>;
+  createImportRule: RpcProcedure<CreateImportRuleInput, ImportRuleItem>;
+  updateImportRule: RpcProcedure<UpdateImportRuleInput, ImportRuleItem>;
+  reorderImportRules: RpcProcedure<ReorderImportRulesInput, ImportRuleItem[]>;
+  deleteImportRule: RpcProcedure<DeleteImportRuleInput, { deletedImportRuleId: string }>;
+}
+
 export const getHealth = async (): Promise<HealthResponse> => rpc.health();
 
 export const getCurrentUser = async (): Promise<CurrentUserResponse> => rpc.currentUser();
 
 export const getAuthSession = async (): Promise<AuthSessionResponse> => {
   const response = await fetch(new URL("/auth/session", apiBaseUrl), {
-    credentials: "include"
+    credentials: "include",
   });
 
   return readJsonResponse<AuthSessionResponse>(response);
@@ -107,24 +141,24 @@ export const signup = async (input: AuthCredentials): Promise<{ user: CurrentUse
     body: JSON.stringify(input),
     credentials: "include",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
     },
-    method: "POST"
+    method: "POST",
   });
 
   return readJsonResponse<{ user: CurrentUserResponse }>(response);
 };
 
 export const login = async (
-  input: Pick<AuthCredentials, "email" | "password">
+  input: Pick<AuthCredentials, "email" | "password">,
 ): Promise<{ user: CurrentUserResponse }> => {
   const response = await fetch(new URL("/auth/login", apiBaseUrl), {
     body: JSON.stringify(input),
     credentials: "include",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
     },
-    method: "POST"
+    method: "POST",
   });
 
   return readJsonResponse<{ user: CurrentUserResponse }>(response);
@@ -133,7 +167,7 @@ export const login = async (
 export const logout = async (): Promise<void> => {
   const response = await fetch(new URL("/auth/logout", apiBaseUrl), {
     credentials: "include",
-    method: "POST"
+    method: "POST",
   });
 
   await readJsonResponse(response);
@@ -141,7 +175,7 @@ export const logout = async (): Promise<void> => {
 
 export const getConnectedApps = async (): Promise<ConnectedApp[]> => {
   const response = await fetch(new URL("/auth/connected-apps", apiBaseUrl), {
-    credentials: "include"
+    credentials: "include",
   });
   const body = await readJsonResponse<{ apps: ConnectedApp[] }>(response);
 
@@ -151,7 +185,7 @@ export const getConnectedApps = async (): Promise<ConnectedApp[]> => {
 export const revokeConnectedApp = async (grantId: string): Promise<void> => {
   const response = await fetch(new URL(`/auth/connected-apps/${grantId}/revoke`, apiBaseUrl), {
     credentials: "include",
-    method: "POST"
+    method: "POST",
   });
 
   await readJsonResponse(response);
@@ -163,7 +197,7 @@ export const getSavedItems = async ({
   inbox,
   libraryId,
   limit = 20,
-  tagId
+  tagId,
 }: {
   cursor?: string | null;
   folderId?: string | null;
@@ -178,30 +212,30 @@ export const getSavedItems = async ({
     inbox,
     libraryId,
     limit,
-    tagId
+    tagId,
   });
 };
 
 export const searchSavedItems = async (
-  input: SearchSavedItemsInput
+  input: SearchSavedItemsInput,
 ): Promise<SavedItemsPageResponse> => rpc.savedItems.search(input);
 
 export const createSavedItem = async (input: CreateSavedItemInput): Promise<SavedItem> =>
   rpc.savedItems.create(input);
 
 export const getSavedItemPreview = async (
-  input: SavedItemPreviewInput
+  input: SavedItemPreviewInput,
 ): Promise<SavedItemPreviewResponse> => rpc.savedItems.preview(input);
 
 export const deleteSavedItem = async (
-  input: DeleteSavedItemInput
+  input: DeleteSavedItemInput,
 ): Promise<{ deletedSavedItemId: string }> => rpc.savedItems.delete(input);
 
 export const updateSavedItem = async (input: UpdateSavedItemInput): Promise<SavedItem> =>
   rpc.savedItems.update(input);
 
 export const moveSavedItems = async (
-  input: MoveSavedItemsInput
+  input: MoveSavedItemsInput,
 ): Promise<{ destinationFolderId: string | null; movedSavedItemIds: string[] }> =>
   rpc.savedItems.move(input);
 
@@ -221,9 +255,8 @@ export const updateTag = async (input: UpdateTagInput): Promise<TagItem> => rpc.
 
 export const moveTag = async (input: MoveTagInput): Promise<TagItem[]> => rpc.tags.move(input);
 
-export const deleteTag = async (
-  input: DeleteTagInput
-): Promise<{ deletedTagId: string }> => rpc.tags.delete(input);
+export const deleteTag = async (input: DeleteTagInput): Promise<{ deletedTagId: string }> =>
+  rpc.tags.delete(input);
 
 export const moveFolder = async (input: MoveFolderInput): Promise<FolderItem[]> =>
   rpc.folders.move(input);
@@ -232,8 +265,65 @@ export const updateFolder = async (input: UpdateFolderInput): Promise<FolderItem
   rpc.folders.update(input);
 
 export const deleteFolder = async (
-  input: DeleteFolderInput
+  input: DeleteFolderInput,
 ): Promise<{ deletedFolderIds: string[] }> => rpc.folders.delete(input);
+
+export const getIntegrations = async (): Promise<IntegrationsListResponse> =>
+  rpc.integrations.list();
+
+export const startGithubConnection = async (
+  input: StartGithubConnectionInput,
+): Promise<StartGithubConnectionResponse> =>
+  rpc.integrations.connectGithub.start({
+    ...input,
+    redirectUri:
+      input.redirectUri ?? new URL("/integrations/github/callback", apiBaseUrl).toString(),
+  });
+
+export const completeGithubConnection = async (input: {
+  code: string;
+  state: string;
+}): Promise<IntegrationAccountItem> => rpc.integrations.connectGithub.callback(input);
+
+export const disconnectIntegration = async (
+  input: IntegrationAccountInput,
+): Promise<IntegrationAccountItem> => rpc.integrations.disconnect(input);
+
+export const setIntegrationEnabled = async (
+  input: SetIntegrationEnabledInput,
+): Promise<IntegrationAccountItem> => rpc.integrations.setEnabled(input);
+
+export const syncIntegrationNow = async (input: IntegrationAccountInput): Promise<SyncRunItem> =>
+  rpc.integrations.syncNow(input);
+
+export const getIntegrationSyncRuns = async (
+  input: IntegrationAccountInput,
+): Promise<SyncRunItem[]> => rpc.integrations.listSyncRuns(input);
+
+export const getProviderImportSettings = async (
+  input: ProviderInput,
+): Promise<ProviderImportSettingsItem> => rpc.integrations.getProviderSettings(input);
+
+export const updateProviderImportSettings = async (
+  input: UpdateProviderSettingsInput,
+): Promise<ProviderImportSettingsItem> => rpc.integrations.updateProviderSettings(input);
+
+export const getImportRules = async (input: ProviderInput): Promise<ImportRuleItem[]> =>
+  rpc.integrations.listImportRules(input);
+
+export const createImportRule = async (input: CreateImportRuleInput): Promise<ImportRuleItem> =>
+  rpc.integrations.createImportRule(input);
+
+export const updateImportRule = async (input: UpdateImportRuleInput): Promise<ImportRuleItem> =>
+  rpc.integrations.updateImportRule(input);
+
+export const reorderImportRules = async (
+  input: ReorderImportRulesInput,
+): Promise<ImportRuleItem[]> => rpc.integrations.reorderImportRules(input);
+
+export const deleteImportRule = async (
+  input: DeleteImportRuleInput,
+): Promise<{ deletedImportRuleId: string }> => rpc.integrations.deleteImportRule(input);
 
 export const apiAssetUrl = (path: string): string => new URL(path, apiBaseUrl).toString();
 
