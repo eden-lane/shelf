@@ -83,6 +83,197 @@ import Main from "../layouts/main.astro";
         aspect-ratio: 16 / 9;
         background-color: #eee;
     }
+
+</style>
+
+<style is:global>
+    .pricing {
+        display: grid;
+        gap: 18px;
+        margin-top: 22px;
+        padding: 24px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .pricing-header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .pricing h2 {
+        margin: 0;
+        color: #333;
+        font-size: 1.6rem;
+    }
+
+    .pricing-note {
+        margin: 0;
+        color: #555;
+        font-size: 14px;
+        text-align: right;
+    }
+
+    .pricing-options {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .pricing-option {
+        position: relative;
+        display: flex;
+        min-height: 190px;
+        flex-direction: column;
+        gap: 16px;
+        justify-content: space-between;
+        overflow: hidden;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 18px;
+        background: #fff;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+    }
+
+    .pricing-option.is-featured {
+        border-color: #333;
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .pricing-option.is-featured::before {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 4px;
+        background: #333;
+        content: "";
+    }
+
+    .pricing-option h3 {
+        margin: 0;
+        color: #333;
+        font-size: 1rem;
+    }
+
+    .pricing-label-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .pricing-badge {
+        border-radius: 999px;
+        padding: 3px 8px;
+        background: #eee;
+        color: #333;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .price {
+        display: flex;
+        align-items: baseline;
+        gap: 5px;
+        margin-top: 10px;
+        color: #333;
+    }
+
+    .price strong {
+        color: #333;
+        font-size: 2.55rem;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    .price span {
+        color: #555;
+        font-size: 14px;
+    }
+
+    .pricing-option p {
+        margin: 0;
+        color: #555;
+        font-size: 14px;
+        line-height: 1.45;
+    }
+
+    .pricing-points {
+        display: grid;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+        color: #555;
+        font-size: 13px;
+        list-style: none;
+    }
+
+    .pricing-points li {
+        display: grid;
+        grid-template-columns: 14px 1fr;
+        gap: 7px;
+    }
+
+    .pricing-points li::before {
+        color: #333;
+        content: "✓";
+    }
+
+    .railway-button {
+        display: inline-flex;
+        width: fit-content;
+        margin-top: 2px;
+    }
+
+    .railway-button img {
+        display: block;
+        height: 40px;
+    }
+
+    @media (max-width: 820px) {
+        .heading {
+            grid-template-columns: auto 1fr;
+        }
+
+        .slogan,
+        .features,
+        .support {
+            grid-column: 1 / -1;
+        }
+
+        .features {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .screenshot {
+            width: 100%;
+            height: auto;
+            min-height: 220px;
+        }
+
+        .pricing {
+            padding: 18px;
+        }
+
+        .pricing-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .pricing-note {
+            text-align: left;
+        }
+
+        .pricing-options {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 
 <Main>
@@ -121,6 +312,64 @@ import Main from "../layouts/main.astro";
 
 
         <div class="screenshot"></div>
+
+        <section class="pricing" aria-labelledby="pricing-heading">
+            <div class="pricing-header">
+                <h2 id="pricing-heading">Pricing</h2>
+                <p class="pricing-note">Hosted plans for convenience, self-hosting when you want control.</p>
+            </div>
+            <div class="pricing-options">
+                <div class="pricing-option">
+                    <div>
+                        <div class="pricing-label-row">
+                            <h3>Monthly</h3>
+                        </div>
+                        <div class="price">
+                            <strong>$1</strong>
+                            <span>/ month</span>
+                        </div>
+                    </div>
+                    <ul class="pricing-points">
+                        <li>Hosted Shelf account</li>
+                        <li>Cancel any month</li>
+                    </ul>
+                </div>
+                <div class="pricing-option is-featured">
+                    <div>
+                        <div class="pricing-label-row">
+                            <h3>Yearly</h3>
+                            <span class="pricing-badge">Best value</span>
+                        </div>
+                        <div class="price">
+                            <strong>$10</strong>
+                            <span>/ year</span>
+                        </div>
+                    </div>
+                    <ul class="pricing-points">
+                        <li>Two months free</li>
+                        <li>One simple yearly payment</li>
+                    </ul>
+                </div>
+                <div class="pricing-option">
+                    <div>
+                        <div class="pricing-label-row">
+                            <h3>Self-hosting</h3>
+                        </div>
+                        <div class="price">
+                            <strong>Free</strong>
+                        </div>
+                    </div>
+                    <p>Run your own Shelf instance on Railway.</p>
+                    <a
+                        class="railway-button"
+                        href="https://railway.com/deploy/shelf-template?utm_medium=integration&utm_source=template&utm_campaign=shelf"
+                        aria-label="Deploy Shelf on Railway"
+                    >
+                        <img src="https://railway.com/button.svg" alt="Deploy on Railway" />
+                    </a>
+                </div>
+            </div>
+        </section>
     </article>
 
 </Main>

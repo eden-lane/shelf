@@ -2,6 +2,7 @@ body {
   font-family: var(--font-open-sans), sans-serif;
   font-weight: 400;
   color: #555;
+  padding-bottom: 64px;
 }
 
 h1,

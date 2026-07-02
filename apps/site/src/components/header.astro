@@ -5,13 +5,51 @@
         gap: 8px;
         align-items: center;
         margin-bottom: 32px;
+        justify-content: space-between;
     }
 
     h1 {
         font-size: 18px;
     }
+
+    .logo {
+        display: flex;
+        column-gap: 8px;
+        align-items: center;
+    }
+
+    a {
+        display: flex;
+        column-gap: 4px;
+        align-items: center;
+        color: #666;
+        text-decoration: none;
+    }
+
+    menu {
+        display: flex;
+        gap: 32px;
+    }
+
+    .cta {
+        background: #555;
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 8px;
+    }
 </style>
 <header>
-    <img src="/shelf-icon.png" alt="Shelf Logo" width="32" height="32" />
-    <h1>Shelf</h1>
+    <div class="logo">
+        <img src="/shelf-icon.png" alt="Shelf Logo" width="32" height="32" />
+        <h1>Shelf</h1>
+    </div>
+    <menu>
+        <a href="https://github.com/eden-lane/shelf">
+            <img width="16" height="16" src="/icons/github.svg" />
+            Github
+        </a>
+        <a class="cta" href="https://app.getshelf.me">
+            Open app
+        </a>
+    </menu>
 </header>
