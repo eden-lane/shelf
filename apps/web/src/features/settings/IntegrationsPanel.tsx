@@ -1029,9 +1029,9 @@ const IntegrationsPanel = ({
         Connect external services to import and sync content.
       </p>
 
-      <div className="grid gap-4 p-4 border rounded border-gray-200">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 text-[#242833]">
+      <div className="grid gap-4 border rounded-md border-gray-200">
+        <div className="flex items-start p-4 gap-3 border-b border-gray-200">
+          <div className="mt-0.5 border p-2 rounded-md border-gray-200 text-[#242833]">
             <IconBrandGithubFilled size={20} stroke={1.75} aria-hidden="true" focusable="false" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1067,7 +1067,7 @@ const IntegrationsPanel = ({
         </div>
 
         {showGithubSettings && githubExpanded && (
-          <div className="grid gap-5">
+          <div className="grid p-4 gap-5">
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#f7f9fc] p-3 text-sm">
               <div className="min-w-0 flex-1">
                 <p className="m-0  text-slate-950">
