@@ -1,11 +1,19 @@
 
 <style>
     header {
+        position: fixed;
+        z-index: 10;
+        top: 0;
+        left: 50%;
         display: flex;
+        width: min(800px, calc(100% - 16px));
+        padding: 8px 0;
         gap: 8px;
         align-items: center;
-        margin-bottom: 32px;
+        border-bottom: 1px solid #eee;
+        background: #fff;
         justify-content: space-between;
+        transform: translateX(-50%);
     }
 
     h1 {
@@ -39,10 +47,10 @@
     }
 </style>
 <header>
-    <div class="logo">
+    <a class="logo" href="/" aria-label="Shelf home">
         <img src="/shelf-icon.png" alt="Shelf Logo" width="32" height="32" />
         <h1>Shelf</h1>
-    </div>
+    </a>
     <menu>
         <a href="https://github.com/eden-lane/shelf">
             <img width="16" height="16" src="/icons/github.svg" />

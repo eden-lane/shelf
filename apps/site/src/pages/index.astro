@@ -216,12 +216,17 @@ import Main from "../layouts/main.astro";
     .pricing-points li {
         display: grid;
         grid-template-columns: 14px 1fr;
+        align-items: center;
         gap: 7px;
     }
 
     .pricing-points li::before {
-        color: #333;
-        content: "✓";
+        width: 14px;
+        height: 14px;
+        background: #168a3a;
+        content: "";
+        -webkit-mask: url("/icons/check.svg") center / 14px 14px no-repeat;
+        mask: url("/icons/check.svg") center / 14px 14px no-repeat;
     }
 
     .railway-button {

@@ -16,4 +16,5 @@ h5 {
 main {
   margin: 0 auto;
   max-width: 800px;
+  padding-top: 80px;
 }
