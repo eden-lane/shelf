@@ -1400,6 +1400,7 @@ describe("App", () => {
 
     let folderListRequests = 0;
     let tagListRequests = 0;
+    let githubConnectStartRequests = 0;
     let backendFolders: FolderItem[] = [];
     let backendTags: TagItem[] = [];
 
@@ -1519,6 +1520,74 @@ describe("App", () => {
         );
       }
 
+      if (url.pathname === "/rpc/integrations/list") {
+        return new Response(JSON.stringify({ json: { accounts: [], latestSyncRuns: [] } }), {
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.pathname === "/rpc/integrations/getProviderSettings") {
+        return new Response(
+          JSON.stringify({
+            json: {
+              id: "00000000-0000-4000-8000-000000000170",
+              libraryId: "00000000-0000-4000-8000-000000000003",
+              provider: "github",
+              defaultFolderId: null,
+              createdAt: "2026-06-19T12:00:00.000Z",
+              updatedAt: "2026-06-19T12:00:00.000Z"
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/integrations/listImportRules") {
+        return new Response(
+          JSON.stringify({
+            json: [
+              {
+                id: "00000000-0000-4000-8000-000000000171",
+                libraryId: "00000000-0000-4000-8000-000000000003",
+                provider: "github",
+                sortOrder: 0,
+                conditionField: "language",
+                conditionOperator: "is",
+                conditionValue: "TypeScript",
+                actionType: "add_tag",
+                actionTargetId: "00000000-0000-4000-8000-000000000130",
+                enabled: true,
+                createdAt: "2026-06-19T12:00:00.000Z",
+                updatedAt: "2026-06-19T12:00:00.000Z"
+              }
+            ]
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/integrations/connectGithub/start") {
+        githubConnectStartRequests += 1;
+        return new Response(
+          JSON.stringify({ json: { authorizationUrl: "https://github.example/oauth" } }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
       if (url.pathname === "/auth/connected-apps") {
         return new Response(JSON.stringify({ apps: [] }), {
           headers: {
@@ -1553,10 +1622,15 @@ describe("App", () => {
     };
     fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
     fireEvent.click(screen.getByRole("switch", { name: "Enable GitHub integration" }));
+    expect(githubConnectStartRequests).toBe(0);
     const integrationsPanel = screen.getByRole("tabpanel", { name: "Integrations" });
-    const ruleRows = Array.from(
-      integrationsPanel.querySelectorAll("[data-settings-rule-row]")
-    ) as HTMLElement[];
+    let ruleRows: HTMLElement[] = [];
+    await waitFor(() => {
+      ruleRows = Array.from(
+        integrationsPanel.querySelectorAll("[data-settings-rule-row]")
+      ) as HTMLElement[];
+      expect(ruleRows.length).toBeGreaterThan(1);
+    });
     expect(ruleRows[0]?.getAttribute("data-settings-rule-row")).toBe("default");
     expect(ruleRows[0]?.textContent).toContain("Save bookmarks to");
     expect(ruleRows[0]?.textContent).not.toContain("IF");

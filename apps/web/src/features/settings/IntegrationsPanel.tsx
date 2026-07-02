@@ -1,7 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import type { FolderItem, ImportRuleItem, TagItem } from "@shelf/shared";
 import {
-  IconBrandGithub,
   IconBrandGithubFilled,
   IconCheck,
   IconChevronDown,
@@ -656,6 +655,7 @@ const IntegrationsPanel = ({
     queryKey: ["importRules", providerInput],
   });
   const [githubExpanded, setGithubExpanded] = useState(true);
+  const [githubSetupRequested, setGithubSetupRequested] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const handledGithubCallbackRef = useRef(false);
@@ -665,6 +665,8 @@ const IntegrationsPanel = ({
     (run) => run.integrationAccountId === githubAccount?.id,
   );
   const githubEnabled = githubAccount?.status === "connected";
+  const githubSwitchChecked = githubAccount ? githubEnabled : githubSetupRequested;
+  const showGithubSettings = Boolean(githubAccount) || githubSetupRequested;
   const defaultRule: GitHubDefaultRule = {
     id: "default",
     kind: "default",
@@ -764,8 +766,8 @@ const IntegrationsPanel = ({
     }
     if (githubAccount) {
       enabledMutation.mutate({ enabled, integrationAccountId: githubAccount.id });
-    } else if (enabled) {
-      connectMutation.mutate();
+    } else {
+      setGithubSetupRequested(enabled);
     }
     setGithubExpanded(enabled);
   };
@@ -847,7 +849,7 @@ const IntegrationsPanel = ({
           </div>
           <div className="flex items-center gap-1.5 pt-0.5">
             <Toggle
-              checked={githubEnabled}
+              checked={githubSwitchChecked}
               onChange={handleToggle}
               label="Enable GitHub integration"
             />
@@ -870,7 +872,7 @@ const IntegrationsPanel = ({
           </div>
         </div>
 
-        {(githubEnabled || githubAccount) && githubExpanded && (
+        {showGithubSettings && githubExpanded && (
           <div className="grid gap-5">
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#f7f9fc] p-3 text-sm">
               <div className="min-w-0 flex-1">
