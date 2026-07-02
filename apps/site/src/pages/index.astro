@@ -9,12 +9,12 @@ import Main from "../layouts/main.astro";
         flex-direction: column;
         gap: 16px;
     }
-    
+
     .heading {
         display: grid;
         grid-template-columns: auto 1fr;
         grid-template-rows: auto auto;
-        gap: 8px;
+        gap: 16px;
         align-items: center;
     }
 
@@ -27,6 +27,39 @@ import Main from "../layouts/main.astro";
         font-size: 1.25rem;
         font-weight: 400;
         grid-column: 2;
+        margin-bottom: 8px;
+    }
+
+    .features {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        grid-column: 2;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .feature {
+        display: grid;
+        align-items: center;
+        grid-template-columns: 16px 1fr;
+        grid-template-rows: 18px 1fr;
+        align-items: flex-start;
+        column-gap: 8px;
+        row-gap: 4px;
+        font-size: 15px;
+
+        & p {
+            grid-column: 2;
+            margin: 0;
+            font-size: 13px;
+            align-self: flex-start;
+        }
+    }
+
+    .support {
+        grid-column: 2;
+        font-size: 14px;
     }
 
     .screenshot {
@@ -38,14 +71,35 @@ import Main from "../layouts/main.astro";
 
 <Main>
     <article>
-    <div class="heading">
-        <img src="/shelf-icon.png" alt="Shelf Logo" width="48" height="48" />
-        <h1>Shelf</h1>
-        <span class="slogan">A new home for your bookmarks</span>
-    </div>
+        <div class="heading">
+            <img src="/shelf-icon.png" alt="Shelf Logo" width="48" height="48" />
+            <h1>Shelf</h1>
+            <span class="slogan">A new home for your bookmarks</span>
+            <ul class="features">
+                <li class="feature">
+                    <img width="18" height="18" src="/icons/server.svg" />
+                    <span>Self-hostable</span>
+                    <p>You can deploy own instance on Railway with just one click.</p>
+                </li>
+                <li class="feature">
+                    <img width="18" height="18" src="/icons/import.svg" />
+                    <span>Import</span>
+                    <p>Gather everything you saved in other services in one place.</p>
+                </li>
+                <li class="feature">
+                    <img width="18" height="18" src="/icons/automatic.svg" />
+                    <span>Automatizations</span>
+                    <p>Add tag and move to folders based on pre-defined rule.</p>
+                </li>
+            </ul>
 
-    <div class="screenshot"></div>
+            <div class="support">
+                Extensions:
+            </div>
+        </div>
+
+
+        <div class="screenshot"></div>
     </article>
 
 </Main>
-
