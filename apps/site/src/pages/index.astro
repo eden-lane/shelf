@@ -59,7 +59,23 @@ import Main from "../layouts/main.astro";
 
     .support {
         grid-column: 2;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
         font-size: 14px;
+    }
+
+    .browser-list {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .browser-icon {
+        width: 22px;
+        height: 22px;
+        display: block;
     }
 
     .screenshot {
@@ -94,7 +110,12 @@ import Main from "../layouts/main.astro";
             </ul>
 
             <div class="support">
-                Extensions:
+                <span>Extensions:</span>
+                <div class="browser-list" aria-label="Supported browsers">
+                    <img class="browser-icon" src="/icons/browsers/chrome.svg" alt="Google Chrome" />
+                    <img class="browser-icon" src="/icons/browsers/firefox.svg" alt="Mozilla Firefox" />
+                    <img class="browser-icon" src="/icons/browsers/safari.png" alt="Safari" />
+                </div>
             </div>
         </div>
 
