@@ -2,6 +2,7 @@ import { Popover } from "@base-ui/react/popover";
 import type { FolderItem, ImportRuleItem, TagItem } from "@shelf/shared";
 import {
   IconBrandGithub,
+  IconBrandGithubFilled,
   IconCheck,
   IconChevronDown,
   IconInbox,
@@ -455,7 +456,7 @@ const RuleForm = ({
                         <button
                           key={tag.id}
                           type="button"
-                          className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
+                          className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm  text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
                           onClick={() => {
                             setThenValue(tag.id);
                             setTagPickerOpen(false);
@@ -543,7 +544,7 @@ const RuleForm = ({
                           <button
                             key={value}
                             type="button"
-                            className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm font-medium text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
+                            className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm  text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
                             style={{
                               paddingLeft: option.kind === "folder" ? 12 + option.depth * 12 : 12,
                             }}
@@ -582,14 +583,14 @@ const RuleForm = ({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-[#697080] hover:bg-white hover:text-[#242833]"
+          className="inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs  text-[#697080] hover:bg-white hover:text-[#242833]"
         >
           <IconX size={12} stroke={2} aria-hidden="true" />
           Cancel
         </button>
         <button
           type="submit"
-          className="inline-flex h-7 items-center gap-1 rounded-md bg-[#3b8df5] px-2.5 text-xs font-medium text-white hover:bg-[#2f7ad8]"
+          className="inline-flex h-7 items-center gap-1 rounded-md bg-[#3b8df5] px-2.5 text-xs  text-white hover:bg-[#2f7ad8]"
         >
           <IconCheck size={12} stroke={2.5} aria-hidden="true" />
           {submitLabel}
@@ -832,13 +833,13 @@ const IntegrationsPanel = ({
         Connect external services to import and sync content.
       </p>
 
-      <div className="grid gap-4">
+      <div className="grid gap-4 p-4 border rounded border-gray-200">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 text-[#242833]">
-            <IconBrandGithub size={20} stroke={1.75} aria-hidden="true" focusable="false" />
+            <IconBrandGithubFilled size={20} stroke={1.75} aria-hidden="true" focusable="false" />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="m-0 text-sm font-medium text-slate-950">GitHub</h4>
+            <h4 className="m-0 text-sm  text-slate-950">GitHub</h4>
             <p className="m-0 mt-0.5 text-sm leading-5 text-gray-500">
               Sync your starred repositories as saved items. Import stars and organize them using
               folders and tags.
@@ -873,7 +874,7 @@ const IntegrationsPanel = ({
           <div className="grid gap-5">
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[#f7f9fc] p-3 text-sm">
               <div className="min-w-0 flex-1">
-                <p className="m-0 font-medium text-slate-950">
+                <p className="m-0  text-slate-950">
                   {githubAccount
                     ? `@${githubAccount.externalAccountName}`
                     : completeConnectionMutation.isPending
@@ -895,7 +896,7 @@ const IntegrationsPanel = ({
               {!githubAccount ? (
                 <button
                   type="button"
-                  className="inline-flex h-8 items-center gap-2 self-start rounded-lg bg-[#242833] px-3 text-sm font-medium text-white outline-none hover:bg-[#111827] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                  className="inline-flex h-8 items-center gap-2 self-start rounded-lg bg-[#242833] px-3 text-sm  text-white outline-none hover:bg-[#111827] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
                   disabled={connectMutation.isPending || !targetLibraryId}
                   onClick={() => connectMutation.mutate()}
                 >
@@ -905,7 +906,7 @@ const IntegrationsPanel = ({
                 <>
                   <button
                     type="button"
-                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm font-medium text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm  text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
                     disabled={
                       syncMutation.isPending ||
                       githubAccount.status !== "connected" ||
@@ -920,7 +921,7 @@ const IntegrationsPanel = ({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm font-medium text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#f2f6fb] px-3 text-sm  text-slate-950 outline-none hover:bg-[#eaf1fa] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
                     disabled={connectMutation.isPending}
                     onClick={() => connectMutation.mutate()}
                   >
@@ -928,7 +929,7 @@ const IntegrationsPanel = ({
                   </button>
                   <button
                     type="button"
-                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-600 outline-none hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
+                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-red-200 px-3 text-sm  text-red-600 outline-none hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3b8df5]"
                     disabled={disconnectMutation.isPending}
                     onClick={() =>
                       disconnectMutation.mutate({ integrationAccountId: githubAccount.id })
@@ -943,7 +944,7 @@ const IntegrationsPanel = ({
             <div className="grid gap-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="m-0 text-sm font-medium text-slate-950">Rules</p>
+                  <p className="m-0 text-sm  text-slate-950">Rules</p>
                   <p className="m-0 text-xs text-gray-500">
                     Define how starred repositories are organized on import.
                   </p>
@@ -952,7 +953,7 @@ const IntegrationsPanel = ({
                   <button
                     type="button"
                     onClick={startAdd}
-                    className="inline-flex h-7 items-center gap-1 rounded-md bg-[#f2f6fb] px-2 text-xs font-medium text-gray-600 hover:bg-[#eaf1fa]"
+                    className="inline-flex h-7 items-center gap-1 rounded-md bg-[#f2f6fb] px-2 text-xs  text-gray-600 hover:bg-[#eaf1fa]"
                   >
                     <IconPlus size={13} stroke={2.5} aria-hidden="true" />
                     Add rule
@@ -995,7 +996,7 @@ const IntegrationsPanel = ({
                         <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-[#3b8df5]">
                           Default
                         </span>
-                        <div className="min-w-0 flex-1 font-medium leading-snug text-slate-950">
+                        <div className="min-w-0 flex-1  leading-snug text-slate-950">
                           Save bookmarks to{" "}
                           <span className="font-semibold">
                             "{getFolderDisplayValue(rule.thenValue, panelFolders)}"
@@ -1023,7 +1024,7 @@ const IntegrationsPanel = ({
                         <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-amber-600">
                           IF
                         </span>
-                        <div className="min-w-0 flex-1 font-medium leading-snug text-slate-950">
+                        <div className="min-w-0 flex-1  leading-snug text-slate-950">
                           {getFieldLabel(rule.ifField)} {rule.ifOperator}{" "}
                           <span className="font-semibold">{rule.ifValue}</span>
                         </div>
@@ -1032,7 +1033,7 @@ const IntegrationsPanel = ({
                         <span className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
                           THEN
                         </span>
-                        <div className="min-w-0 flex-1 font-medium leading-snug text-slate-950">
+                        <div className="min-w-0 flex-1  leading-snug text-slate-950">
                           {rule.thenType === "addTag" ? "Add tag" : "Move to folder"}{" "}
                           <span className="font-semibold">
                             "
