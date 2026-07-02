@@ -89,6 +89,7 @@ export interface ProviderImportSettingsUpdateInput {
   libraryId: string;
   provider: IntegrationProvider;
   defaultFolderId: string | null;
+  defaultTagIds: string[];
   allowedLibraryIds: string[];
 }
 

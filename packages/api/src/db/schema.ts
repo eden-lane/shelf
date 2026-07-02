@@ -571,6 +571,7 @@ export const providerImportSettings = pgTable(
       .references(() => libraries.id, { onDelete: "cascade" }),
     provider: integrationProvider("provider").notNull(),
     defaultFolderId: uuid("default_folder_id"),
+    defaultTagIds: jsonb("default_tag_ids").$type<string[]>().notNull().default([]),
     ...timestamps,
   },
   (table) => [

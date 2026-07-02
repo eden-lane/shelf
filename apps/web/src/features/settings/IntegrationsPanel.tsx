@@ -50,10 +50,12 @@ interface GitHubDefaultRule {
   kind: "default";
   thenType: "moveToFolder";
   thenValue: string;
+  tagIds: string[];
 }
 
 type GitHubRule = GitHubDefaultRule | GitHubConditionalRule;
 type GitHubRuleAction = Pick<GitHubRule, "thenType" | "thenValue">;
+type GitHubDefaultRuleAction = GitHubRuleAction & { tagIds: string[] };
 
 const toPanelRule = (rule: ImportRuleItem): GitHubConditionalRule => ({
   id: rule.id,
@@ -208,7 +210,9 @@ type RuleFormProps = {
   variant?: "conditional" | "default";
   submitLabel: string;
   onRefreshLibraryItems: () => void;
-  onSubmit: (data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction) => void;
+  onSubmit: (
+    data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction | GitHubDefaultRuleAction,
+  ) => void;
   onCancel: () => void;
 };
 
@@ -231,6 +235,9 @@ const RuleForm = ({
     initialRule?.thenType ?? "addTag",
   );
   const [thenValue, setThenValue] = useState(initialRule?.thenValue ?? "");
+  const [defaultTagIds, setDefaultTagIds] = useState(
+    initialRule?.kind === "default" ? initialRule.tagIds : [],
+  );
 
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
@@ -260,10 +267,20 @@ const RuleForm = ({
     setThenValue("");
   };
 
+  const toggleDefaultTag = (tagId: string) => {
+    setDefaultTagIds((current) =>
+      current.includes(tagId) ? current.filter((id) => id !== tagId) : [...current, tagId],
+    );
+  };
+
   const displayedTags = useMemo(() => {
     const q = tagSearch.trim().toLowerCase();
     return q ? tags.filter((t) => t.name.toLowerCase().includes(q)) : tags;
   }, [tags, tagSearch]);
+  const selectedDefaultTags = useMemo(
+    () => defaultTagIds.map((id) => tags.find((tag) => tag.id === id)).filter(Boolean) as TagItem[],
+    [defaultTagIds, tags],
+  );
 
   const folderOptions = useMemo(() => buildFolderOptions(folders), [folders]);
   const selectedFolderOption = useMemo(
@@ -284,7 +301,7 @@ const RuleForm = ({
     e.preventDefault();
     if (!thenValue.trim()) return;
     if (isDefaultRule) {
-      onSubmit({ thenType: "moveToFolder", thenValue: thenValue.trim() });
+      onSubmit({ tagIds: defaultTagIds, thenType: "moveToFolder", thenValue: thenValue.trim() });
       return;
     }
     if (!ifValue.trim()) return;
@@ -385,7 +402,179 @@ const RuleForm = ({
             </select>
           )}
 
-          {thenType === "addTag" ? (
+          {isDefaultRule ? (
+            <>
+              <Popover.Root
+                open={folderPickerOpen}
+                onOpenChange={(open) => {
+                  setFolderPickerOpen(open);
+                  if (open) {
+                    onRefreshLibraryItems();
+                    setFolderSearch("");
+                  }
+                }}
+              >
+                <Popover.Trigger className={pickerTriggerClassName} type="button">
+                  {thenValue ? (
+                    <>
+                      {selectedFolderOption ? (
+                        <FolderOptionIcon option={selectedFolderOption} size={14} />
+                      ) : (
+                        <FallbackFolderIcon size={14} />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {getFolderDisplayValue(thenValue, folders)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[#9aa1ad]">Select folder…</span>
+                  )}
+                  <IconChevronDown
+                    size={12}
+                    stroke={1.8}
+                    className="ml-auto shrink-0 text-[#697080]"
+                    aria-hidden="true"
+                  />
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Positioner className="z-[70] outline-none" align="start" sideOffset={4}>
+                    <Popover.Popup className="w-[min(260px,var(--available-width))] overflow-hidden rounded-xl border border-[#dfe4ef] bg-white shadow-[0_16px_48px_rgb(22_28_43_/_0.18)] outline-none">
+                      <div className="border-b border-[#eef1f6] p-2">
+                        <label className="flex min-h-8 items-center gap-2 rounded-lg bg-[#f7f8fc] px-2 text-[#697080] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#d9eaff]">
+                          <IconSearch size={14} stroke={1.7} aria-hidden="true" />
+                          <input
+                            ref={folderSearchRef}
+                            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-[#242833] outline-none placeholder:text-[#9aa1ad]"
+                            placeholder="Search folders…"
+                            autoComplete="off"
+                            value={folderSearch}
+                            onChange={(e) => setFolderSearch(e.target.value)}
+                          />
+                        </label>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto py-1">
+                        {displayedFolderOptions.map((option) => {
+                          const label = getFolderLabel(option);
+                          const value = getFolderOptionValue(option);
+                          const selected = thenValue === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm  text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
+                              style={{
+                                paddingLeft: option.kind === "folder" ? 12 + option.depth * 12 : 12,
+                              }}
+                              onClick={() => {
+                                setThenValue(value);
+                                setFolderPickerOpen(false);
+                              }}
+                            >
+                              <FolderOptionIcon option={option} size={14} />
+                              <span className="min-w-0 flex-1 truncate">{label}</span>
+                              {selected && (
+                                <IconCheck
+                                  size={14}
+                                  stroke={2}
+                                  className="shrink-0 text-[#3b8df5]"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                        {displayedFolderOptions.length === 0 && (
+                          <p className="px-3 py-2 text-sm text-[#697080]">No folders found.</p>
+                        )}
+                      </div>
+                    </Popover.Popup>
+                  </Popover.Positioner>
+                </Popover.Portal>
+              </Popover.Root>
+
+              <Popover.Root
+                open={tagPickerOpen}
+                onOpenChange={(open) => {
+                  setTagPickerOpen(open);
+                  if (open) {
+                    onRefreshLibraryItems();
+                    setTagSearch("");
+                  }
+                }}
+              >
+                <Popover.Trigger className={pickerTriggerClassName} type="button">
+                  {selectedDefaultTags.length > 0 ? (
+                    <span className="min-w-0 flex-1 truncate text-left">
+                      {selectedDefaultTags.map((tag) => tag.name).join(", ")}
+                    </span>
+                  ) : (
+                    <span className="text-[#9aa1ad]">Add tags…</span>
+                  )}
+                  <IconChevronDown
+                    size={12}
+                    stroke={1.8}
+                    className="ml-auto shrink-0 text-[#697080]"
+                    aria-hidden="true"
+                  />
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Positioner className="z-[70] outline-none" align="start" sideOffset={4}>
+                    <Popover.Popup className="w-[min(260px,var(--available-width))] overflow-hidden rounded-xl border border-[#dfe4ef] bg-white shadow-[0_16px_48px_rgb(22_28_43_/_0.18)] outline-none">
+                      <div className="border-b border-[#eef1f6] p-2">
+                        <label className="flex min-h-8 items-center gap-2 rounded-lg bg-[#f7f8fc] px-2 text-[#697080] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#d9eaff]">
+                          <IconSearch size={14} stroke={1.7} aria-hidden="true" />
+                          <input
+                            ref={tagSearchRef}
+                            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-[#242833] outline-none placeholder:text-[#9aa1ad]"
+                            placeholder="Search tags…"
+                            autoComplete="off"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto py-1">
+                        {displayedTags.map((tag) => {
+                          const selected = defaultTagIds.includes(tag.id);
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              className="flex min-h-9 w-full items-center gap-2 px-3 py-1.5 text-left text-sm  text-[#4b5262] outline-none hover:bg-[#f0f6ff] hover:text-[#242833]"
+                              onClick={() => toggleDefaultTag(tag.id)}
+                            >
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full"
+                                style={{ backgroundColor: tag.color ?? "#697080" }}
+                                aria-hidden="true"
+                              />
+                              <span className="min-w-0 flex-1 truncate">{tag.name}</span>
+                              {selected && (
+                                <IconCheck
+                                  size={14}
+                                  stroke={2}
+                                  className="shrink-0 text-[#3b8df5]"
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
+                          );
+                        })}
+                        {displayedTags.length === 0 && !tagSearch.trim() && (
+                          <p className="px-3 py-2 text-sm text-[#697080]">No tags yet.</p>
+                        )}
+                      </div>
+                    </Popover.Popup>
+                  </Popover.Positioner>
+                </Popover.Portal>
+              </Popover.Root>
+            </>
+          ) : thenType === "addTag" ? (
             <Popover.Root
               open={tagPickerOpen}
               onOpenChange={(open) => {
@@ -670,6 +859,7 @@ const IntegrationsPanel = ({
   const defaultRule: GitHubDefaultRule = {
     id: "default",
     kind: "default",
+    tagIds: providerSettingsQuery.data?.defaultTagIds ?? [],
     thenType: "moveToFolder",
     thenValue: providerSettingsQuery.data?.defaultFolderId ?? "inbox",
   };
@@ -781,12 +971,14 @@ const IntegrationsPanel = ({
 
   const saveEdit = (
     id: string,
-    data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction,
+    data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction | GitHubDefaultRuleAction,
   ) => {
     if (id === "default" && providerInput) {
+      const defaultData = data as GitHubDefaultRuleAction;
       updateSettingsMutation.mutate({
         ...providerInput,
-        defaultFolderId: data.thenValue === "inbox" ? null : data.thenValue,
+        defaultFolderId: defaultData.thenValue === "inbox" ? null : defaultData.thenValue,
+        defaultTagIds: defaultData.tagIds,
       });
     } else {
       const ruleData = data as Omit<GitHubConditionalRule, "id" | "kind">;
@@ -815,7 +1007,9 @@ const IntegrationsPanel = ({
     setEditingId(null);
   };
 
-  const saveAdd = (data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction) => {
+  const saveAdd = (
+    data: Omit<GitHubConditionalRule, "id" | "kind"> | GitHubRuleAction | GitHubDefaultRuleAction,
+  ) => {
     if (!providerInput) return;
     const ruleData = data as Omit<GitHubConditionalRule, "id" | "kind">;
     createRuleMutation.mutate({
@@ -1003,6 +1197,23 @@ const IntegrationsPanel = ({
                           <span className="font-semibold">
                             "{getFolderDisplayValue(rule.thenValue, panelFolders)}"
                           </span>
+                          {rule.tagIds.length > 0 && (
+                            <>
+                              {" "}
+                              and add{" "}
+                              <span className="font-semibold">
+                                "
+                                {rule.tagIds
+                                  .map(
+                                    (tagId) =>
+                                      panelTags.find((tag) => tag.id === tagId)?.name ??
+                                      "Missing tag",
+                                  )
+                                  .join(", ")}
+                                "
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="absolute right-3 top-3 flex items-center gap-1 opacity-70 transition group-hover:opacity-100">

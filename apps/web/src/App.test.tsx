@@ -1401,6 +1401,8 @@ describe("App", () => {
     let folderListRequests = 0;
     let tagListRequests = 0;
     let githubConnectStartRequests = 0;
+    const updateProviderSettingsRequests: unknown[] = [];
+    let providerDefaultTagIds: string[] = [];
     let backendFolders: FolderItem[] = [];
     let backendTags: TagItem[] = [];
 
@@ -1536,6 +1538,32 @@ describe("App", () => {
               libraryId: "00000000-0000-4000-8000-000000000003",
               provider: "github",
               defaultFolderId: null,
+              defaultTagIds: providerDefaultTagIds,
+              createdAt: "2026-06-19T12:00:00.000Z",
+              updatedAt: "2026-06-19T12:00:00.000Z"
+            }
+          }),
+          {
+            headers: {
+              "content-type": "application/json"
+            }
+          }
+        );
+      }
+
+      if (url.pathname === "/rpc/integrations/updateProviderSettings") {
+        const body = await request.json();
+        const input = body?.json ?? body;
+        updateProviderSettingsRequests.push(input);
+        providerDefaultTagIds = input.defaultTagIds ?? [];
+        return new Response(
+          JSON.stringify({
+            json: {
+              id: "00000000-0000-4000-8000-000000000170",
+              libraryId: "00000000-0000-4000-8000-000000000003",
+              provider: "github",
+              defaultFolderId: input.defaultFolderId ?? null,
+              defaultTagIds: providerDefaultTagIds,
               createdAt: "2026-06-19T12:00:00.000Z",
               updatedAt: "2026-06-19T12:00:00.000Z"
             }
@@ -1636,6 +1664,21 @@ describe("App", () => {
     expect(ruleRows[0]?.textContent).not.toContain("IF");
     expect(ruleRows[1]?.textContent).toContain("IF");
     expect(ruleRows[1]?.textContent).toContain("THEN");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit default rule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add tags…" }));
+    fireEvent.click(screen.getByRole("button", { name: "Production" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      expect(updateProviderSettingsRequests.at(-1)).toMatchObject({
+        defaultFolderId: null,
+        defaultTagIds: ["00000000-0000-4000-8000-000000000130"]
+      });
+    });
+    await waitFor(() => {
+      expect(integrationsPanel.textContent).toContain("and add");
+      expect(integrationsPanel.textContent).toContain("Production");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Add rule" }));
     const orderedRuleChildren = Array.from(

@@ -622,6 +622,7 @@ export const createRpcRouter = (options: RpcRouterOptions) => ({
       return options.integrationsStore.updateProviderSettings({
         allowedLibraryIds: currentUserLibraryIds(options.currentUser),
         defaultFolderId: provider.defaultFolderId ?? null,
+        defaultTagIds: provider.defaultTagIds ?? [],
         libraryId: provider.libraryId,
         provider: provider.provider,
       });
@@ -1380,6 +1381,13 @@ const parseUpdateProviderSettingsInput = (input: unknown): UpdateProviderSetting
       typeof input.defaultFolderId === "string" && input.defaultFolderId
         ? input.defaultFolderId
         : null,
+    defaultTagIds: Array.isArray(input.defaultTagIds)
+      ? [
+          ...new Set(
+            input.defaultTagIds.filter((tagId): tagId is string => typeof tagId === "string"),
+          ),
+        ]
+      : [],
   };
 };
 

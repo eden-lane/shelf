@@ -295,6 +295,7 @@ export interface ProviderImportSettingsItem {
   libraryId: string;
   provider: IntegrationProvider;
   defaultFolderId: string | null;
+  defaultTagIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -348,6 +349,7 @@ export interface ProviderInput {
 
 export interface UpdateProviderSettingsInput extends ProviderInput {
   defaultFolderId?: string | null;
+  defaultTagIds?: string[];
 }
 
 export interface CreateImportRuleInput extends ProviderInput {

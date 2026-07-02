@@ -185,6 +185,7 @@ const getProviderSettings = async (
     .insert(schema.providerImportSettings)
     .values({
       defaultFolderId: null,
+      defaultTagIds: [],
       libraryId: input.libraryId,
       provider: input.provider,
     })
@@ -224,10 +225,25 @@ const updateProviderSettings = async (
     }
   }
 
+  const defaultTagIds = [...new Set(input.defaultTagIds)];
+  if (defaultTagIds.length > 0) {
+    const tags = await db
+      .select({ id: schema.tags.id })
+      .from(schema.tags)
+      .where(
+        and(inArray(schema.tags.id, defaultTagIds), eq(schema.tags.libraryId, input.libraryId)),
+      );
+
+    if (tags.length !== defaultTagIds.length) {
+      throw new Error("Default tag does not exist");
+    }
+  }
+
   const [row] = await db
     .insert(schema.providerImportSettings)
     .values({
       defaultFolderId: input.defaultFolderId,
+      defaultTagIds,
       libraryId: input.libraryId,
       provider: input.provider,
     })
@@ -235,6 +251,7 @@ const updateProviderSettings = async (
       target: [schema.providerImportSettings.libraryId, schema.providerImportSettings.provider],
       set: {
         defaultFolderId: input.defaultFolderId,
+        defaultTagIds,
         updatedAt: sql`now()`,
       },
     })
@@ -609,7 +626,10 @@ const importGitHubRepository = async (
 
     if (!savedItemId) {
       const settings = await tx
-        .select({ defaultFolderId: schema.providerImportSettings.defaultFolderId })
+        .select({
+          defaultFolderId: schema.providerImportSettings.defaultFolderId,
+          defaultTagIds: schema.providerImportSettings.defaultTagIds,
+        })
         .from(schema.providerImportSettings)
         .where(
           and(
@@ -639,6 +659,7 @@ const importGitHubRepository = async (
       }
 
       savedItemId = savedItem.id;
+      await applyTagIds(tx, account.libraryId, savedItemId, settings[0]?.defaultTagIds ?? []);
       created = true;
     }
 
@@ -687,6 +708,30 @@ const importGitHubRepository = async (
 
     return { created, savedItemId };
   });
+
+const applyTagIds = async (
+  db: Database,
+  libraryId: string,
+  savedItemId: string,
+  tagIds: string[],
+) => {
+  const uniqueTagIds = [...new Set(tagIds)];
+  if (uniqueTagIds.length === 0) {
+    return;
+  }
+
+  const tags = await db
+    .select({ id: schema.tags.id })
+    .from(schema.tags)
+    .where(and(inArray(schema.tags.id, uniqueTagIds), eq(schema.tags.libraryId, libraryId)));
+
+  for (const tag of tags) {
+    await db
+      .insert(schema.savedItemTags)
+      .values({ libraryId, savedItemId, tagId: tag.id })
+      .onConflictDoNothing();
+  }
+};
 
 const applySystemLabel = async (
   db: Database,
@@ -746,18 +791,7 @@ const applyImportRules = async (
     }
 
     if (rule.actionType === "add_tag") {
-      const [tag] = await db
-        .select({ id: schema.tags.id })
-        .from(schema.tags)
-        .where(and(eq(schema.tags.id, rule.actionTargetId), eq(schema.tags.libraryId, libraryId)))
-        .limit(1);
-
-      if (tag) {
-        await db
-          .insert(schema.savedItemTags)
-          .values({ libraryId, savedItemId, tagId: tag.id })
-          .onConflictDoNothing();
-      }
+      await applyTagIds(db, libraryId, savedItemId, [rule.actionTargetId]);
     } else if (rule.actionType === "move_to_folder") {
       if (rule.actionTargetId === "inbox") {
         destinationFolderId = null;
@@ -1001,6 +1035,7 @@ const serializeProviderSettings = (
 ): ProviderImportSettingsItem => ({
   createdAt: row.createdAt.toISOString(),
   defaultFolderId: row.defaultFolderId,
+  defaultTagIds: row.defaultTagIds,
   id: row.id,
   libraryId: row.libraryId,
   provider: row.provider,
